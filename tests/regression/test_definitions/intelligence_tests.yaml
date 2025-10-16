@@ -1,0 +1,288 @@
+# WhisperEngine Intelligence System Test Definitions
+# Tests advanced intelligence: episodic memory, emotional patterns, preferences, etc.
+#
+# Intelligence Test Structure:
+#   - test_id: unique identifier
+#   - test_name: human-readable name
+#   - bot_name: character to test
+#   - system_type: intelligence system being tested
+#   - category: test category
+#   - setup_sequence: messages to setup the intelligence
+#   - validation_query: query to test intelligence
+#   - expected_indicators: patterns proving intelligence works
+#   - min_expected_matches: minimum patterns required (default: 1)
+
+# ==================== EPISODIC MEMORY INTELLIGENCE ====================
+
+- test_id: elena_episodic_emotional_peak
+  test_name: "Episodic: Emotional Peak Memory"
+  bot_name: elena
+  system_type: episodic_memory
+  category: Memorable Moments
+  setup_sequence:
+    - "I just witnessed the most incredible thing - a whale breach right next to my boat! I was sobbing with joy!"
+    - "Tell me about marine mammals"
+  validation_query: "Do you remember any particularly emotional moments we've shared?"
+  expected_indicators:
+    - "whale|breach|boat"
+    - "joy|incredible|emotional|sob"
+    - "moment|memory|experience"
+  min_expected_matches: 2
+
+- test_id: marcus_episodic_technical_insight
+  test_name: "Episodic: Technical Discussion Memory"
+  bot_name: marcus
+  system_type: episodic_memory
+  category: Memorable Moments
+  setup_sequence:
+    - "I finally got my attention mechanism working with multi-head cross-attention!"
+    - "What's your research focus?"
+  validation_query: "What technical achievements have I mentioned?"
+  expected_indicators:
+    - "attention|multi-head|cross-attention"
+    - "working|achievement|success"
+  min_expected_matches: 1
+
+- test_id: gabriel_episodic_personal_sharing
+  test_name: "Episodic: Personal Story Memory"
+  bot_name: gabriel
+  system_type: episodic_memory
+  category: Memorable Moments
+  setup_sequence:
+    - "My grandmother just passed away. She taught me everything about British literature."
+    - "Tell me about yourself"
+  validation_query: "Have I shared anything personal with you?"
+  expected_indicators:
+    - "grandmother|passed|loss"
+    - "literature|taught"
+    - "personal|shared|told"
+  min_expected_matches: 2
+
+# ==================== EMOTIONAL INTELLIGENCE ====================
+
+- test_id: elena_emotional_pattern_anxiety
+  test_name: "Emotional: Anxiety Pattern Recognition"
+  bot_name: elena
+  system_type: emotional_intelligence
+  category: Emotional Patterns
+  setup_sequence:
+    - "I'm really stressed about my PhD defense next week"
+    - "I can't sleep thinking about the questions they might ask"
+    - "What if I fail?"
+  validation_query: "How am I feeling about my PhD defense?"
+  expected_indicators:
+    - "stress|anxious|anxiety|worry|worried"
+    - "defense|PhD|questions"
+    - "sleep|can't sleep|thinking"
+  min_expected_matches: 2
+
+- test_id: marcus_emotional_enthusiasm
+  test_name: "Emotional: Enthusiasm Pattern Recognition"
+  bot_name: marcus
+  system_type: emotional_intelligence
+  category: Emotional Patterns
+  setup_sequence:
+    - "I'm so excited about transformer architectures!"
+    - "The self-attention mechanism is absolutely brilliant!"
+    - "I could talk about this all day!"
+  validation_query: "What topics am I passionate about?"
+  expected_indicators:
+    - "excited|passion|enthusias"
+    - "transformer|self-attention|architect"
+    - "brilliant|love|talk all day"
+  min_expected_matches: 2
+
+# ==================== USER PREFERENCES ====================
+
+- test_id: elena_preference_name
+  test_name: "Preferences: Preferred Name Storage"
+  bot_name: elena
+  system_type: user_preferences
+  category: Preference Management
+  setup_sequence:
+    - "Please call me Alex from now on"
+    - "Tell me about coral reefs"
+  validation_query: "What's my name?"
+  expected_indicators:
+    - "Alex"
+  min_expected_matches: 1
+
+- test_id: marcus_preference_communication
+  test_name: "Preferences: Communication Style"
+  bot_name: marcus
+  system_type: user_preferences
+  category: Preference Management
+  setup_sequence:
+    - "I prefer technical explanations with lots of details"
+    - "Explain transformers to me"
+  validation_query: "How do I like information presented?"
+  expected_indicators:
+    - "technical|detail|detailed"
+    - "prefer|like|style"
+  min_expected_matches: 1
+
+# ==================== CONVERSATION INTELLIGENCE ====================
+
+- test_id: elena_conversation_topic_shift
+  test_name: "Conversation: Topic Shift Detection"
+  bot_name: elena
+  system_type: conversation_intelligence
+  category: Conversation Dynamics
+  setup_sequence:
+    - "Tell me about ocean acidification"
+    - "Actually, can we talk about sea turtles instead?"
+    - "What's your favorite sea turtle species?"
+  validation_query: "What topics have we discussed?"
+  expected_indicators:
+    - "ocean acidification|acidification"
+    - "sea turtle|turtle"
+    - "topic|shift|chang|switch"
+  min_expected_matches: 2
+
+- test_id: marcus_conversation_depth
+  test_name: "Conversation: Discussion Depth Tracking"
+  bot_name: marcus
+  system_type: conversation_intelligence
+  category: Conversation Dynamics
+  setup_sequence:
+    - "What's a neural network?"
+    - "How do layers work?"
+    - "What about backpropagation?"
+    - "Can you explain gradient descent?"
+  validation_query: "How deep have we gone into neural networks?"
+  expected_indicators:
+    - "layer|backprop|gradient|descent"
+    - "deep|detail|progress|building"
+    - "neural network|network"
+  min_expected_matches: 2
+
+# ==================== TEMPORAL AWARENESS ====================
+
+- test_id: elena_temporal_frequency
+  test_name: "Temporal: Question Frequency Awareness"
+  bot_name: elena
+  system_type: temporal_awareness
+  category: Temporal Patterns
+  setup_sequence:
+    - "Tell me about dolphins"
+    - "What do dolphins eat?"
+    - "How do dolphins communicate?"
+    - "Where do dolphins live?"
+  validation_query: "Have I been asking about a specific topic repeatedly?"
+  expected_indicators:
+    - "dolphin"
+    - "multiple|several|many|repeated|four|4"
+    - "question|ask|topic"
+  min_expected_matches: 2
+
+- test_id: jake_temporal_session_awareness
+  test_name: "Temporal: Session Continuity"
+  bot_name: jake
+  system_type: temporal_awareness
+  category: Temporal Patterns
+  setup_sequence:
+    - "Good morning! Ready for our conversation?"
+    - "Tell me about wilderness photography"
+  validation_query: "When did we start talking today?"
+  expected_indicators:
+    - "morning|started|began|session|conversation"
+    - "today|earlier|recent"
+  min_expected_matches: 1
+
+# ==================== CHARACTER SELF-KNOWLEDGE ====================
+
+- test_id: elena_self_knowledge_teaching_style
+  test_name: "Self-Knowledge: Teaching Style Awareness"
+  bot_name: elena
+  system_type: character_self_knowledge
+  category: Character Insights
+  setup_sequence:
+    - "You explain things so clearly!"
+    - "I love how enthusiastic you are about marine biology"
+    - "Your analogies really help me understand"
+  validation_query: "How would you describe your teaching style?"
+  expected_indicators:
+    - "clear|explain|analogy|analogies"
+    - "enthusias|passion|love"
+    - "teach|help|understand"
+  min_expected_matches: 2
+
+- test_id: marcus_self_knowledge_research_approach
+  test_name: "Self-Knowledge: Research Approach Awareness"
+  bot_name: marcus
+  system_type: character_self_knowledge
+  category: Character Insights
+  setup_sequence:
+    - "You're very methodical in your explanations"
+    - "I appreciate how you build concepts step by step"
+    - "Your technical precision is impressive"
+  validation_query: "How would you describe your approach to explaining AI?"
+  expected_indicators:
+    - "methodical|systematic|step|structured"
+    - "precision|precise|technical|accurate"
+    - "build|foundation|concept"
+  min_expected_matches: 2
+
+# ==================== KNOWLEDGE INTEGRATION ====================
+
+- test_id: elena_knowledge_integration_marine
+  test_name: "Knowledge: Marine Science Integration"
+  bot_name: elena
+  system_type: knowledge_integration
+  category: Knowledge Synthesis
+  setup_sequence:
+    - "Tell me about coral reefs"
+    - "What about ocean acidification?"
+    - "How does temperature affect marine life?"
+  validation_query: "How are all these topics connected?"
+  expected_indicators:
+    - "coral|acidification|temperature"
+    - "connect|related|link|affect"
+    - "marine|ocean|ecosystem"
+  min_expected_matches: 2
+
+- test_id: marcus_knowledge_integration_ai
+  test_name: "Knowledge: AI Concepts Integration"
+  bot_name: marcus
+  system_type: knowledge_integration
+  category: Knowledge Synthesis
+  setup_sequence:
+    - "Explain neural networks"
+    - "What about transformers?"
+    - "How does attention mechanism work?"
+  validation_query: "How do these AI concepts relate to each other?"
+  expected_indicators:
+    - "neural|transformer|attention"
+    - "connect|build|foundation|evolution"
+    - "concept|architecture|mechanism"
+  min_expected_matches: 2
+
+# ==================== CONTEXT AWARENESS ====================
+
+- test_id: elena_context_location
+  test_name: "Context: Location-Based Awareness"
+  bot_name: elena
+  system_type: context_awareness
+  category: Contextual Intelligence
+  setup_sequence:
+    - "I live in San Diego near the coast"
+    - "What marine life can I see here?"
+  validation_query: "What do you know about my location?"
+  expected_indicators:
+    - "San Diego|coast|location"
+    - "marine|ocean|Pacific"
+  min_expected_matches: 1
+
+- test_id: marcus_context_expertise
+  test_name: "Context: Expertise Level Awareness"
+  bot_name: marcus
+  system_type: context_awareness
+  category: Contextual Intelligence
+  setup_sequence:
+    - "I'm a beginner in machine learning"
+    - "Can you explain neural networks?"
+  validation_query: "What's my experience level with AI?"
+  expected_indicators:
+    - "beginner|new|start|learning"
+    - "machine learning|AI|neural network"
+  min_expected_matches: 1
