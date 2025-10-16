@@ -496,6 +496,169 @@ class VectorEmojiIntelligence:
                 "emoji_comfort_level": 0.5
             }
     
+    async def _get_user_emoji_preferences(self, user_id: str) -> Dict[str, Any]:
+        """
+        🎯 PERSONALIZATION: Retrieve user's emoji preferences from history.
+        
+        Priority 5 Enhancement: User-personalized character emoji sets
+        
+        Queries memory system and personality analysis to build a comprehensive
+        emoji preference profile including:
+        - Positive reactions (emojis user has reacted positively to)
+        - Negative reactions (emojis user disliked)
+        - Emoji comfort level (0.0=minimal, 1.0=loves emojis)
+        - Successful emojis (historically effective)
+        
+        Returns:
+            Dict with keys:
+            - 'positive_reactions': List[str] - Emojis user liked
+            - 'negative_reactions': List[str] - Emojis user disliked
+            - 'emoji_comfort_level': float - 0.0 to 1.0
+            - 'successful_emojis': List[str] - Historically effective emojis
+        """
+        try:
+            preferences = {
+                "positive_reactions": [],
+                "negative_reactions": [],
+                "emoji_comfort_level": 0.5,  # Default moderate
+                "successful_emojis": []
+            }
+            
+            # Get emoji comfort level from personality analysis
+            personality_context = await self._analyze_user_personality_context(user_id)
+            preferences["emoji_comfort_level"] = personality_context.get("emoji_comfort_level", 0.5)
+            
+            # Query memory system for emoji reaction history
+            # Look for stored emoji reactions (stored with [EMOJI_REACTION] prefix)
+            emoji_reaction_memories = await self.memory_manager.retrieve_relevant_memories(
+                user_id=user_id,
+                query="[EMOJI_REACTION] [EMOTIONAL_FEEDBACK]",
+                limit=50  # Get last 50 emoji reactions
+            )
+            
+            # Analyze emoji reactions to build preference profile
+            positive_emojis = []
+            negative_emojis = []
+            successful_emojis = []
+            
+            for memory in emoji_reaction_memories:
+                metadata = memory.get("metadata", {})
+                
+                # Check if this was an emoji reaction
+                if metadata.get("interaction_type") == "emoji_reaction":
+                    emoji = metadata.get("emoji", "")
+                    reaction_type = metadata.get("emotion_type", "")
+                    confidence = metadata.get("confidence_score", 0.5)
+                    
+                    # High confidence positive reactions
+                    if confidence > 0.7 and reaction_type in ["positive", "love", "joy", "excitement"]:
+                        if emoji and emoji not in positive_emojis:
+                            positive_emojis.append(emoji)
+                            successful_emojis.append(emoji)
+                    
+                    # High confidence negative reactions
+                    elif confidence > 0.7 and reaction_type in ["negative", "dislike", "anger", "frustration"]:
+                        if emoji and emoji not in negative_emojis:
+                            negative_emojis.append(emoji)
+            
+            preferences["positive_reactions"] = positive_emojis
+            preferences["negative_reactions"] = negative_emojis
+            preferences["successful_emojis"] = successful_emojis
+            
+            logger.debug(f"🎯 User {user_id} emoji preferences: comfort={preferences['emoji_comfort_level']:.2f}, "
+                        f"positive={len(positive_emojis)}, negative={len(negative_emojis)}")
+            
+            return preferences
+            
+        except Exception as e:
+            logger.error(f"Error retrieving user emoji preferences: {e}")
+            return {
+                "positive_reactions": [],
+                "negative_reactions": [],
+                "emoji_comfort_level": 0.5,
+                "successful_emojis": []
+            }
+    
+    async def _get_personalized_character_emojis(
+        self,
+        user_id: str,
+        bot_character: str,
+        emotion_category: str
+    ) -> List[str]:
+        """
+        🎨 PERSONALIZATION: Select character emojis based on user history.
+        
+        Priority 5 Enhancement: Character emoji sets become personalized
+        
+        Instead of using static character emoji sets, this dynamically adjusts
+        the emoji selection based on:
+        1. User's past emoji reactions (prioritize ones they liked)
+        2. Emoji comfort level (simple vs elaborate)
+        3. Historical success patterns
+        
+        Args:
+            user_id: User identifier
+            bot_character: Character archetype (mystical, technical, general)
+            emotion_category: Category of emotion (wonder, positive, acknowledgment, playful, negative)
+        
+        Returns:
+            List[str] of personalized emojis filtered and prioritized for this user
+        """
+        try:
+            # Get base character emoji set
+            character_emojis = self.character_emoji_sets.get(
+                bot_character, 
+                self.character_emoji_sets["general"]
+            )
+            
+            # Get emojis for this emotion category
+            base_emojis = character_emojis.get(emotion_category, character_emojis.get("positive", ["😊"]))
+            
+            if not base_emojis:
+                logger.warning(f"No emojis found for character={bot_character}, category={emotion_category}")
+                return ["😊"]  # Fallback to smile
+            
+            # Retrieve user's emoji preferences
+            emoji_preferences = await self._get_user_emoji_preferences(user_id)
+            
+            # Strategy 1: Filter for user-preferred emojis (if they have history)
+            positive_reactions = emoji_preferences.get("positive_reactions", [])
+            if positive_reactions:
+                # Prioritize emojis the user has reacted positively to
+                preferred_emojis = [emoji for emoji in base_emojis if emoji in positive_reactions]
+                if preferred_emojis:
+                    logger.debug(f"🎨 Using user-preferred emojis: {preferred_emojis}")
+                    return preferred_emojis
+            
+            # Strategy 2: Adjust for emoji comfort level (if no explicit preferences)
+            emoji_comfort = emoji_preferences.get("emoji_comfort_level", 0.5)
+            
+            if emoji_comfort < 0.3:
+                # User prefers minimal emojis - use first 2 (usually simplest)
+                result = base_emojis[:2]
+                logger.debug(f"🎨 Low emoji comfort ({emoji_comfort:.2f}): using {result}")
+                return result
+            
+            elif emoji_comfort > 0.7:
+                # User loves emojis - use full set
+                logger.debug(f"🎨 High emoji comfort ({emoji_comfort:.2f}): using full set ({len(base_emojis)} emojis)")
+                return base_emojis
+            
+            else:
+                # Moderate comfort - use 3 emojis
+                result = base_emojis[:3]
+                logger.debug(f"🎨 Moderate emoji comfort ({emoji_comfort:.2f}): using {result}")
+                return result
+            
+        except Exception as e:
+            logger.error(f"Error getting personalized character emojis: {e}")
+            # Fallback to base character emojis
+            character_emojis = self.character_emoji_sets.get(
+                bot_character, 
+                self.character_emoji_sets["general"]
+            )
+            return character_emojis.get(emotion_category, ["😊"])
+    
     def _analyze_message_formality(self, content: str) -> float:
         """Analyze formality level of a message (0=casual, 1=formal)"""
         content_lower = content.lower()
@@ -998,8 +1161,8 @@ class VectorEmojiIntelligence:
         context_reason = EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
         if should_use_emoji:
-            emoji_choice, context_reason = self._select_enhanced_optimal_emoji(
-                user_message, bot_character, conversation_patterns, 
+            emoji_choice, context_reason = await self._select_enhanced_optimal_emoji(
+                user_id, user_message, bot_character, conversation_patterns, 
                 emotional_state, personality_context, communication_style
             )
         
@@ -1208,8 +1371,9 @@ class VectorEmojiIntelligence:
         )
         return None
     
-    def _select_enhanced_optimal_emoji(
-        self, 
+    async def _select_enhanced_optimal_emoji(
+        self,
+        user_id: str,
         user_message: str, 
         bot_character: str,
         conversation_patterns: ConversationPattern,
@@ -1247,8 +1411,13 @@ class VectorEmojiIntelligence:
         # Priority 1: User's historical preferences (if established relationship)
         if conversation_patterns.preferred_emojis and len(conversation_patterns.similar_conversations) > 10:
             preferred_emoji = conversation_patterns.preferred_emojis[0][0]
-            character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
-            all_character_emojis = [emoji for emoji_list in character_emojis.values() for emoji in emoji_list]
+            # 🎨 PRIORITY 5: Use personalized character emoji sets
+            character_emojis_list = await self._get_personalized_character_emojis(
+                user_id=user_id,
+                bot_character=bot_character,
+                emotion_category="positive"  # Get positive emojis for fallback
+            )
+            all_character_emojis = character_emojis_list
             
             # Filter out inappropriate emojis if user in distress
             if user_in_distress and self._is_celebratory_emoji(preferred_emoji):
@@ -1291,13 +1460,17 @@ class VectorEmojiIntelligence:
             if taxonomy_emoji and not self._is_celebratory_emoji(taxonomy_emoji):
                 return taxonomy_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
             
-            # Fallback to existing logic if taxonomy doesn't have mapping
-            character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
-            
+            # 🎨 PRIORITY 5: Use personalized character emojis for fallback
             if current_emotion in ["joy", "excitement", "wonder"]:
-                return character_emojis["wonder"][0], EmojiResponseContext.EMOTIONAL_OVERWHELM
+                personalized_emojis = await self._get_personalized_character_emojis(
+                    user_id=user_id, bot_character=bot_character, emotion_category="wonder"
+                )
+                return personalized_emojis[0] if personalized_emojis else "✨", EmojiResponseContext.EMOTIONAL_OVERWHELM
             elif current_emotion in ["gratitude"]:
-                return character_emojis["acknowledgment"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
+                personalized_emojis = await self._get_personalized_character_emojis(
+                    user_id=user_id, bot_character=bot_character, emotion_category="acknowledgment"
+                )
+                return personalized_emojis[0] if personalized_emojis else "🙏", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
         # Priority 4: Trajectory-aware context selection (replaces keyword matching)
         # Use emotional trajectory data instead of hard-coded keywords
@@ -1331,19 +1504,32 @@ class VectorEmojiIntelligence:
             )
             return empathy_emoji, EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
+        # 🎨 PRIORITY 5: Use personalized character emojis for character-specific contexts
         # Technical appreciation for technical characters (NOT in distress)
         if bot_character == "technical" and any(word in message_lower for word in ["code", "algorithm", "system", "data", "tech"]):
-            return character_emojis["positive"][0], EmojiResponseContext.TECHNICAL_APPRECIATION
+            personalized_emojis = await self._get_personalized_character_emojis(
+                user_id=user_id, bot_character=bot_character, emotion_category="positive"
+            )
+            return personalized_emojis[0] if personalized_emojis else "💡", EmojiResponseContext.TECHNICAL_APPRECIATION
         
         # Mystical wonder for mystical characters (NOT in distress)
         if bot_character == "mystical" and any(word in message_lower for word in ["magic", "energy", "spiritual", "mystical", "dream"]):
-            return character_emojis["wonder"][0], EmojiResponseContext.MYSTICAL_WONDER
+            personalized_emojis = await self._get_personalized_character_emojis(
+                user_id=user_id, bot_character=bot_character, emotion_category="wonder"
+            )
+            return personalized_emojis[0] if personalized_emojis else "🔮", EmojiResponseContext.MYSTICAL_WONDER
         
         # Default based on communication style preference (NOT in distress)
         if communication_style.get("prefers_brief_responses", False):
-            return character_emojis["acknowledgment"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
+            personalized_emojis = await self._get_personalized_character_emojis(
+                user_id=user_id, bot_character=bot_character, emotion_category="acknowledgment"
+            )
+            return personalized_emojis[0] if personalized_emojis else "👍", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         else:
-            return character_emojis["positive"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
+            personalized_emojis = await self._get_personalized_character_emojis(
+                user_id=user_id, bot_character=bot_character, emotion_category="positive"
+            )
+            return personalized_emojis[0] if personalized_emojis else "😊", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
 
     async def _analyze_emotional_appropriateness(
         self,
