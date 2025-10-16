@@ -146,37 +146,71 @@ async def run_migrations():
             );
         """)
         
-        # Check if this is a legacy v1.0.6 database (has tables but no Alembic tracking)
-        # Legacy databases have the full schema but were created before Alembic was introduced
-        if table_count > 50 and not alembic_version_exists:
-            print("🔍 Detected legacy v1.0.6 database (pre-Alembic) - auto-stamping...")
-            print("ℹ️  This database has the full schema but needs Alembic tracking enabled")
+        # Check if this is a database with existing schema but no Alembic tracking
+        # This could be:
+        # 1. TRUE legacy v1.0.6 database (minimal tables, old schema)
+        # 2. Database from 00_init.sql dump (many tables but potentially outdated)
+        if table_count > 0 and not alembic_version_exists:
+            print("🔍 Detected database with existing schema but no Alembic tracking...")
             
             database_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
             env = os.environ.copy()
             env['DATABASE_URL'] = database_url
             
+            # Check if this database has emoji columns (added in recent migrations)
+            emoji_columns_exist = await conn.fetchval("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'characters' 
+                AND column_name LIKE 'emoji%'
+            """)
+            
+            if table_count < 30:
+                print(f"ℹ️  Small database ({table_count} tables) - likely true legacy v1.0.6")
+                print("🏷️  Stamping as fully up-to-date (v1.0.6 had full schema for its time)...")
+                stamp_revision = "head"
+            elif emoji_columns_exist > 0:
+                print(f"ℹ️  Large database ({table_count} tables) with recent changes (emoji columns found)")
+                print("🏷️  Stamping as fully up-to-date...")
+                stamp_revision = "head"
+            else:
+                print(f"ℹ️  Large database ({table_count} tables) but missing recent changes (no emoji columns)")
+                print("ℹ️  This appears to be from an older 00_init.sql dump")
+                print("🏷️  Stamping with baseline revision and will apply incremental updates...")
+                # This matches the revision that 00_init.sql was generated from
+                stamp_revision = "20251011_baseline_v106"
+            
             try:
-                # Stamp the database as being at the current HEAD revision
-                # This allows future migrations to apply incrementally
+                # Stamp the database with appropriate revision
                 result = subprocess.run([
-                    'alembic', 'stamp', 'head'
+                    'alembic', 'stamp', stamp_revision
                 ], cwd='/app', env=env, capture_output=True, text=True)
                 
                 if result.returncode == 0:
-                    print("✅ Legacy database stamped with current Alembic revision!")
-                    print("ℹ️  Future updates will now apply migrations automatically")
-                    print("🎉 All migrations complete!")
-                    return 0
+                    print(f"✅ Database stamped with Alembic revision: {stamp_revision}")
+                    
+                    # Now run any migrations that need to be applied
+                    print("🔄 Running any pending migrations...")
+                    upgrade_result = subprocess.run([
+                        'alembic', 'upgrade', 'head'
+                    ], cwd='/app', env=env, capture_output=True, text=True)
+                    
+                    if upgrade_result.returncode == 0:
+                        print("✅ All Alembic migrations completed successfully!")
+                        print("🎉 Database is now fully up-to-date!")
+                        return 0
+                    else:
+                        print(f"❌ Migration upgrade failed: {upgrade_result.stderr}")
+                        print(f"STDOUT: {upgrade_result.stdout}")
+                        return 1
                 else:
-                    print(f"⚠️  Failed to stamp legacy database: {result.stderr}")
-                    print(f"⚠️  You may need to manually run: docker exec <container> alembic stamp head")
+                    print(f"⚠️  Failed to stamp database: {result.stderr}")
+                    print(f"⚠️  You may need to manually run: docker exec <container> alembic stamp {stamp_revision}")
                     print("⚠️  Continuing anyway to allow container startup...")
                     return 0  # Don't fail - allow container to start
                     
             except Exception as e:
-                print(f"⚠️  Exception while stamping legacy database: {e}")
-                print(f"⚠️  You may need to manually run: docker exec <container> alembic stamp head")
+                print(f"⚠️  Exception while processing database: {e}")
                 print("⚠️  Continuing anyway to allow container startup...")
                 return 0  # Don't fail - allow container to start
         
