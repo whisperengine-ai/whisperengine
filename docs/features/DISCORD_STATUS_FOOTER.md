@@ -3,13 +3,15 @@
 ## 🎯 Overview
 
 The Discord Status Footer provides optional real-time intelligence status information at the end of bot messages, giving users transparency into:
-- 🎯 **Learning Moments**: Character intelligence insights (facts learned, relationship observations)
+- 🎯 **Learning Moments**: Character intelligence insights (facts learned, relationship observations) - **Deduplicated**
 - 🧠 **Memory Context**: How many relevant memories inform the response
-- 💖 **Relationship Status**: Trust, affection, and attunement levels
-- 🔥 **Bot Emotional State**: Bot's emotional response to the conversation
-- 💬 **User Emotional State**: User's detected emotion from RoBERTa analysis
-- 📈 **Emotional Trajectory**: Bot's emotional state trend over time
+- 💖 **Relationship Status**: Trust, affection, and attunement levels - **Real dynamic scores from database**
+- 🔥 **Bot Emotional State**: Bot's emotional response to the conversation - **With mixed emotion support**
+- 💬 **User Emotional State**: User's detected emotion from RoBERTa analysis - **With mixed emotion support**
+- 📈 **Emotional Trajectory**: Bot's emotional state trend over time (historical)
 - ⚡ **Processing Metrics**: Response generation time
+- 🎯 **Workflow Detection**: Active workflows (when triggered)
+- 💬 **Conversation Modes**: Detected interaction types (assistance requests, etc.)
 
 ## 🚨 Critical Design Constraints
 
@@ -35,9 +37,11 @@ Shows detected learning moments from `character_learning_moments` AI component:
 - **💖 Emotion**: Emotional growth insights
 - **🤝 Bond**: Relationship awareness
 
+**Deduplication**: Only shows unique learning moment types (no duplicates like "💡Connection, 💡Connection")
+
 **Example:**
 ```
-🎯 **Learning**: 🌱Growth, 👁️Insight, 💡Connection
+🎯 **Learning**: �Learning, 💡Connection
 ```
 
 ### 2. 🧠 Memory Context
@@ -59,20 +63,37 @@ Shows current relationship level and metrics (0-100 scale):
 - 💙 **Close Friend** - Trust: 88, Affection: 85, Attunement: 90
 - 💖 **Best Friend** - Trust: 95, Affection: 95, Attunement: 98
 
-**Example:**
+**Dynamic Scores**: Uses real-time relationship data from `relationship_state` AI component when available (0.0-1.0 scale converted to 0-100). Falls back to approximate mapping if database scores unavailable.
+
+**Interaction Count**: Shows total interactions with user when dynamic scores are available.
+
+**Example (with real scores):**
+```
+👋 **Relationship**: Acquaintance (Trust: 42, Affection: 38, Attunement: 51) [15 interactions]
+```
+
+**Example (fallback):**
 ```
 😊 **Relationship**: Friend (Trust: 70, Affection: 65, Attunement: 75)
 ```
 
 ### 4. 🔥 Bot Emotional State
 Shows the bot's emotional response from RoBERTa emotion analysis:
-- Emotion label (joy, sadness, curiosity, etc.)
+- Emotion label (joy, sadness, curiosity, anticipation, etc.)
 - Confidence percentage
 - Appropriate emoji indicator
+- **Mixed emotions**: Shows secondary emotion if ≥30% confidence
 
-**Example:**
+**Field Names**: Supports both `primary_emotion`/`confidence` (current) and `emotion`/`roberta_confidence` (legacy)
+
+**Example (single emotion):**
 ```
 😊 **Bot Emotion**: Joy (87%)
+```
+
+**Example (mixed emotions):**
+```
+😊 **Bot Emotion**: Joy (60%) + 😔 Sadness (40%)
 ```
 
 ### 5. 💬 User Emotional State
@@ -80,32 +101,43 @@ Shows the user's detected emotion from RoBERTa analysis:
 - Primary emotion detected in user's message
 - Intensity percentage (how strongly the emotion is expressed)
 - Appropriate emoji indicator
+- **Mixed emotions**: Shows secondary emotion if ≥30% intensity
 
-**Example:**
+**Field Names**: Uses `intensity` field primarily, falls back to `confidence` if unavailable
+
+**Example (single emotion):**
 ```
 🤔 **User Emotion**: Curiosity (82%)
+```
+
+**Example (mixed emotions):**
+```
+😊 **User Emotion**: Joy (50%) + 😔 Sadness (35%)
 ```
 
 **Supported Emotions:**
 - Joy, Sadness, Anger, Fear, Surprise, Disgust, Neutral
 - Love, Admiration, Curiosity, Excitement, Gratitude
-- Pride, Relief, Amusement
+- Pride, Relief, Amusement, Anticipation, Optimism
+- Disappointment, Nervousness
 
 ### 6. 📈 Emotional Trajectory
-Shows the bot's emotional state trend over conversation history:
-- **Trajectory direction** (improving, stable, declining, volatile, positive, negative)
-- **Current emotion** baseline
+Shows the bot's **historical** emotional state trend over conversation history:
+- **Trajectory direction** (intensifying, calming, stable)
+- **Current emotion** baseline from previous responses
 - Helps track emotional connection development
+
+**Important**: This shows the bot's **previous emotional state evolution**, not the current response emotion (which is shown in Bot Emotion section).
 
 **Example:**
 ```
-📈 **Emotional Trajectory**: Improving (Joy)
+📈 **Emotional Trajectory**: Intensifying (Joy)
 ```
 
 **Trajectory Types:**
-- 📈 **Improving** - Bot emotions getting more positive
+- 📈 **Intensifying** - Bot emotions getting stronger/more intense
 - ➡️ **Stable** - Consistent emotional baseline
-- 📉 **Declining** - Bot emotions getting more negative  
+- 📉 **Calming** - Bot emotions getting less intense
 - 📊 **Volatile** - Rapidly changing emotions
 - ✨ **Positive** - Overall positive emotional state
 - ⚠️ **Negative** - Overall negative emotional state
@@ -118,11 +150,51 @@ Shows total message processing time in milliseconds:
 ⚡ **Processed**: 1,234ms
 ```
 
-## 📝 Example Full Footer
+### 8. 🎯 Workflow Detection
+Shows active workflows when triggered (rare, character-specific):
+
+**Example:**
+```
+🎯 **Workflow**: **Payment Processing** | Action: validate_transaction | ID: abc12345
+```
+
+### 9. � Conversation Modes & Interaction Types
+Shows detected conversation modes and interaction types when non-standard:
+
+**Conversation Modes** (only shown if not "standard"):
+- 🧠 Deep Conversation
+- 💬 Casual Chat
+- 💖 Emotional Support
+- 📚 Educational
+- 🎉 Playful
+- 🎯 Serious
+- 🆘 Crisis
+- 📖 Storytelling
+
+**Interaction Types** (only shown if not "general"):
+- Assistance Request
+- Question Answering
+- Creative Collaboration
+- Problem Solving
+- Social Interaction
+
+**Example:**
+```
+💬 **Interaction**: Assistance Request
+```
+
+## �📝 Example Full Footer
 
 ```
 ──────────────────────────────────────────────────
-🎯 **Learning**: 🌱Growth, 💡Connection • 🧠 **Memory**: 8 memories (established) • 😊 **Relationship**: Friend (Trust: 70, Affection: 65, Attunement: 75) • 😊 **Bot Emotion**: Joy (87%) • 🤔 **User Emotion**: Curiosity (82%) • 📈 **Emotional Trajectory**: Improving (Joy) • ⚡ **Processed**: 1,234ms
+🎯 **Learning**: 📚Learning, 💡Connection
+🧠 **Memory**: 10 memories (established)
+� **Relationship**: Acquaintance (Trust: 42, Affection: 38, Attunement: 51) [15 interactions]
+😊 **Bot Emotion**: Joy (100%)
+😊 **User Emotion**: Joy (55%)
+📈 **Emotional Trajectory**: Stable (Joy)
+⚡ **Processed**: 6052ms
+💬 **Interaction**: Assistance Request
 ──────────────────────────────────────────────────
 ```
 

@@ -16,27 +16,30 @@ echo "DISCORD_STATUS_FOOTER=true" >> .env.elena
 
 ```
 ──────────────────────────────────────────────────
-🎯 **Learning**: 🌱Growth, 💡Connection • 
-🧠 **Memory**: 8 memories (established) • 
-😊 **Relationship**: Friend (Trust: 70, Affection: 65, Attunement: 75) • 
-😊 **Bot Emotion**: Joy (87%) • 
-🤔 **User Emotion**: Curiosity (82%) • 
-📈 **Emotional Trajectory**: Improving (Joy) • 
-⚡ **Processed**: 1,234ms
+🎯 **Learning**: 📚Learning, 💡Connection
+🧠 **Memory**: 10 memories (established)
+� **Relationship**: Acquaintance (Trust: 42, Affection: 38, Attunement: 51) [15 interactions]
+😊 **Bot Emotion**: Joy (100%)
+😊 **User Emotion**: Joy (55%)
+📈 **Emotional Trajectory**: Stable (Joy)
+⚡ **Processed**: 6052ms
+💬 **Interaction**: Assistance Request
 ──────────────────────────────────────────────────
 ```
 
-## 🔥 Components Explained
+## 🔥 Components Explained (9 Total)
 
 | Component | What It Shows | Example |
 |-----------|---------------|---------|
-| 🎯 **Learning** | Character intelligence discoveries | `🌱Growth, 👁️Insight, 💡Connection` |
-| 🧠 **Memory** | Relevant memories retrieved | `8 memories (established)` |
-| 💖 **Relationship** | Trust/Affection/Attunement (0-100) | `Friend (Trust: 70, Affection: 65, Attunement: 75)` |
-| 😊 **Bot Emotion** | Bot's emotional response | `Joy (87%)` |
-| 🤔 **User Emotion** | Your detected emotion | `Curiosity (82%)` |
-| 📈 **Trajectory** | Emotional trend over time | `Improving (Joy)` |
-| ⚡ **Processed** | Response generation time | `1,234ms` |
+| 🎯 **Learning** | Character intelligence discoveries (deduplicated) | `�Learning, 💡Connection` |
+| 🧠 **Memory** | Relevant memories retrieved | `10 memories (established)` |
+| 💖 **Relationship** | Real dynamic scores + interaction count | `Acquaintance (Trust: 42, Affection: 38, Attunement: 51) [15 interactions]` |
+| 😊 **Bot Emotion** | Bot's emotional response (+ mixed if ≥30%) | `Joy (60%) + 😔 Sadness (40%)` |
+| 🤔 **User Emotion** | Your detected emotion (+ mixed if ≥30%) | `Joy (50%) + 😔 Sadness (35%)` |
+| 📈 **Trajectory** | Bot's historical emotional trend | `Intensifying (Joy)` |
+| ⚡ **Processed** | Response generation time | `6052ms` |
+| 🎯 **Workflow** | Active workflows (rare) | `**Payment** \| Action: validate` |
+| 💬 **Mode** | Conversation type/interaction | `Assistance Request` |
 
 ## 🚨 Critical Safety
 

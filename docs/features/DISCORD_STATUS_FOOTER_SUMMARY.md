@@ -2,43 +2,57 @@
 
 ## ✅ What Was Implemented
 
-A **comprehensive intelligence status footer** for Discord messages that provides real-time transparency into WhisperEngine's AI processing pipeline.
+A **comprehensive intelligence status footer** for Discord messages that provides real-time transparency into WhisperEngine's AI processing pipeline with **9 intelligence components**.
 
 ### 🎯 Core Features
 
-1. **🎯 Learning Moments** - Character intelligence discoveries
+1. **🎯 Learning Moments** - Character intelligence discoveries (deduplicated)
    - Growth insights, user observations, memory connections
    - Knowledge evolution, emotional growth, relationship awareness
-   - Shows top 3 learning moments with emoji indicators
+   - Shows up to 3 unique learning moment types with emoji indicators
+   - **Deduplication**: Prevents duplicate types like "💡Connection, 💡Connection"
 
 2. **🧠 Memory Context** - Semantic memory retrieval
    - Number of relevant memories retrieved
    - Context depth indicator (building/established/deep)
    - Vector memory system transparency
 
-3. **💖 Relationship Status** - Relationship intelligence metrics
+3. **💖 Relationship Status** - Real dynamic relationship metrics
    - Current relationship level (stranger → best friend)
-   - Trust, affection, and attunement scores (0-100)
-   - Relationship progression visibility
+   - **Real-time scores** from database (Trust, Affection, Attunement 0-100)
+   - **Interaction count** when dynamic scores available
+   - Fallback to approximate mapping if database unavailable
 
-4. **😊 Bot Emotional State** - Bot's emotional response
+4. **😊 Bot Emotional State** - Bot's emotional response with mixed emotions
    - RoBERTa-analyzed emotion with confidence %
-   - 15+ emotion types with appropriate emoji
-   - Shows bot's empathetic response to user
+   - **Mixed emotion support**: Shows secondary emotion if ≥30% confidence
+   - 19+ emotion types with appropriate emoji
+   - Field compatibility: `primary_emotion`/`confidence` + legacy support
 
-5. **🤔 User Emotional State** - User's detected emotion
+5. **🤔 User Emotional State** - User's detected emotion with mixed emotions
    - RoBERTa-analyzed primary emotion with intensity %
-   - Same 15+ emotion types as bot
-   - Demonstrates emotional intelligence awareness
+   - **Mixed emotion support**: Shows secondary emotion if ≥30% intensity
+   - Same 19+ emotion types as bot
+   - Field fallback: `intensity` → `confidence`
 
-6. **📈 Emotional Trajectory** - Emotional state trends
-   - Bot's emotional direction (improving/stable/declining)
-   - Current emotional baseline
+6. **📈 Emotional Trajectory** - Historical emotional state trends
+   - Bot's **previous** emotional direction (intensifying/calming/stable)
+   - Current emotional baseline from past responses
    - Tracks connection development over time
+   - Uses InfluxDB (primary) or Qdrant (fallback)
 
 7. **⚡ Processing Metrics** - System performance
    - Total processing time in milliseconds
    - Performance transparency
+
+8. **🎯 Workflow Detection** - Active workflow triggers (rare)
+   - Workflow name, action, transaction ID
+   - Character-specific workflows when active
+
+9. **💬 Conversation Modes** - Detected interaction types
+   - Shows non-standard conversation modes (deep_conversation, emotional_support, etc.)
+   - Shows interaction types (assistance_request, question_answering, etc.)
+   - Only displayed when detected (not for standard/general)
 
 ## 🚨 Critical Safeguards
 
@@ -63,20 +77,22 @@ A **comprehensive intelligence status footer** for Discord messages that provide
 ## 📁 Files Created/Modified
 
 ### Created Files
-1. **`src/utils/discord_status_footer.py`** (208 lines)
-   - `generate_discord_status_footer()` - Main footer generation
+1. **`src/utils/discord_status_footer.py`** (376 lines)
+   - `generate_discord_status_footer()` - Main footer generation with 9 components
    - `strip_footer_from_response()` - Memory safeguard
    - `is_footer_enabled()` - Environment check
+   - Mixed emotion support for bot and user
+   - Conversation mode/interaction type detection
 
 2. **`tests/automated/test_discord_status_footer.py`** (320 lines)
-   - 4 comprehensive test scenarios
+   - 9 comprehensive test scenarios
    - Footer generation validation
    - Footer stripping validation (CRITICAL)
    - Length limit validation
    - Memory storage safeguard validation
 
-3. **`docs/features/DISCORD_STATUS_FOOTER.md`** (500+ lines)
-   - Complete feature documentation
+3. **`docs/features/DISCORD_STATUS_FOOTER.md`** (600+ lines)
+   - Complete feature documentation with all 9 components
    - Configuration guide
    - Testing instructions
    - Architecture diagrams

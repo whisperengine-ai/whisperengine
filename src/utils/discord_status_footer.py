@@ -101,12 +101,19 @@ def generate_discord_status_footer(
     
     # 3. 💖 Relationship Status
     try:
+        logger.info("🔍 FOOTER: Starting relationship status section")
         # Try to get actual dynamic relationship scores first
         relationship_state = ai_components.get('relationship_state', {})
         conv_intelligence = ai_components.get('conversation_intelligence', {})
         
+        # DEBUG: Log what we found
+        logger.info("🔍 RELATIONSHIP DEBUG: relationship_state exists: %s", bool(relationship_state))
+        logger.info("🔍 RELATIONSHIP DEBUG: conv_intelligence exists: %s", bool(conv_intelligence))
+        logger.info("🔍 RELATIONSHIP DEBUG: conv_intelligence keys: %s", list(conv_intelligence.keys()) if conv_intelligence else [])
+        
         # Get relationship level for emoji and label
         relationship_level = conv_intelligence.get('relationship_level', 'acquaintance')
+        logger.info("🔍 RELATIONSHIP DEBUG: relationship_level: %s", relationship_level)
         
         # Map relationship level to emoji
         relationship_emoji = {
@@ -148,7 +155,7 @@ def generate_discord_status_footer(
                 f"(Trust: {scores['trust']}, Affection: {scores['affection']}, Attunement: {scores['attunement']})"
             )
     except (KeyError, TypeError, AttributeError) as e:
-        logger.debug("Could not extract relationship status for footer: %s", str(e))
+        logger.warning("Could not extract relationship status for footer: %s", str(e), exc_info=True)
     
     # 4. 🔥 Emotional State (Bot Emotion)
     try:
