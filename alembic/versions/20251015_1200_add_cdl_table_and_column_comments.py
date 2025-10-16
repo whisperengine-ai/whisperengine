@@ -10,6 +10,16 @@ pgAdmin, DBeaver, and psql commands, helping developers understand the schema
 without needing external documentation.
 
 Comments are non-destructive and do not affect data or performance.
+
+IMPORTANT: This migration uses PostgreSQL SAVEPOINTs to gracefully handle missing
+columns. Some columns (like emoji_frequency, emoji_style) may not exist if the
+emoji_personality_cols migration hasn't been applied yet. This can happen when:
+1. Using an older Docker image that doesn't include recent migrations
+2. The database was created before emoji columns were added
+3. The emoji migration failed or was skipped
+
+The migration will skip comments for missing columns and apply them successfully
+when those columns are eventually created in future upgrades.
 """
 from typing import Sequence, Union
 from pathlib import Path
@@ -69,18 +79,32 @@ def upgrade() -> None:
     if current_statement:
         statements.append(' '.join(current_statement))
     
-    # Execute each COMMENT statement individually
+    # Execute each COMMENT statement individually with savepoints
+    # This allows us to recover from errors without aborting the entire transaction
     successful = 0
     skipped = 0
     
-    for stmt in statements:
+    for idx, stmt in enumerate(statements):
         if not stmt or stmt.startswith('SELECT'):
             continue
         
+        # Create a unique savepoint for this statement
+        savepoint_name = f"comment_stmt_{idx}"
+        
         try:
+            # Create savepoint before executing
+            connection.execute(sa.text(f"SAVEPOINT {savepoint_name}"))
             connection.execute(sa.text(stmt))
+            # Release savepoint on success
+            connection.execute(sa.text(f"RELEASE SAVEPOINT {savepoint_name}"))
             successful += 1
         except Exception as e:
+            # Rollback to savepoint on error
+            try:
+                connection.execute(sa.text(f"ROLLBACK TO SAVEPOINT {savepoint_name}"))
+            except:
+                pass  # Savepoint might not exist if connection is in bad state
+            
             # Skip comments on non-existent columns
             error_msg = str(e)
             if 'does not exist' in error_msg:

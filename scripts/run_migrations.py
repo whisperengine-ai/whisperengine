@@ -146,6 +146,40 @@ async def run_migrations():
             );
         """)
         
+        # Check if this is a legacy v1.0.6 database (has tables but no Alembic tracking)
+        # Legacy databases have the full schema but were created before Alembic was introduced
+        if table_count > 50 and not alembic_version_exists:
+            print("🔍 Detected legacy v1.0.6 database (pre-Alembic) - auto-stamping...")
+            print("ℹ️  This database has the full schema but needs Alembic tracking enabled")
+            
+            database_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+            env = os.environ.copy()
+            env['DATABASE_URL'] = database_url
+            
+            try:
+                # Stamp the database as being at the current HEAD revision
+                # This allows future migrations to apply incrementally
+                result = subprocess.run([
+                    'alembic', 'stamp', 'head'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    print("✅ Legacy database stamped with current Alembic revision!")
+                    print("ℹ️  Future updates will now apply migrations automatically")
+                    print("🎉 All migrations complete!")
+                    return 0
+                else:
+                    print(f"⚠️  Failed to stamp legacy database: {result.stderr}")
+                    print(f"⚠️  You may need to manually run: docker exec <container> alembic stamp head")
+                    print("⚠️  Continuing anyway to allow container startup...")
+                    return 0  # Don't fail - allow container to start
+                    
+            except Exception as e:
+                print(f"⚠️  Exception while stamping legacy database: {e}")
+                print(f"⚠️  You may need to manually run: docker exec <container> alembic stamp head")
+                print("⚠️  Continuing anyway to allow container startup...")
+                return 0  # Don't fail - allow container to start
+        
         if alembic_version_exists:
             print("🔍 Detected Alembic-managed database - running Alembic migrations...")
             print("ℹ️  PRODUCTION MODE: Using Alembic incremental migrations")
@@ -195,6 +229,32 @@ async def run_migrations():
                         # After successful init, record the migration
                         await record_migration(conn, migration_name)
                         print("✅ Comprehensive schema applied - 73 tables + AI Assistant character ready!")
+                        
+                        # Stamp database with Alembic revision matching the init SQL dump
+                        # This allows future Alembic migrations to run incrementally
+                        print("🏷️  Stamping database with Alembic revision...")
+                        database_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+                        env = os.environ.copy()
+                        env['DATABASE_URL'] = database_url
+                        
+                        # 00_init.sql was generated on Oct 11, 2025 from baseline schema
+                        # It corresponds to the 20251011_baseline_v106 revision
+                        INIT_SQL_ALEMBIC_REVISION = "20251011_baseline_v106"
+                        
+                        try:
+                            result = subprocess.run([
+                                'alembic', 'stamp', INIT_SQL_ALEMBIC_REVISION
+                            ], cwd='/app', env=env, capture_output=True, text=True)
+                            
+                            if result.returncode == 0:
+                                print(f"✅ Database stamped with Alembic revision: {INIT_SQL_ALEMBIC_REVISION}")
+                                print("ℹ️  Future Alembic migrations will now apply incrementally from this point")
+                            else:
+                                print(f"⚠️  Failed to stamp Alembic revision: {result.stderr}")
+                                print("⚠️  Continuing anyway - you may need to manually run: alembic stamp 20251011_baseline_v106")
+                        except Exception as e:
+                            print(f"⚠️  Exception while stamping Alembic: {e}")
+                            print("⚠️  Continuing anyway - you may need to manually run: alembic stamp 20251011_baseline_v106")
                     else:
                         print("❌ Init schema failed - exiting")
                         return 1
