@@ -466,11 +466,56 @@ class RelationshipEvolutionEngine:
         emotion_variance: float
     ) -> None:
         """Record relationship update event to InfluxDB for trend analysis."""
-        # TODO: Re-enable InfluxDB recording after aligning RelationshipMetrics with evolution engine data model
-        # The current RelationshipMetrics dataclass requires interaction_quality and communication_comfort
-        # which are not readily available in the evolution engine update context
-        # For now, relationship data is still persisted in PostgreSQL
-        return
+        if not self.temporal_client:
+            return
+        
+        try:
+            # Map conversation quality to interaction_quality score
+            quality_mapping = {
+                ConversationQuality.EXCELLENT: 0.9,
+                ConversationQuality.GOOD: 0.75,
+                ConversationQuality.AVERAGE: 0.5,
+                ConversationQuality.POOR: 0.3,
+                ConversationQuality.FAILED: 0.1
+            }
+            interaction_quality = quality_mapping.get(quality, 0.5)
+            
+            # Calculate communication_comfort from emotion variance
+            # Low variance = comfortable (stable emotions)
+            # High variance = uncomfortable (volatile emotions)
+            communication_comfort = max(0.0, 1.0 - emotion_variance)
+            
+            # Get current scores for absolute values
+            current_scores = await self._get_current_scores(user_id, bot_name)
+            
+            # Create RelationshipMetrics with calculated values
+            from src.temporal.temporal_intelligence_client import RelationshipMetrics
+            
+            metrics = RelationshipMetrics(
+                trust_level=float(current_scores.trust),
+                affection_level=float(current_scores.affection),
+                attunement_level=float(current_scores.attunement),
+                interaction_quality=interaction_quality,
+                communication_comfort=communication_comfort
+            )
+            
+            # Record to InfluxDB
+            await self.temporal_client.record_relationship_progression(
+                bot_name=bot_name,
+                user_id=user_id,
+                relationship_metrics=metrics,
+                session_id=None,
+                timestamp=datetime.now()
+            )
+            
+            self.logger.debug(
+                f"📊 Recorded relationship progression to InfluxDB: "
+                f"{bot_name}/{user_id} (trust={current_scores.trust:.2f})"
+            )
+            
+        except Exception as e:
+            self.logger.debug(f"Failed to record relationship update to InfluxDB: {e}")
+            # Don't raise - InfluxDB recording is supplementary
     
     def _generate_update_reason(
         self,

@@ -981,10 +981,41 @@ class MessageProcessor:
             except Exception as e:
                 logger.debug("Relationship Intelligence: Could not retrieve relationship scores: %s", e)
             
-            # TRENDWISE ANALYTICS: Get conversation quality trends (if trend_analyzer available)
-            # TODO: Implement temporal trend retrieval for prompt injection
-            # For now, use confidence metrics as a proxy for conversation quality
-            if self.confidence_analyzer and len(relevant_memories) > 0:
+            # TRENDWISE ANALYTICS: Get conversation quality trends from InfluxDB
+            if self.temporal_client and self.temporal_client.enabled:
+                try:
+                    # Query last 7 days of conversation quality
+                    quality_history = await self.temporal_client.get_conversation_quality_trend(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        hours_back=168  # 7 days
+                    )
+                    
+                    if quality_history:
+                        # Calculate trend (improving/declining/stable)
+                        recent_avg = sum(q['engagement_score'] for q in quality_history[-5:]) / min(5, len(quality_history))
+                        older_avg = sum(q['engagement_score'] for q in quality_history[:5]) / min(5, len(quality_history))
+                        
+                        trend_direction = "improving" if recent_avg > older_avg + 0.1 else \
+                                         "declining" if recent_avg < older_avg - 0.1 else \
+                                         "stable"
+                        
+                        ai_components['conversation_quality_trend'] = {
+                            'trend_direction': trend_direction,
+                            'recent_average_engagement': round(recent_avg, 2),
+                            'historical_average_engagement': round(older_avg, 2),
+                            'data_points': len(quality_history)
+                        }
+                        
+                        logger.info(
+                            "🎯 QUALITY TREND: Conversation quality is %s (recent: %.2f vs historical: %.2f)",
+                            trend_direction, recent_avg, older_avg
+                        )
+                except Exception as e:
+                    logger.debug("Could not retrieve conversation quality trend: %s", e)
+                    
+            # Fallback: Use confidence metrics as proxy if quality trend unavailable
+            if 'conversation_quality_trend' not in ai_components and self.confidence_analyzer and len(relevant_memories) > 0:
                 try:
                     # Calculate current confidence metrics as quality indicator
                     confidence_metrics = self.confidence_analyzer.calculate_confidence_metrics(
@@ -4174,8 +4205,9 @@ class MessageProcessor:
         """
         Analyze bot's emotional trajectory from recent conversation history.
         
-        Phase 7.6: Bot Emotional Self-Awareness
-        - Retrieves bot's recent emotional responses from vector memory
+        Phase 6.5: Bot Emotional Self-Awareness
+        - PRIMARY: Retrieves bot's recent emotional responses from InfluxDB (time-series)
+        - FALLBACK: Uses Qdrant vector memory if InfluxDB unavailable
         - Calculates emotional trajectory (improving, declining, stable)
         - Provides emotional state for prompt building (bot knows its own emotions)
         - Enables emotionally-aware responses (e.g., "I've been feeling down lately")
@@ -4190,36 +4222,61 @@ class MessageProcessor:
             if not self.memory_manager:
                 return None
             
-            # Get bot name for querying bot-specific memories
             bot_name = get_normalized_bot_name_from_env()
             
-            # Retrieve bot's recent responses from vector memory
-            # Query for bot responses (role=bot) in recent conversations
-            bot_memory_query = f"emotional responses by {bot_name}"
-            
-            recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
-                user_id=message_context.user_id,
-                query=bot_memory_query,
-                limit=10  # Last 10 bot responses
-            )
-            
-            if not recent_bot_memories:
-                return None
-            
-            # Extract bot emotions from memory metadata
+            # PRIMARY: Try InfluxDB for chronological time-series (if available)
             recent_emotions = []
-            for memory in recent_bot_memories:
-                if isinstance(memory, dict):
-                    metadata = memory.get('metadata', {})
-                    bot_emotion = metadata.get('bot_emotion')
+            if self.temporal_client and self.temporal_client.enabled:
+                try:
+                    # Query last 24 hours of bot emotions from InfluxDB
+                    influx_emotions = await self.temporal_client.get_bot_emotion_trend(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        hours_back=24
+                    )
                     
-                    if bot_emotion and isinstance(bot_emotion, dict):
-                        recent_emotions.append({
-                            'emotion': bot_emotion.get('primary_emotion', 'neutral'),
-                            'intensity': bot_emotion.get('intensity', 0.0),
-                            'timestamp': memory.get('timestamp', ''),
-                            'mixed_emotions': bot_emotion.get('mixed_emotions', [])
-                        })
+                    if influx_emotions:
+                        recent_emotions = [
+                            {
+                                'emotion': e['primary_emotion'],
+                                'intensity': e['intensity'],
+                                'timestamp': e['timestamp'],
+                                'mixed_emotions': []  # InfluxDB doesn't store mixed emotions
+                            }
+                            for e in influx_emotions[-10:]  # Last 10 emotions
+                        ]
+                        logger.debug("🎭 Retrieved %d bot emotions from InfluxDB", len(recent_emotions))
+                except Exception as e:
+                    logger.debug("InfluxDB bot emotion query failed, falling back to Qdrant: %s", e)
+            
+            # FALLBACK: Use Qdrant semantic search if InfluxDB unavailable or returned no data
+            if not recent_emotions:
+                bot_memory_query = f"emotional responses by {bot_name}"
+                
+                recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
+                    user_id=message_context.user_id,
+                    query=bot_memory_query,
+                    limit=10
+                )
+                
+                if not recent_bot_memories:
+                    return None
+                
+                # Extract bot emotions from memory metadata
+                for memory in recent_bot_memories:
+                    if isinstance(memory, dict):
+                        metadata = memory.get('metadata', {})
+                        bot_emotion = metadata.get('bot_emotion')
+                        
+                        if bot_emotion and isinstance(bot_emotion, dict):
+                            recent_emotions.append({
+                                'emotion': bot_emotion.get('primary_emotion', 'neutral'),
+                                'intensity': bot_emotion.get('intensity', 0.0),
+                                'timestamp': memory.get('timestamp', ''),
+                                'mixed_emotions': bot_emotion.get('mixed_emotions', [])
+                            })
+                
+                logger.debug("🎭 Retrieved %d bot emotions from Qdrant (fallback)", len(recent_emotions))
             
             if not recent_emotions:
                 return None
@@ -5824,6 +5881,9 @@ Be conservative - only extract clear statements about the bot's own characterist
         # 3. Phase 5 Temporal Intelligence (if available)
         if self.confidence_analyzer:
             try:
+                # Get bot name for queries
+                bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+                
                 # Get confidence metrics from analyzer
                 confidence_metrics = self.confidence_analyzer.calculate_confidence_metrics(
                     ai_components=ai_components,
@@ -5831,13 +5891,47 @@ Be conservative - only extract clear statements about the bot's own characterist
                     processing_time_ms=processing_time_ms
                 )
                 
+                # Calculate interaction pattern from temporal data
+                interaction_pattern = "stable"  # Default
+                if self.temporal_client and self.temporal_client.enabled:
+                    try:
+                        # Query conversation frequency over last 30 days
+                        frequency_query = f'''
+                            from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                            |> range(start: -30d)
+                            |> filter(fn: (r) => r._measurement == "conversation_quality")
+                            |> filter(fn: (r) => r.bot == "{bot_name}")
+                            |> filter(fn: (r) => r.user_id == "{message_context.user_id}")
+                            |> aggregateWindow(every: 1d, fn: count)
+                        '''
+                        
+                        frequency_data = await self.temporal_client.query_data(frequency_query)
+                        
+                        if len(frequency_data) >= 7:
+                            # Calculate weekly averages
+                            recent_week = sum(d.get('_value', 0) for d in frequency_data[-7:]) / 7
+                            older_week = sum(d.get('_value', 0) for d in frequency_data[:7]) / 7
+                            
+                            if recent_week > older_week * 1.5:
+                                interaction_pattern = "increasing"
+                            elif recent_week < older_week * 0.5:
+                                interaction_pattern = "decreasing"
+                            elif recent_week > 5:
+                                interaction_pattern = "frequent"
+                            elif recent_week < 1:
+                                interaction_pattern = "sporadic"
+                            else:
+                                interaction_pattern = "stable"
+                    except Exception as e:
+                        logger.debug(f"Could not calculate interaction pattern: {e}")
+                
                 metadata["temporal_intelligence"] = {
                     "confidence_evolution": round(confidence_metrics.overall_confidence, 3),
                     "user_fact_confidence": round(confidence_metrics.user_fact_confidence, 3),
                     "relationship_confidence": round(confidence_metrics.relationship_confidence, 3),
                     "context_confidence": round(confidence_metrics.context_confidence, 3),
                     "emotional_confidence": round(confidence_metrics.emotional_confidence, 3),
-                    "interaction_pattern": "stable",  # TODO: Calculate from temporal data
+                    "interaction_pattern": interaction_pattern,
                     "data_source": "temporal_relationship_intelligence"
                 }
             except Exception as e:

@@ -24,59 +24,63 @@
 
 ## 📊 PHASE 6.5: BOT EMOTIONAL SELF-AWARENESS
 
-### **Data Source: Currently Qdrant (Should be InfluxDB)**
+### **Data Source: InfluxDB (PRIMARY) with Qdrant Fallback**
 
-⚠️ **IMPLEMENTATION GAP DISCOVERED**: Phase 6.5 SHOULD query InfluxDB for bot emotion time-series, but due to missing query methods in `TemporalIntelligenceClient`, it currently queries Qdrant instead.
+✅ **IMPLEMENTATION COMPLETE**: Phase 6.5 now queries InfluxDB for bot emotion time-series as PRIMARY data source, with Qdrant as FALLBACK when InfluxDB unavailable.
 
-**CURRENT IMPLEMENTATION** (queries Qdrant):
+**CURRENT IMPLEMENTATION** (InfluxDB PRIMARY with Qdrant fallback):
 
 ```python
-# Phase 6.5: Query Qdrant for bot's recent emotional responses
+# Phase 6.5: Query InfluxDB for bot's recent emotional responses
 # Source: message_processor.py lines 4173-4230
 async def _analyze_bot_emotional_trajectory(self, message_context: MessageContext):
-    bot_memory_query = f"emotional responses by {bot_name}"
+    bot_name = get_normalized_bot_name_from_env()
+    recent_emotions = []
     
-    # CURRENT: Queries QDRANT (workaround for missing InfluxDB methods)
-    recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
-        user_id=message_context.user_id,
-        query=bot_memory_query,
-        limit=10  # Last 10 bot responses
-    )
+    # PRIMARY: Try InfluxDB for chronological time-series
+    if self.temporal_client and self.temporal_client.enabled:
+        try:
+            influx_emotions = await self.temporal_client.get_bot_emotion_trend(
+                bot_name=bot_name,
+                user_id=message_context.user_id,
+                hours_back=24
+            )
+            
+            if influx_emotions:
+                recent_emotions = [
+                    {
+                        'emotion': e['primary_emotion'],
+                        'intensity': e['intensity'],
+                        'timestamp': e['timestamp'],
+                        'mixed_emotions': []
+                    }
+                    for e in influx_emotions[-10:]
+                ]
+                logger.debug("Retrieved %d bot emotions from InfluxDB", len(recent_emotions))
+        except Exception as e:
+            logger.debug("InfluxDB bot emotion query failed, falling back to Qdrant: %s", e)
     
-    # Extract bot emotions from Qdrant conversation metadata
-    for memory in recent_bot_memories:
-        metadata = memory.get('metadata', {})
-        bot_emotion = metadata.get('bot_emotion')  # Stored by Phase 9
+    # FALLBACK: Use Qdrant semantic search if InfluxDB unavailable
+    if not recent_emotions:
+        bot_memory_query = f"emotional responses by {bot_name}"
+        recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
+            user_id=message_context.user_id,
+            query=bot_memory_query,
+            limit=10
+        )
+        
+        # Extract bot emotions from Qdrant conversation metadata
+        for memory in recent_bot_memories:
+            metadata = memory.get('metadata', {})
+            bot_emotion = metadata.get('bot_emotion')
+        
+        logger.debug("Retrieved %d bot emotions from Qdrant (fallback)", len(recent_emotions))
 ```
 
-**INTENDED DESIGN** (should query InfluxDB):
-
-```python
-# Phase 6.5 SHOULD query InfluxDB for bot emotion time-series
-# Evidence: character_temporal_evolution_analyzer.py:220 calls this:
-
-bot_emotions = await temporal_client.get_bot_emotion_trend(
-    bot_name=bot_name,
-    user_id=user_id,
-    hours_back=24  # Last 24 hours
-)
-
-# But this method DOESN'T EXIST in temporal_intelligence_client.py!
-# Missing methods:
-# - get_bot_emotion_trend()
-# - get_bot_emotion_overall_trend()
-```
-
-**Why This Matters**:
-- **Qdrant (current)**: Semantic search, context-aware, but limited to stored conversations
-- **InfluxDB (intended)**: Pure time-series, chronological order, complete emotion history
-- **Trade-off**: Qdrant gives contextually relevant emotions; InfluxDB gives chronological trajectory
-
-**Why Qdrant Works (for now)**:
-- ✅ Still retrieves bot emotions from past conversations
-- ✅ Semantic search provides context-relevant emotional history  
-- ✅ No critical functionality lost (just different query strategy)
-- ❌ Missing true time-series analysis (e.g., "emotion trend over last 7 days")
+**Why Dual Data Sources**:
+- **InfluxDB (primary)**: Pure time-series, chronological order, complete emotion history
+- **Qdrant (fallback)**: Semantic search, context-aware, always available
+- **Hybrid approach**: Best of both worlds - time-series analysis when available, context-aware fallback when needed
 
 ### **What Gets Created**
 
@@ -161,9 +165,15 @@ await self.memory_manager.store_conversation(
 ```
 Phase 6.5: _analyze_bot_emotional_trajectory()
     ↓
-    Query Qdrant for bot's past responses
+    PRIMARY: Query InfluxDB for bot emotion time-series
     ↓
-    Extract bot emotions from stored metadata
+    If InfluxDB available:
+        └→ temporal_client.get_bot_emotion_trend(bot_name, user_id, hours_back=24)
+        └→ Returns chronological emotions from InfluxDB
+    ↓
+    FALLBACK: If InfluxDB unavailable or returns no data:
+        └→ Query Qdrant for bot's past responses
+        └→ Extract bot emotions from stored metadata
     ↓
     Calculate trajectory (intensifying/calming/stable)
     ↓
@@ -191,7 +201,9 @@ Phase 7.5: _analyze_bot_emotion_with_shared_analyzer(response)
     ┌─────────────────────────────────────┐
     │ STORAGE: Persistent Databases       │
     │ • InfluxDB: Time-series metrics     │
+    │   └→ Queryable by Phase 6.5         │
     │ • Qdrant: Conversation metadata     │
+    │   └→ Fallback for Phase 6.5         │
     └─────────────────────────────────────┘
 ```
 

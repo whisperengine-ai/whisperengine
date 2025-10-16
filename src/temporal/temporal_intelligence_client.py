@@ -881,6 +881,371 @@ class TemporalIntelligenceClient:
             logger.error("Failed to get relationship evolution: %s", e)
             return []
 
+    async def get_bot_emotion_trend(
+        self,
+        bot_name: str,
+        user_id: str,
+        hours_back: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get bot emotion trend for specific user over time.
+        
+        Retrieves chronological bot emotion data from InfluxDB for Phase 6.5
+        bot emotional trajectory analysis.
+        
+        Args:
+            bot_name: Name of the bot (elena, marcus, etc.)
+            user_id: User identifier
+            hours_back: How many hours of history to retrieve (default: 24)
+            
+        Returns:
+            List of bot emotion measurements sorted chronologically:
+            [
+                {
+                    'timestamp': datetime,
+                    'primary_emotion': str,
+                    'intensity': float,
+                    'confidence': float
+                },
+                ...
+            ]
+            
+        Example:
+            >>> emotions = await client.get_bot_emotion_trend("elena", "123456", hours_back=48)
+            >>> print(emotions[0])
+            {'timestamp': '2025-10-15T10:30:00Z', 'primary_emotion': 'joy', 'intensity': 0.87}
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                |> range(start: -{hours_back}h)
+                |> filter(fn: (r) => r._measurement == "bot_emotion")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> filter(fn: (r) => r.user_id == "{user_id}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+            '''
+            
+            result = self.query_api.query(query)
+            
+            emotions = []
+            for table in result:
+                for record in table.records:
+                    emotions.append({
+                        'timestamp': record.get_time(),
+                        'primary_emotion': record.values.get('emotion', 'neutral'),  # From tag
+                        'intensity': record.values.get('intensity', 0.0),
+                        'confidence': record.values.get('confidence', 0.0)
+                    })
+            
+            return sorted(emotions, key=lambda x: x['timestamp'])
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to get bot emotion trend: %s", e)
+            return []
+
+    async def get_bot_emotion_overall_trend(
+        self,
+        bot_name: str,
+        hours_back: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get bot emotion trend across ALL users (character-level analysis).
+        
+        Retrieves bot's emotional patterns aggregated across all conversations.
+        Useful for character behavior analysis and emotional consistency monitoring.
+        
+        Args:
+            bot_name: Name of the bot (elena, marcus, etc.)
+            hours_back: How many hours of history to retrieve (default: 24)
+            
+        Returns:
+            List of bot emotion measurements across all users:
+            [
+                {
+                    'timestamp': datetime,
+                    'primary_emotion': str,
+                    'intensity': float,
+                    'confidence': float,
+                    'user_id': str  # Which user triggered this emotion
+                },
+                ...
+            ]
+            
+        Example:
+            >>> emotions = await client.get_bot_emotion_overall_trend("elena", hours_back=168)
+            >>> joy_count = sum(1 for e in emotions if e['primary_emotion'] == 'joy')
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                |> range(start: -{hours_back}h)
+                |> filter(fn: (r) => r._measurement == "bot_emotion")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+            '''
+            
+            result = self.query_api.query(query)
+            
+            emotions = []
+            for table in result:
+                for record in table.records:
+                    emotions.append({
+                        'timestamp': record.get_time(),
+                        'primary_emotion': record.values.get('emotion', 'neutral'),  # From tag
+                        'intensity': record.values.get('intensity', 0.0),
+                        'confidence': record.values.get('confidence', 0.0),
+                        'user_id': record.values.get('user_id', 'unknown')  # From tag
+                    })
+            
+            return sorted(emotions, key=lambda x: x['timestamp'])
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to get bot emotion overall trend: %s", e)
+            return []
+
+    async def get_confidence_overall_trend(
+        self,
+        bot_name: str,
+        hours_back: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get confidence evolution trend across ALL users.
+        
+        Character-level confidence analysis for behavior monitoring.
+        
+        Args:
+            bot_name: Name of the bot (elena, marcus, etc.)
+            hours_back: How many hours of history to retrieve (default: 24)
+            
+        Returns:
+            List of confidence measurements across all users:
+            [
+                {
+                    'timestamp': datetime,
+                    'user_fact_confidence': float,
+                    'relationship_confidence': float,
+                    'context_confidence': float,
+                    'emotional_confidence': float,
+                    'overall_confidence': float,
+                    'user_id': str  # Which user this confidence applies to
+                },
+                ...
+            ]
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                |> range(start: -{hours_back}h)
+                |> filter(fn: (r) => r._measurement == "confidence_evolution")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+            '''
+            
+            result = self.query_api.query(query)
+            
+            trends = []
+            for table in result:
+                for record in table.records:
+                    trends.append({
+                        'timestamp': record.get_time(),
+                        'user_fact_confidence': record.values.get('user_fact_confidence', 0.0),
+                        'relationship_confidence': record.values.get('relationship_confidence', 0.0),
+                        'context_confidence': record.values.get('context_confidence', 0.0),
+                        'emotional_confidence': record.values.get('emotional_confidence', 0.0),
+                        'overall_confidence': record.values.get('overall_confidence', 0.0),
+                        'user_id': record.values.get('user_id', 'unknown')  # From tag
+                    })
+            
+            return sorted(trends, key=lambda x: x['timestamp'])
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to get confidence overall trend: %s", e)
+            return []
+
+    async def get_conversation_quality_trend(
+        self,
+        bot_name: str,
+        user_id: str,
+        hours_back: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get conversation quality trend for specific user over time.
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            hours_back: How many hours of history to retrieve (default: 24)
+            
+        Returns:
+            List of quality measurements sorted chronologically:
+            [
+                {
+                    'timestamp': datetime,
+                    'engagement_score': float,
+                    'satisfaction_score': float,
+                    'natural_flow_score': float,
+                    'emotional_resonance': float,
+                    'topic_relevance': float
+                },
+                ...
+            ]
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                |> range(start: -{hours_back}h)
+                |> filter(fn: (r) => r._measurement == "conversation_quality")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> filter(fn: (r) => r.user_id == "{user_id}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+            '''
+            
+            result = self.query_api.query(query)
+            
+            quality_data = []
+            for table in result:
+                for record in table.records:
+                    quality_data.append({
+                        'timestamp': record.get_time(),
+                        'engagement_score': record.values.get('engagement_score', 0.0),
+                        'satisfaction_score': record.values.get('satisfaction_score', 0.0),
+                        'natural_flow_score': record.values.get('natural_flow_score', 0.0),
+                        'emotional_resonance': record.values.get('emotional_resonance', 0.0),
+                        'topic_relevance': record.values.get('topic_relevance', 0.0)
+                    })
+            
+            return sorted(quality_data, key=lambda x: x['timestamp'])
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to get conversation quality trend: %s", e)
+            return []
+
+    async def get_conversation_quality_overall_trend(
+        self,
+        bot_name: str,
+        hours_back: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        Get conversation quality trend across ALL users.
+        
+        Character-level quality analysis for behavior monitoring.
+        
+        Args:
+            bot_name: Name of the bot
+            hours_back: How many hours of history to retrieve (default: 24)
+            
+        Returns:
+            List of quality measurements across all users with user_id included
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                |> range(start: -{hours_back}h)
+                |> filter(fn: (r) => r._measurement == "conversation_quality")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+            '''
+            
+            result = self.query_api.query(query)
+            
+            quality_data = []
+            for table in result:
+                for record in table.records:
+                    quality_data.append({
+                        'timestamp': record.get_time(),
+                        'engagement_score': record.values.get('engagement_score', 0.0),
+                        'satisfaction_score': record.values.get('satisfaction_score', 0.0),
+                        'natural_flow_score': record.values.get('natural_flow_score', 0.0),
+                        'emotional_resonance': record.values.get('emotional_resonance', 0.0),
+                        'topic_relevance': record.values.get('topic_relevance', 0.0),
+                        'user_id': record.values.get('user_id', 'unknown')  # From tag
+                    })
+            
+            return sorted(quality_data, key=lambda x: x['timestamp'])
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to get conversation quality overall trend: %s", e)
+            return []
+
+    async def query_data(
+        self,
+        flux_query: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute generic Flux query and return results.
+        
+        Low-level query method for custom InfluxDB queries.
+        Use specific methods (get_bot_emotion_trend, etc.) when possible.
+        
+        Args:
+            flux_query: Complete Flux query string
+            
+        Returns:
+            List of query results as dictionaries:
+            [
+                {
+                    'timestamp': datetime,
+                    'field_name': value,
+                    ...
+                },
+                ...
+            ]
+            
+        Example:
+            >>> query = '''
+            ... from(bucket: "whisperengine")
+            ... |> range(start: -1h)
+            ... |> filter(fn: (r) => r._measurement == "bot_emotion")
+            ... '''
+            >>> results = await client.query_data(query)
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            result = self.query_api.query(flux_query)
+            
+            data = []
+            for table in result:
+                for record in table.records:
+                    # Extract all values from record
+                    row = {
+                        'timestamp': record.get_time(),
+                        '_measurement': record.get_measurement(),
+                        '_field': record.get_field()
+                    }
+                    
+                    # Add all other fields from values
+                    row.update(record.values)
+                    
+                    data.append(row)
+            
+            return data
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to execute query: %s", e)
+            return []
+
     def close(self):
         """Close InfluxDB client connection"""
         if self.client:
