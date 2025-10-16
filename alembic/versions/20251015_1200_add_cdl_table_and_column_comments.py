@@ -13,6 +13,7 @@ Comments are non-destructive and do not affect data or performance.
 """
 from typing import Sequence, Union
 from pathlib import Path
+import re
 
 from alembic import op
 import sqlalchemy as sa
@@ -26,7 +27,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Apply PostgreSQL COMMENT statements to CDL tables and columns."""
+    """Apply PostgreSQL COMMENT statements to CDL tables and columns.
+    
+    This migration executes each COMMENT statement individually and skips
+    any statements that fail (e.g., if a column doesn't exist yet).
+    This makes the migration more resilient to schema variations.
+    """
     
     # Load the SQL file with all COMMENT statements
     sql_file_path = Path(__file__).parent.parent.parent / 'sql' / 'add_cdl_table_comments.sql'
@@ -34,12 +40,65 @@ def upgrade() -> None:
     with open(sql_file_path, 'r', encoding='utf-8') as f:
         sql_content = f.read()
     
-    # Execute the SQL file
-    # Note: This uses raw SQL execution which is safe for COMMENT statements
+    # Get database connection
     connection = op.get_bind()
-    connection.execute(sa.text(sql_content))
     
-    print("✅ Successfully applied PostgreSQL COMMENT statements to CDL tables and columns")
+    # Split the SQL content into individual statements
+    # We need to execute each COMMENT statement separately to handle missing columns gracefully
+    statements = []
+    current_statement = []
+    
+    for line in sql_content.split('\n'):
+        # Skip comments and empty lines
+        if line.strip().startswith('--') or not line.strip():
+            continue
+        
+        # Collect lines that are part of a COMMENT statement
+        if line.strip().upper().startswith('COMMENT ON'):
+            if current_statement:
+                statements.append(' '.join(current_statement))
+            current_statement = [line.strip()]
+        elif current_statement:
+            current_statement.append(line.strip())
+            # Check if this line ends the statement (ends with semicolon)
+            if line.strip().endswith(';'):
+                statements.append(' '.join(current_statement))
+                current_statement = []
+    
+    # Add any remaining statement
+    if current_statement:
+        statements.append(' '.join(current_statement))
+    
+    # Execute each COMMENT statement individually
+    successful = 0
+    skipped = 0
+    
+    for stmt in statements:
+        if not stmt or stmt.startswith('SELECT'):
+            continue
+        
+        try:
+            connection.execute(sa.text(stmt))
+            successful += 1
+        except Exception as e:
+            # Skip comments on non-existent columns
+            error_msg = str(e)
+            if 'does not exist' in error_msg:
+                # Extract column/table name from error message
+                match = re.search(r'column "(\w+)" of relation "(\w+)"', error_msg)
+                if match:
+                    column_name, table_name = match.groups()
+                    print(f"⚠️  Skipped comment for {table_name}.{column_name} (column does not exist)")
+                else:
+                    print(f"⚠️  Skipped statement due to missing object: {error_msg.split('DETAIL:')[0].strip()}")
+                skipped += 1
+            else:
+                # Re-raise other errors
+                raise
+    
+    print(f"✅ Applied {successful} PostgreSQL COMMENT statements to CDL tables and columns")
+    if skipped > 0:
+        print(f"⚠️  Skipped {skipped} comments for non-existent columns (will be added in future migrations)")
 
 
 def downgrade() -> None:
