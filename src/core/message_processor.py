@@ -3678,9 +3678,9 @@ class MessageProcessor:
             # Extract key data for prompt integration
             result = {
                 'intervention_needed': engagement_analysis.get('intervention_needed', False),
-                'recommended_strategy': engagement_analysis.get('recommended_strategy'),
-                'flow_state': engagement_analysis.get('flow_analysis', {}).get('current_state'),
-                'stagnation_risk': engagement_analysis.get('stagnation_analysis', {}).get('risk_level'),
+                'recommended_strategy': engagement_analysis.get('suggested_strategy'),  # Fixed: engagement engine returns 'suggested_strategy'
+                'flow_state': engagement_analysis.get('flow_state'),  # Direct field, not nested
+                'stagnation_risk': engagement_analysis.get('stagnation_risk'),  # Direct field, not nested
                 'recommendations': engagement_analysis.get('recommendations', [])
             }
             
