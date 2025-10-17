@@ -55,6 +55,9 @@ from src.memory.multi_vector_intelligence import (
     VectorStrategy
 )
 
+# Import vector fusion for Phase 1 Task 3: Multi-Vector Fusion
+from src.memory.vector_fusion import create_vector_fusion_coordinator, VectorFusionCoordinator
+
 logger = logging.getLogger(__name__)
 
 
@@ -3935,7 +3938,8 @@ class VectorMemoryManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 25  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
+        limit: int = 25,  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
+        emotion_hint: Optional[str] = None  # 🎭 NEW: Optional emotion hint from RoBERTa analysis
     ) -> List[Dict[str, Any]]:
         """
         Retrieve memories relevant to the given query using intelligent vector selection.
@@ -3944,6 +3948,13 @@ class VectorMemoryManager:
         - Emotional queries → emotion vector (feelings, mood, emotional state)
         - Pattern queries → semantic vector (relationship patterns, behavioral trends)
         - Content queries → content vector (semantic meaning, topics, facts)
+        
+        Args:
+            user_id: User identifier for memory retrieval
+            query: Query text for semantic search
+            limit: Maximum number of memories to retrieve
+            emotion_hint: Optional emotion label from RoBERTa analysis (joy, sadness, anger, fear, etc.)
+                         If provided, bypasses keyword-based emotion detection
         """
         import time
         
@@ -3976,18 +3987,32 @@ class VectorMemoryManager:
             # 🎭 INTELLIGENT VECTOR SELECTION: Route to appropriate named vector based on query intent
             query_lower = query.lower()
             
-            # Emotional queries → use emotion vector for better emotional context matching
-            emotional_keywords = ['feel', 'feeling', 'felt', 'mood', 'emotion', 'emotional', 
-                                 'happy', 'sad', 'angry', 'excited', 'worried', 'anxious',
-                                 'joyful', 'depressed', 'upset', 'frustrated', 'content']
-            if any(keyword in query_lower for keyword in emotional_keywords):
-                logger.info(f"🎭 EMOTIONAL QUERY DETECTED: '{query}' - Using emotion vector search")
+            # 🎭 ENHANCED EMOTION DETECTION: Use RoBERTa hint if provided, or fallback to keyword detection
+            use_emotion_vector = False
+            emotion_source = "none"
+            
+            if emotion_hint:
+                # Priority 1: Trust RoBERTa emotion analysis from MessageProcessor
+                use_emotion_vector = True
+                emotion_source = f"roberta:{emotion_hint}"
+                logger.info(f"🎭 EMOTION HINT PROVIDED: '{emotion_hint}' - Using emotion vector search")
+            else:
+                # Priority 2: Fallback to keyword-based detection for direct memory API calls
+                emotional_keywords = ['feel', 'feeling', 'felt', 'mood', 'emotion', 'emotional', 
+                                     'happy', 'sad', 'angry', 'excited', 'worried', 'anxious',
+                                     'joyful', 'depressed', 'upset', 'frustrated', 'content']
+                if any(keyword in query_lower for keyword in emotional_keywords):
+                    use_emotion_vector = True
+                    emotion_source = "keyword_detection"
+                    logger.info(f"🎭 EMOTIONAL QUERY DETECTED (keywords): '{query}' - Using emotion vector search")
+            
+            if use_emotion_vector:
                 try:
                     emotion_results = await self.vector_store.search_memories_with_qdrant_intelligence(
                         query=query,
                         user_id=user_id,
                         top_k=limit,
-                        emotional_context=query  # Use same query for emotion matching
+                        emotional_context=emotion_hint or query  # Use hint if available, else query
                     )
                     
                     if emotion_results:
@@ -4000,18 +4025,172 @@ class VectorMemoryManager:
                                 "metadata": r.get("metadata", {}),
                                 "memory_type": r.get("memory_type", "conversation"),
                                 "emotional": True,
-                                "search_type": "emotion_vector"
+                                "search_type": "emotion_vector",
+                                "emotion_source": emotion_source  # Track whether RoBERTa or keyword detection
                             })
                         
-                        logger.debug(f"🎭 EMOTION VECTOR: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                        logger.debug(f"🎭 EMOTION VECTOR ({emotion_source}): Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
                         return formatted_results
                 except Exception as e:
                     logger.warning(f"Emotion vector search failed, falling back to content: {e}")
             
+            # 🎯 SEMANTIC VECTOR: Pattern/relationship queries use semantic vector for conceptual understanding
+            semantic_keywords = ['pattern', 'usually', 'always', 'never', 'tend', 'habit', 
+                               'relationship', 'between', 'connect', 'relate', 'similar',
+                               'what did we', 'remember when', 'talked about', 'discussed',
+                               'our conversation', 'we spoke about', 'you mentioned']
+            if any(keyword in query_lower for keyword in semantic_keywords):
+                logger.info(f"🎯 SEMANTIC QUERY DETECTED: '{query}' - Using semantic vector for conceptual patterns")
+                try:
+                    # Use semantic vector via Qdrant's named vector search
+                    search_result = self.client.search(
+                        collection_name=self.collection_name,
+                        query_vector=(
+                            "semantic",  # Named vector for conceptual understanding
+                            self.embedding_generator.embed(query).tolist()
+                        ),
+                        query_filter=models.Filter(
+                            must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                        ),
+                        limit=limit,
+                        with_payload=True,
+                        score_threshold=0.65  # Slightly lower threshold for semantic patterns
+                    )
+                    
+                    if search_result:
+                        formatted_results = []
+                        for r in search_result:
+                            if r.payload:
+                                formatted_results.append({
+                                    "content": r.payload.get("content", ""),
+                                    "score": r.score,
+                                    "timestamp": r.payload.get("timestamp", ""),
+                                    "metadata": r.payload.get("metadata", {}),
+                                    "memory_type": r.payload.get("memory_type", "conversation"),
+                                    "semantic": True,
+                                    "search_type": "semantic_vector"
+                                })
+                        
+                        logger.debug(f"🎯 SEMANTIC VECTOR: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                        return formatted_results
+                except Exception as e:
+                    logger.warning(f"Semantic vector search failed, falling back to content: {e}")
+            
+            # 🔀 TASK 3: MULTI-VECTOR FUSION - Combine vectors for conversational queries
+            # Check if this query would benefit from multi-vector fusion
+            fusion_coordinator = create_vector_fusion_coordinator()
+            if fusion_coordinator.should_use_fusion(query):
+                try:
+                    # Determine which vectors to combine
+                    fusion_vectors = fusion_coordinator.get_fusion_vectors(query)
+                    logger.info(f"🔀 MULTI-VECTOR FUSION TRIGGERED: Combining {fusion_vectors} for query: '{query[:60]}...'")
+                    
+                    # Retrieve from each vector type
+                    results_by_vector = {}
+                    
+                    for vector_name in fusion_vectors:
+                        try:
+                            if vector_name == 'content':
+                                # Content vector (default semantic search)
+                                query_embedding = list(self.vector_store.embedder.embed([query]))[0].tolist()
+                                search_result = self.vector_store.client.search(
+                                    collection_name=self.vector_store.collection_name,
+                                    query_vector=(
+                                        "content",
+                                        query_embedding
+                                    ),
+                                    query_filter=models.Filter(
+                                        must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                                    ),
+                                    limit=limit,
+                                    with_payload=True,
+                                    score_threshold=0.7
+                                )
+                                
+                                vector_results = []
+                                for r in search_result:
+                                    if r.payload:
+                                        vector_results.append({
+                                            "content": r.payload.get("content", ""),
+                                            "score": r.score,
+                                            "timestamp": r.payload.get("timestamp", ""),
+                                            "metadata": r.payload.get("metadata", {}),
+                                            "memory_type": r.payload.get("memory_type", "conversation")
+                                        })
+                                results_by_vector['content'] = vector_results
+                                logger.debug(f"🔀 Retrieved {len(vector_results)} results from content vector")
+                                
+                            elif vector_name == 'semantic':
+                                # Semantic vector (conceptual patterns)
+                                query_embedding = list(self.vector_store.embedder.embed([query]))[0].tolist()
+                                search_result = self.vector_store.client.search(
+                                    collection_name=self.vector_store.collection_name,
+                                    query_vector=(
+                                        "semantic",
+                                        query_embedding
+                                    ),
+                                    query_filter=models.Filter(
+                                        must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                                    ),
+                                    limit=limit,
+                                    with_payload=True,
+                                    score_threshold=0.65
+                                )
+                                
+                                vector_results = []
+                                for r in search_result:
+                                    if r.payload:
+                                        vector_results.append({
+                                            "content": r.payload.get("content", ""),
+                                            "score": r.score,
+                                            "timestamp": r.payload.get("timestamp", ""),
+                                            "metadata": r.payload.get("metadata", {}),
+                                            "memory_type": r.payload.get("memory_type", "conversation")
+                                        })
+                                results_by_vector['semantic'] = vector_results
+                                logger.debug(f"🔀 Retrieved {len(vector_results)} results from semantic vector")
+                                
+                            elif vector_name == 'emotion':
+                                # Emotion vector (emotional context)
+                                emotion_results = await self.vector_store.search_memories_with_qdrant_intelligence(
+                                    query=query,
+                                    user_id=user_id,
+                                    top_k=limit,
+                                    emotional_context=query
+                                )
+                                
+                                vector_results = []
+                                for r in emotion_results:
+                                    vector_results.append({
+                                        "content": r.get("content", ""),
+                                        "score": r.get("score", 0.0),
+                                        "timestamp": r.get("timestamp", ""),
+                                        "metadata": r.get("metadata", {}),
+                                        "memory_type": r.get("memory_type", "conversation")
+                                    })
+                                results_by_vector['emotion'] = vector_results
+                                logger.debug(f"🔀 Retrieved {len(vector_results)} results from emotion vector")
+                                
+                        except Exception as vector_error:
+                            logger.warning(f"Failed to retrieve from {vector_name} vector: {vector_error}")
+                            continue
+                    
+                    # Fuse results using Reciprocal Rank Fusion
+                    if results_by_vector:
+                        fused_results = fusion_coordinator.rrf.fuse(results_by_vector, limit=limit)
+                        
+                        if fused_results:
+                            # Add multi-vector search type to results
+                            for result in fused_results:
+                                result['search_type'] = 'multi_vector_fusion'
+                            
+                            logger.info(f"🔀 MULTI-VECTOR FUSION: Successfully fused {len(fused_results)} memories from {len(results_by_vector)} vectors in {(time.time() - start_time)*1000:.1f}ms")
+                            return fused_results
+                    
+                except Exception as fusion_error:
+                    logger.warning(f"Multi-vector fusion failed, falling back to content search: {fusion_error}")
+            
             # Default: Content vector for semantic meaning and topics
-            # NOTE: Pattern/semantic vector routing disabled due to infinite recursion
-            # get_memory_clusters_for_roleplay() internally calls retrieve_relevant_memories()
-            # TODO: Refactor to prevent recursion before re-enabling pattern routing
             logger.debug(f"🧠 CONTENT QUERY: '{query}' - Using content vector (default)")
             
             # 🚀 SIMPLIFIED: Trust vector embeddings for semantic search

@@ -226,6 +226,12 @@ class MessageProcessor:
             logger.warning("Fidelity metrics collector not available")
             self.fidelity_metrics = None
         
+        # Character Emotional State Manager: Track bot's own emotional state across conversations
+        # Note: Uses lazy initialization since postgres_pool is initialized asynchronously
+        self.character_state_manager = None
+        self._character_state_manager_initialized = False
+        self._character_state_manager_lock = asyncio.Lock()
+        
         # Unified Character Intelligence Coordinator: PHASE 4A Integration
         self.character_intelligence_coordinator = None
         
@@ -319,9 +325,95 @@ class MessageProcessor:
             logger.warning("Emotional context engine initialization failed: %s", e)
             self.emotional_context_engine = None
         
+        # Initialize Proactive Conversation Engagement Engine for natural topic suggestions
+        try:
+            from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
+            
+            # Get personality profiler if available (for personality-based topic suggestions)
+            personality_profiler = None
+            if hasattr(self, 'bot_core') and self.bot_core:
+                personality_profiler = getattr(self.bot_core, 'personality_profiler', None)
+            
+            self.engagement_engine = ProactiveConversationEngagementEngine(
+                emotional_engine=self._shared_emotion_analyzer,  # Correct parameter name
+                personality_profiler=personality_profiler,
+                memory_manager=self.memory_manager,  # Add memory manager for conversation history
+                stagnation_threshold_minutes=10,  # Conservative: 10 min before suggesting topics
+                engagement_check_interval_minutes=5,  # Check every 5 min
+                max_proactive_suggestions_per_hour=3  # Conservative: max 3 suggestions/hour
+            )
+            logger.info("🎯 Proactive Conversation Engagement Engine initialized")
+            
+            # Store in bot_core for access by integration point (line 3041)
+            if hasattr(self, 'bot_core') and self.bot_core:
+                self.bot_core.engagement_engine = self.engagement_engine
+            
+            # Log configuration for debugging
+            logger.info("🎯 ENGAGEMENT CONFIG: Stagnation threshold: %d min, Check interval: %d min, Max suggestions: %d/hour",
+                       self.engagement_engine.stagnation_threshold.total_seconds() / 60,
+                       self.engagement_engine.engagement_check_interval.total_seconds() / 60,
+                       self.engagement_engine.max_suggestions_per_hour)
+                       
+        except ImportError as e:
+            logger.warning("Proactive engagement engine not available: %s", e)
+            self.engagement_engine = None
+        except Exception as e:
+            logger.error("Proactive engagement engine initialization failed: %s", e)
+            self.engagement_engine = None
+        
+        # Character Learning Persistence: Layer 1 (PostgreSQL) - Lazy initialization
+        self.character_insight_storage = None
+        self.character_insight_extractor = None
+        self._character_learning_initialized = False
+        self._character_learning_lock = asyncio.Lock()
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
+    
+    async def _ensure_character_state_manager_initialized(self):
+        """
+        Ensure character emotional state manager is initialized (lazy initialization).
+        
+        This is async because it needs to wait for postgres_pool which is initialized
+        asynchronously during bot startup. Only initializes once.
+        
+        Returns:
+            bool: True if manager is available (either already initialized or just initialized)
+        """
+        # Fast path: already initialized
+        if self._character_state_manager_initialized:
+            return self.character_state_manager is not None
+        
+        # Use lock to prevent multiple simultaneous initialization attempts
+        async with self._character_state_manager_lock:
+            # Double-check after acquiring lock (another coroutine may have initialized)
+            if self._character_state_manager_initialized:
+                return self.character_state_manager is not None
+            
+            try:
+                from src.intelligence.character_emotional_state import create_character_emotional_state_manager
+                
+                # Check if postgres_pool is now available
+                postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+                if postgres_pool:
+                    self.character_state_manager = create_character_emotional_state_manager(postgres_pool)
+                    logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (lazy)")
+                else:
+                    logger.debug("🎭 CHARACTER STATE: PostgreSQL pool still not available - state tracking disabled")
+                    self.character_state_manager = None
+            
+            except ImportError as e:
+                logger.warning("🎭 CHARACTER STATE: Tracking not available: %s", e)
+                self.character_state_manager = None
+            except Exception as e:
+                logger.error("🎭 CHARACTER STATE: Initialization failed: %s", e)
+                self.character_state_manager = None
+            
+            # Mark as initialized (even if it failed, don't retry every message)
+            self._character_state_manager_initialized = True
+            
+            return self.character_state_manager is not None
     
     def _try_initialize_emoji_selector(self):
         """
@@ -345,6 +437,77 @@ class MessageProcessor:
         except Exception as e:
             logger.warning("Database emoji selector initialization failed: %s", e)
             self._emoji_selector_init_attempted = True  # Don't retry on failure
+    
+    async def _ensure_character_learning_persistence_initialized(self):
+        """
+        Ensure character learning persistence components are initialized (lazy initialization).
+        
+        Requires postgres_pool from bot_core. Only initializes once.
+        
+        Returns:
+            bool: True if learning persistence is available
+        """
+        # Fast path: already initialized
+        if self._character_learning_initialized:
+            return (self.character_insight_storage is not None and 
+                   self.character_insight_extractor is not None)
+        
+        # Use lock to prevent multiple simultaneous initialization attempts
+        async with self._character_learning_lock:
+            # Double-check after acquiring lock
+            if self._character_learning_initialized:
+                return (self.character_insight_storage is not None and 
+                       self.character_insight_extractor is not None)
+            
+            try:
+                from src.characters.learning.character_insight_storage import create_character_insight_storage
+                from src.characters.learning.character_self_insight_extractor import create_character_self_insight_extractor
+                
+                # Check if postgres_pool is available (validates PostgreSQL is ready)
+                postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+                if postgres_pool:
+                    # Initialize storage layer with environment variables
+                    # Note: create_character_insight_storage creates its own pool
+                    postgres_host = os.getenv("POSTGRES_HOST", "localhost")
+                    postgres_port = int(os.getenv("POSTGRES_PORT", "5433"))
+                    postgres_db = os.getenv("POSTGRES_DB", "whisperengine")
+                    postgres_user = os.getenv("POSTGRES_USER", "whisperengine")
+                    postgres_password = os.getenv("POSTGRES_PASSWORD", "whisperengine")
+                    
+                    self.character_insight_storage = await create_character_insight_storage(
+                        postgres_host=postgres_host,
+                        postgres_port=postgres_port,
+                        postgres_db=postgres_db,
+                        postgres_user=postgres_user,
+                        postgres_password=postgres_password
+                    )
+                    
+                    # Initialize extractor
+                    self.character_insight_extractor = create_character_self_insight_extractor(
+                        min_confidence=0.6,  # Only persist high-confidence insights
+                        min_importance=4     # Only persist moderately important insights
+                    )
+                    
+                    logger.info("📚 Character Learning Persistence initialized (Layer 1: PostgreSQL)")
+                else:
+                    logger.debug("📚 PostgreSQL pool not available - character learning persistence disabled")
+                    self.character_insight_storage = None
+                    self.character_insight_extractor = None
+            
+            except ImportError as e:
+                logger.warning("📚 Character learning persistence not available: %s", e)
+                self.character_insight_storage = None
+                self.character_insight_extractor = None
+            except Exception as e:
+                logger.error("📚 Character learning persistence initialization failed: %s", e)
+                self.character_insight_storage = None
+                self.character_insight_extractor = None
+            
+            # Mark as initialized (even if failed, don't retry)
+            self._character_learning_initialized = True
+            
+            return (self.character_insight_storage is not None and 
+                   self.character_insight_extractor is not None)
 
     @handle_errors(category=ErrorCategory.VALIDATION, severity=ErrorSeverity.HIGH)
     async def process_message(self, message_context: MessageContext) -> ProcessingResult:
@@ -435,6 +598,32 @@ class MessageProcessor:
                 message_context, ai_components, relevant_memories
             )
             
+            # Phase 6.8: Character Emotional State (Biochemical Modeling - Bot's Own Emotional State)
+            # Get character's current emotional state to influence response generation
+            # Note: Uses lazy initialization to wait for postgres_pool availability
+            await self._ensure_character_state_manager_initialized()
+            
+            if self.character_state_manager:
+                try:
+                    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                    character_name = get_normalized_bot_name_from_env()
+                    
+                    if character_name:
+                        character_state = await self.character_state_manager.get_character_state(
+                            character_name=character_name,
+                            user_id=message_context.user_id
+                        )
+                        
+                        # Add to AI components for CDL prompt building
+                        ai_components['character_emotional_state'] = character_state
+                        logger.info(
+                            "🎭 CHARACTER STATE: Retrieved for %s - %s (enthusiasm=%.2f, stress=%.2f)",
+                            character_name, character_state.get_dominant_state(),
+                            character_state.enthusiasm, character_state.stress
+                        )
+                except Exception as e:
+                    logger.debug("Failed to retrieve character emotional state: %s", e)
+            
             # Phase 7: Response generation
             print(f"🎯 PHASE 7 START: About to call _generate_response for user {message_context.user_id}", flush=True)
             response = await self._generate_response(
@@ -446,6 +635,62 @@ class MessageProcessor:
             bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
             ai_components['bot_emotion'] = bot_emotion
             
+            # Phase 7.5b: Update character's own emotional state (biochemical modeling - bot emotions)
+            # Note: Manager should already be initialized from Phase 6.8, but ensure just in case
+            await self._ensure_character_state_manager_initialized()
+            
+            if self.character_state_manager and bot_emotion:
+                try:
+                    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                    character_name = get_normalized_bot_name_from_env()
+                    
+                    if character_name:
+                        # Calculate interaction quality (can be enhanced later with more metrics)
+                        interaction_quality = 0.7  # Default neutral quality
+                        
+                        # Boost quality if relationship is strong
+                        relationship_data = ai_components.get('relationship_state')
+                        if relationship_data and isinstance(relationship_data, dict):
+                            trust = relationship_data.get('trust', 0.5)
+                            affection = relationship_data.get('affection', 0.5)
+                            interaction_quality = (trust + affection) / 2.0
+                        
+                        # Update character's emotional state based on this conversation
+                        updated_state = await self.character_state_manager.update_character_state(
+                            character_name=character_name,
+                            user_id=message_context.user_id,
+                            bot_emotion_data=bot_emotion,
+                            user_emotion_data=ai_components.get('emotion_data'),
+                            interaction_quality=interaction_quality
+                        )
+                        logger.debug("🎭 Updated character emotional state for %s", character_name)
+                        
+                        # Phase 7.5c: Record character emotional state to InfluxDB for temporal analysis
+                        if updated_state and self.temporal_client:
+                            try:
+                                await self.temporal_client.record_character_emotional_state(
+                                    bot_name=character_name,
+                                    user_id=message_context.user_id,
+                                    enthusiasm=updated_state.enthusiasm,
+                                    stress=updated_state.stress,
+                                    contentment=updated_state.contentment,
+                                    empathy=updated_state.empathy,
+                                    confidence=updated_state.confidence,
+                                    dominant_state=updated_state.get_dominant_state()
+                                )
+                                logger.debug(
+                                    "📊 TEMPORAL: Recorded character emotional state to InfluxDB (dominant: %s)",
+                                    updated_state.get_dominant_state()
+                                )
+                            except AttributeError:
+                                # record_character_emotional_state method not yet in all environments
+                                logger.debug("Character emotional state InfluxDB recording not available in this environment")
+                            except Exception as e:
+                                logger.debug("Failed to record character emotional state to InfluxDB: %s", e)
+                                
+                except Exception as e:
+                    logger.debug("Failed to update character emotional state: %s", e)
+            
             # Phase 7.6: Intelligent Emoji Decoration (NEW - Database-driven post-LLM enhancement)
             # Try to initialize emoji selector if not yet available (lazy initialization)
             if not self.emoji_selector:
@@ -455,9 +700,11 @@ class MessageProcessor:
                 try:
                     # Step 1: Filter inappropriate emojis from LLM's own response
                     # (e.g., remove celebration emojis when user is in distress)
+                    # Use emotion_data (primary) or emotion_analysis (fallback) for compatibility
+                    user_emotion = ai_components.get('emotion_data') or ai_components.get('emotion_analysis')
                     filtered_response = self.emoji_selector.filter_inappropriate_emojis(
                         message=response,
-                        user_emotion_data=ai_components.get('emotion_analysis')
+                        user_emotion_data=user_emotion
                     )
                     
                     if filtered_response != response:
@@ -471,7 +718,7 @@ class MessageProcessor:
                     emoji_selection = await self.emoji_selector.select_emojis(
                         character_name=self.character_name,
                         bot_emotion_data=bot_emotion or {},
-                        user_emotion_data=ai_components.get('emotion_analysis'),
+                        user_emotion_data=user_emotion,  # Use same emotion data as filter above
                         detected_topics=ai_components.get('detected_topics', []),
                         response_type=ai_components.get('response_type'),
                         message_content=response,
@@ -3557,6 +3804,15 @@ class MessageProcessor:
                     }
                     for moment in learning_moments
                 ]
+                
+                # 📚 CHARACTER LEARNING PERSISTENCE: Store insights for long-term memory
+                # Persist learning moments to PostgreSQL for character evolution
+                await self._persist_learning_moments(
+                    learning_moments=learning_moments,
+                    character_name=character_name,
+                    user_id=user_id,
+                    conversation_context=content[:500]  # Truncated conversation summary
+                )
             
             logger.info("🌟 Learning moment detection successful for %s (detected %d moments)", 
                        character_name, len(learning_moments))
@@ -3565,6 +3821,78 @@ class MessageProcessor:
         except Exception as e:
             logger.error("🌟 Learning moment detection failed: %s", str(e))
             return None
+    
+    async def _persist_learning_moments(
+        self,
+        learning_moments: List,
+        character_name: str,
+        user_id: str,
+        conversation_context: Optional[str] = None
+    ) -> None:
+        """
+        Persist detected learning moments to PostgreSQL for long-term character learning.
+        
+        Args:
+            learning_moments: List of LearningMoment objects detected
+            character_name: Character name (e.g., 'elena', 'marcus')
+            user_id: Discord user ID
+            conversation_context: Optional conversation summary
+        """
+        try:
+            # Ensure learning persistence is initialized (lazy)
+            persistence_available = await self._ensure_character_learning_persistence_initialized()
+            if not persistence_available or not learning_moments:
+                logger.debug("📚 Learning persistence unavailable or no moments to persist")
+                return
+            
+            # Get character_id from database
+            from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+            from src.database.postgres_pool_manager import get_postgres_pool
+            
+            pool = await get_postgres_pool()
+            if not pool:
+                logger.warning("📚 PostgreSQL pool not available - cannot persist insights")
+                return
+            
+            enhanced_manager = create_enhanced_cdl_manager(pool)
+            character_data = await enhanced_manager.get_character_by_name(character_name)
+            
+            if not character_data or 'id' not in character_data:
+                logger.warning("📚 Character '%s' not found in database - cannot persist insights", character_name)
+                return
+            
+            character_id = character_data['id']
+            
+            # Extract insights from learning moments
+            insights = self.character_insight_extractor.extract_insights_from_learning_moments(
+                learning_moments=learning_moments,
+                character_id=character_id,
+                conversation_context=conversation_context
+            )
+            
+            if not insights:
+                logger.debug("📚 No insights extracted from %d learning moments (filtered by quality)", 
+                           len(learning_moments))
+                return
+            
+            # Store insights in PostgreSQL
+            stored_count = 0
+            for insight in insights:
+                try:
+                    insight_id = await self.character_insight_storage.store_insight(insight)
+                    stored_count += 1
+                    logger.info("📚 Stored insight #%d: [%s] %s", 
+                              insight_id, insight.insight_type, insight.insight_content[:60])
+                except Exception as store_error:
+                    # Log but continue - don't fail entire process for one insight
+                    logger.warning("📚 Failed to store insight: %s", store_error)
+            
+            logger.info("📚 CHARACTER LEARNING PERSISTENCE: Stored %d/%d insights for %s", 
+                       stored_count, len(insights), character_name)
+        
+        except Exception as e:
+            # Log error but don't fail message processing
+            logger.error("📚 Learning moment persistence failed: %s", e, exc_info=True)
 
     async def _process_thread_management(self, user_id: str, content: str, 
                                        message_context: MessageContext) -> Optional[Dict[str, Any]]:
@@ -3592,26 +3920,73 @@ class MessageProcessor:
 
     async def _process_proactive_engagement(self, user_id: str, content: str, 
                                           message_context: MessageContext) -> Optional[Dict[str, Any]]:
-        """Process Phase 4.3 Proactive Engagement Analysis."""
+        """Process Proactive Conversation Engagement for natural topic suggestions."""
+        logger.debug("🎯 STARTING PROACTIVE ENGAGEMENT ANALYSIS for user %s", user_id)
         try:
             if not self.bot_core or not hasattr(self.bot_core, 'engagement_engine'):
+                logger.debug("🎯 Engagement engine not available")
                 return None
             
-            # Create adapter for Discord-specific component
-            discord_message = create_discord_message_adapter(message_context)
+            engagement_engine = self.bot_core.engagement_engine
             
-            # Process proactive engagement
-            engagement_result = await self.bot_core.engagement_engine.analyze_engagement_potential(
+            # Get recent conversation history for analysis
+            from datetime import datetime
+            conversation_context = []
+            if self.memory_manager:
+                recent_memories = await self.memory_manager.get_conversation_history(
+                    user_id=user_id,
+                    limit=10
+                )
+                if recent_memories:
+                    for memory in recent_memories:
+                        if isinstance(memory, dict):
+                            conversation_context.append({
+                                'content': memory.get('content', ''),
+                                'role': memory.get('role', 'user'),
+                                'timestamp': memory.get('timestamp', datetime.now())
+                            })
+            
+            # Add current message to context
+            conversation_context.append({
+                'content': content,
+                'role': 'user',
+                'timestamp': datetime.now()
+            })
+            
+            # Get thread info if available
+            current_thread_info = None
+            if hasattr(self.bot_core, 'conversation_thread_manager'):
+                # Get thread info from thread manager if needed
+                pass  # Thread manager integration optional
+            
+            # Analyze conversation engagement
+            engagement_analysis = await engagement_engine.analyze_conversation_engagement(
                 user_id=user_id,
-                message=discord_message,
-                conversation_history=[]
+                context_id=f"discord_{user_id}",
+                recent_messages=conversation_context,
+                current_thread_info=current_thread_info
             )
             
-            logger.debug(f"Proactive engagement analysis successful for user {user_id}")
-            return engagement_result
+            # Extract key data for prompt integration
+            result = {
+                'intervention_needed': engagement_analysis.get('intervention_needed', False),
+                'recommended_strategy': engagement_analysis.get('suggested_strategy'),  # Fixed: engagement engine returns 'suggested_strategy'
+                'flow_state': engagement_analysis.get('flow_state'),  # Direct field, not nested
+                'stagnation_risk': engagement_analysis.get('stagnation_risk'),  # Direct field, not nested
+                'recommendations': engagement_analysis.get('recommendations', [])
+            }
+            
+            if result['intervention_needed']:
+                logger.info("🎯 PROACTIVE ENGAGEMENT: Intervention recommended - Strategy: %s, Risk: %s",
+                          result['recommended_strategy'], result['stagnation_risk'])
+            else:
+                logger.debug("🎯 PROACTIVE ENGAGEMENT: No intervention needed - Flow state: %s",
+                           result['flow_state'])
+            
+            return result
             
         except Exception as e:
-            logger.debug(f"Proactive engagement analysis failed: {e}")
+            logger.error("🎯 Proactive engagement analysis failed: %s", e)
             return None
 
     async def _process_human_like_memory(self, user_id: str, content: str, 
@@ -4875,6 +5250,12 @@ class MessageProcessor:
                     if memory_boost and isinstance(memory_boost, dict):
                         memory_count = memory_boost.get('memory_count', 0)
                         logger.info(f"🧠 MEMORY BOOST: {memory_count} relevant memories available for prompt injection")
+            
+            # 🎭 CHARACTER EMOTIONAL STATE: Add bot's own emotional state (biochemical modeling)
+            character_emotional_state = ai_components.get('character_emotional_state')
+            if character_emotional_state:
+                ai_components['comprehensive_context']['character_emotional_state'] = character_emotional_state
+                logger.info("🎭 CHARACTER STATE: Added bot emotional state to comprehensive_context for prompt injection")
             
             # 🚀 COMPREHENSIVE CONTEXT INTEGRATION: Add all AI components to pipeline
             comprehensive_context = ai_components.get('comprehensive_context')

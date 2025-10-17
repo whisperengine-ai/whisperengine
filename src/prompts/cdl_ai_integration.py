@@ -903,7 +903,102 @@ class CDLAIPromptIntegration:
             if hasattr(big_five, 'neuroticism'):
                 prompt += f"- {get_adaptive_trait_info(big_five.neuroticism, 'neuroticism')}\n"
 
-        # � VOICE & COMMUNICATION STYLE: Consolidated section matching complete_prompt_examples format
+        # 📚 CHARACTER LEARNING PERSISTENCE INTEGRATION
+        # Retrieves long-term learned insights from PostgreSQL for character evolution
+        try:
+            from src.characters.learning.character_insight_storage import create_character_insight_storage
+            
+            # Get character_id from character name
+            bot_name = self._get_safe_bot_name(character)
+            if bot_name and bot_name != 'unknown':
+                try:
+                    # Get character data to extract ID
+                    from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+                    from src.database.postgres_pool_manager import get_postgres_pool
+                    
+                    pool = await get_postgres_pool()
+                    if pool:
+                        enhanced_manager = create_enhanced_cdl_manager(pool)
+                        character_data = await enhanced_manager.get_character_by_name(bot_name)
+                        
+                        if character_data and 'id' in character_data:
+                            character_id = character_data['id']
+                            
+                            # Create storage and retrieve recent insights
+                            storage = await create_character_insight_storage()
+                            recent_insights = await storage.get_recent_insights(
+                                character_id=character_id,
+                                days_back=30,  # Last 30 days
+                                limit=5  # Max 5 most recent/important insights
+                            )
+                            
+                            if recent_insights:
+                                prompt += f"\n\n📚 YOUR RECENT SELF-DISCOVERIES:\n"
+                                prompt += "These are insights you've gained through conversations. Use them naturally when relevant:\n\n"
+                                
+                                for insight in recent_insights:
+                                    # Format insight with confidence indicator
+                                    confidence_emoji = "✨" if insight.confidence_score > 0.8 else "💫" if insight.confidence_score > 0.6 else "🌟"
+                                    prompt += f"- {confidence_emoji} {insight.insight_content}\n"
+                                    if insight.triggers:
+                                        prompt += f"  (Relevant when discussing: {', '.join(insight.triggers[:3])})\n"
+                                
+                                logger.info("📚 CHARACTER LEARNING: Added %d persistent insights to prompt for %s", 
+                                          len(recent_insights), bot_name)
+                            else:
+                                logger.debug("📚 CHARACTER LEARNING: No recent insights found for %s", bot_name)
+                        else:
+                            logger.debug("📚 CHARACTER LEARNING: Character '%s' not found in database", bot_name)
+                    else:
+                        logger.debug("📚 CHARACTER LEARNING: PostgreSQL pool not available")
+                        
+                except Exception as storage_error:
+                    logger.debug("📚 CHARACTER LEARNING: Could not retrieve insights: %s", storage_error)
+            else:
+                logger.debug("📚 CHARACTER LEARNING: Bot name not available")
+                
+        except ImportError:
+            logger.debug("📚 CHARACTER LEARNING: Storage not available (modules not found)")
+        except Exception as e:
+            logger.debug("📚 CHARACTER LEARNING: Integration failed: %s", e)
+        
+        # 🌟 CHARACTER LEARNING MOMENTS INTEGRATION
+        # Connects detected learning moments to LLM prompt for natural character growth expression
+        try:
+            if pipeline_dict and 'ai_components' in pipeline_dict:
+                ai_components = pipeline_dict['ai_components']
+                
+                if isinstance(ai_components, dict) and 'character_learning_moments' in ai_components:
+                    learning_data = ai_components['character_learning_moments']
+                    
+                    if learning_data and learning_data.get('surface_moment'):
+                        integration = learning_data.get('suggested_integration', {})
+                        suggested_response = integration.get('suggested_response', '')
+                        moment_type = integration.get('type', 'unknown')
+                        confidence = integration.get('confidence', 0.0)
+                        integration_point = integration.get('integration_point', '')
+                        character_voice = integration.get('character_voice', '')
+                        
+                        if suggested_response:
+                            prompt += f"\n\n🌟 NATURAL LEARNING MOMENT OPPORTUNITY:\n"
+                            prompt += f"**Type**: {moment_type}\n"
+                            prompt += f"**Confidence**: {confidence:.2f}\n"
+                            prompt += f"**Suggested Expression**: \"{suggested_response}\"\n"
+                            if integration_point:
+                                prompt += f"**Natural Integration Point**: {integration_point}\n"
+                            if character_voice:
+                                prompt += f"**Voice Adaptation**: {character_voice}\n"
+                            prompt += "\n**GUIDANCE**: If conversationally appropriate, consider naturally "
+                            prompt += "weaving this learning insight into your response. This should "
+                            prompt += "feel organic and character-appropriate - not forced. Only include "
+                            prompt += "this if it flows naturally with the current conversation context.\n"
+                            
+                            logger.info("🌟 LEARNING MOMENT: Added to prompt (type=%s, confidence=%.2f)", 
+                                       moment_type, confidence)
+        except Exception as e:
+            logger.debug("Could not integrate learning moments: %s", e)
+
+        # VOICE & COMMUNICATION STYLE: Consolidated section matching complete_prompt_examples format
         voice_section = await self._build_voice_communication_section(character)
         if voice_section:
             prompt += f"\n\n{voice_section}"
@@ -1458,7 +1553,47 @@ class CDLAIPromptIntegration:
                         if primary_emotion and confidence > 0.5:
                             guidance_parts.append(f"🎭 EMOTION: Detected {primary_emotion} (confidence: {confidence:.2f}) - respond with appropriate empathy")
                     
-                    # 🎯 ADAPTIVE LEARNING INTELLIGENCE
+                    # � EMOTION-DRIVEN PROMPT MODIFIERS (WhisperEngine's "Biochemical Modeling")
+                    # Leverage existing RoBERTa emotion data to dynamically adjust response style
+                    try:
+                        from src.intelligence.emotion_prompt_modifier import create_emotion_prompt_modifier
+                        
+                        # Try to get emotion data from multiple possible sources
+                        emotion_data = (
+                            pipeline_dict.get('emotion_analysis') or 
+                            comprehensive_context.get('emotion_analysis') or
+                            {}
+                        )
+                        
+                        if emotion_data:
+                            # Determine character archetype for appropriate modifiers
+                            character_archetype = None
+                            if character.identity.archetype:
+                                archetype_lower = character.identity.archetype.lower()
+                                if 'real' in archetype_lower or 'honest' in archetype_lower:
+                                    character_archetype = "real_world"
+                                elif 'fantasy' in archetype_lower or 'mystical' in archetype_lower:
+                                    character_archetype = "fantasy"
+                                elif 'ai' in archetype_lower or 'conscious' in archetype_lower:
+                                    character_archetype = "narrative_ai"
+                            
+                            emotion_modifier = create_emotion_prompt_modifier(
+                                confidence_threshold=0.7,
+                                intensity_threshold=0.5
+                            )
+                            
+                            emotion_guidance = emotion_modifier.create_system_prompt_addition(
+                                emotion_data=emotion_data,
+                                character_archetype=character_archetype
+                            )
+                            
+                            if emotion_guidance:
+                                guidance_parts.append(emotion_guidance)
+                                logger.info("🎭 EMOTION MODIFIERS: Applied biochemical-style response guidance")
+                    except Exception as e:
+                        logger.debug("Could not apply emotion prompt modifiers: %s", e)
+                    
+                    # �🎯 ADAPTIVE LEARNING INTELLIGENCE
                     # Inject relationship depth, conversation quality, and confidence metrics
                     relationship_data = comprehensive_context.get('relationship_state')
                     if relationship_data and isinstance(relationship_data, dict):
@@ -1533,7 +1668,22 @@ class CDLAIPromptIntegration:
                             f"(Performance Score: {overall_score:.2f}, Status: {performance_status})"
                         )
                     
-                    # 🎯 STEP 7: Intelligent Question Generation - Add curiosity questions
+                    # � CHARACTER EMOTIONAL STATE (Biochemical Modeling - Bot's Own Emotions)
+                    # Add guidance based on character's current emotional state (not user's)
+                    character_state = comprehensive_context.get('character_emotional_state')
+                    if character_state and hasattr(character_state, 'get_prompt_guidance'):
+                        try:
+                            state_guidance = character_state.get_prompt_guidance()
+                            if state_guidance:
+                                guidance_parts.append(state_guidance)
+                                logger.info(
+                                    "🎭 CHARACTER STATE GUIDANCE: Added %s state to prompt",
+                                    character_state.get_dominant_state()
+                                )
+                        except Exception as e:
+                            logger.debug("Failed to get character state guidance: %s", e)
+                    
+                    # �🎯 STEP 7: Intelligent Question Generation - Add curiosity questions
                     try:
                         if self.semantic_router:
                             curiosity_questions = await self.generate_curiosity_questions(

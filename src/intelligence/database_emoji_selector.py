@@ -769,9 +769,13 @@ class DatabaseEmojiSelector:
         user_emotion = user_emotion_data.get('primary_emotion')
         user_intensity = user_emotion_data.get('intensity', 0.5)
         
-        # Only filter if user is in emotional distress
-        if user_emotion not in ['sadness', 'fear', 'anger'] or user_intensity <= 0.6:
-            return message
+        # DISABLED: LLM emoji usage is part of personality expression
+        # Only emoji REACTIONS are filtered (via vector_emoji_intelligence.py)
+        return message
+        
+        # Original filtering logic kept for reference but disabled:
+        # if user_emotion not in ['sadness', 'fear', 'anger'] or user_intensity <= 0.6:
+        #     return message
         
         # WHITELIST APPROACH: Define ALLOWED emojis for distress contexts
         # Better to remove celebratory emojis, but ALLOW empathy-mirroring emojis

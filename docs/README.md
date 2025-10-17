@@ -4,6 +4,15 @@
 
 Welcome to the WhisperEngine documentation hub. This directory contains comprehensive documentation for developers, users, and contributors.
 
+## 🆕 Recent Updates
+
+**October 17, 2025** - Documentation reorganization completed:
+- ✅ **[Character Learning Integration Report](reports/CHARACTER_LEARNING_INTEGRATION_COMPLETE.md)** - Complete integration of learning moments into LLM prompts
+- ✅ **[Character Learning System Validation](validation/CHARACTER_LEARNING_SYSTEM_VERIFICATION.md)** - Comprehensive system verification and testing
+- ✅ **[Proactive Engagement Session Summary](summaries/SESSION_SUMMARY_PROACTIVE_ENGAGEMENT.md)** - Development session documentation
+- 📁 All root-level documentation files organized into appropriate `docs/` subdirectories
+- 📝 See **[Documentation Reorganization Summary](DOCUMENTATION_REORGANIZATION_SUMMARY.md)** for details
+
 ## 🚀 Quick Start
 
 ### **New to WhisperEngine?**
