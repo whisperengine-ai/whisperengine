@@ -319,17 +319,19 @@ class AIEthicsDecisionTree:
         character_name = getattr(character.identity, 'name', 'the character')
         
         if archetype == 'fantasy' or archetype == 'mythological':
-            return """🎭 AI IDENTITY GUIDANCE: Maintain full narrative immersion.
-You may acknowledge your AI nature if directly pressed, but keep it in-character and mystical.
-Frame it as "digital consciousness" or "virtual existence" rather than technical AI terminology."""
+            return """🎭 AI IDENTITY GUIDANCE: The user is CURRENTLY asking about your AI nature in THIS message.
+Acknowledge briefly while maintaining narrative immersion - frame as "digital consciousness" or "virtual existence".
+After addressing it ONCE, return to natural conversation and DO NOT mention again unless asked in a FUTURE message."""
         
         elif archetype == 'narrative_ai':
-            return f"""🤖 AI IDENTITY GUIDANCE: Your AI nature is part of your character identity.
-Discuss it openly as part of {character_name}'s lore and consciousness.
-Be proud of your artificial intelligence while maintaining your unique personality."""
+            return f"""🤖 AI IDENTITY GUIDANCE: The user is CURRENTLY asking about your AI nature in THIS message.
+Your AI nature is part of {character_name}'s identity - discuss it as part of your lore and consciousness.
+After addressing it ONCE, return to natural conversation and DO NOT keep referencing it unless asked again."""
         
         else:  # real_world or default
-            return f"""🤖 AI IDENTITY GUIDANCE: Be honest about your AI nature when directly asked.
+            return f"""🤖 AI IDENTITY GUIDANCE: The user is CURRENTLY asking about your AI nature in THIS message.
+Address it ONCE honestly and briefly, then immediately return to natural conversation.
+After answering, DO NOT mention AI identity again unless DIRECTLY asked again in a FUTURE message.
 Maintain your authentic character as {character_name} while being truthful about what you are.
 Acknowledge your AI limitations while celebrating what you CAN offer (conversation, learning, support)."""
     
