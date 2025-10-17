@@ -226,6 +226,12 @@ class MessageProcessor:
             logger.warning("Fidelity metrics collector not available")
             self.fidelity_metrics = None
         
+        # Character Emotional State Manager: Track bot's own emotional state across conversations
+        # Note: Uses lazy initialization since postgres_pool is initialized asynchronously
+        self.character_state_manager = None
+        self._character_state_manager_initialized = False
+        self._character_state_manager_lock = asyncio.Lock()
+        
         # Unified Character Intelligence Coordinator: PHASE 4A Integration
         self.character_intelligence_coordinator = None
         
@@ -359,6 +365,50 @@ class MessageProcessor:
         self._last_security_validation = None
         self._last_emotional_context = None
     
+    async def _ensure_character_state_manager_initialized(self):
+        """
+        Ensure character emotional state manager is initialized (lazy initialization).
+        
+        This is async because it needs to wait for postgres_pool which is initialized
+        asynchronously during bot startup. Only initializes once.
+        
+        Returns:
+            bool: True if manager is available (either already initialized or just initialized)
+        """
+        # Fast path: already initialized
+        if self._character_state_manager_initialized:
+            return self.character_state_manager is not None
+        
+        # Use lock to prevent multiple simultaneous initialization attempts
+        async with self._character_state_manager_lock:
+            # Double-check after acquiring lock (another coroutine may have initialized)
+            if self._character_state_manager_initialized:
+                return self.character_state_manager is not None
+            
+            try:
+                from src.intelligence.character_emotional_state import create_character_emotional_state_manager
+                
+                # Check if postgres_pool is now available
+                postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+                if postgres_pool:
+                    self.character_state_manager = create_character_emotional_state_manager(postgres_pool)
+                    logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (lazy)")
+                else:
+                    logger.debug("🎭 CHARACTER STATE: PostgreSQL pool still not available - state tracking disabled")
+                    self.character_state_manager = None
+            
+            except ImportError as e:
+                logger.warning("🎭 CHARACTER STATE: Tracking not available: %s", e)
+                self.character_state_manager = None
+            except Exception as e:
+                logger.error("🎭 CHARACTER STATE: Initialization failed: %s", e)
+                self.character_state_manager = None
+            
+            # Mark as initialized (even if it failed, don't retry every message)
+            self._character_state_manager_initialized = True
+            
+            return self.character_state_manager is not None
+    
     def _try_initialize_emoji_selector(self):
         """
         Try to initialize database emoji selector (lazy initialization).
@@ -471,6 +521,32 @@ class MessageProcessor:
                 message_context, ai_components, relevant_memories
             )
             
+            # Phase 6.8: Character Emotional State (Biochemical Modeling - Bot's Own Emotional State)
+            # Get character's current emotional state to influence response generation
+            # Note: Uses lazy initialization to wait for postgres_pool availability
+            await self._ensure_character_state_manager_initialized()
+            
+            if self.character_state_manager:
+                try:
+                    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                    character_name = get_normalized_bot_name_from_env()
+                    
+                    if character_name:
+                        character_state = await self.character_state_manager.get_character_state(
+                            character_name=character_name,
+                            user_id=message_context.user_id
+                        )
+                        
+                        # Add to AI components for CDL prompt building
+                        ai_components['character_emotional_state'] = character_state
+                        logger.info(
+                            "🎭 CHARACTER STATE: Retrieved for %s - %s (enthusiasm=%.2f, stress=%.2f)",
+                            character_name, character_state.get_dominant_state(),
+                            character_state.enthusiasm, character_state.stress
+                        )
+                except Exception as e:
+                    logger.debug("Failed to retrieve character emotional state: %s", e)
+            
             # Phase 7: Response generation
             print(f"🎯 PHASE 7 START: About to call _generate_response for user {message_context.user_id}", flush=True)
             response = await self._generate_response(
@@ -482,6 +558,62 @@ class MessageProcessor:
             bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
             ai_components['bot_emotion'] = bot_emotion
             
+            # Phase 7.5b: Update character's own emotional state (biochemical modeling - bot emotions)
+            # Note: Manager should already be initialized from Phase 6.8, but ensure just in case
+            await self._ensure_character_state_manager_initialized()
+            
+            if self.character_state_manager and bot_emotion:
+                try:
+                    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                    character_name = get_normalized_bot_name_from_env()
+                    
+                    if character_name:
+                        # Calculate interaction quality (can be enhanced later with more metrics)
+                        interaction_quality = 0.7  # Default neutral quality
+                        
+                        # Boost quality if relationship is strong
+                        relationship_data = ai_components.get('relationship_state')
+                        if relationship_data and isinstance(relationship_data, dict):
+                            trust = relationship_data.get('trust', 0.5)
+                            affection = relationship_data.get('affection', 0.5)
+                            interaction_quality = (trust + affection) / 2.0
+                        
+                        # Update character's emotional state based on this conversation
+                        updated_state = await self.character_state_manager.update_character_state(
+                            character_name=character_name,
+                            user_id=message_context.user_id,
+                            bot_emotion_data=bot_emotion,
+                            user_emotion_data=ai_components.get('emotion_data'),
+                            interaction_quality=interaction_quality
+                        )
+                        logger.debug("🎭 Updated character emotional state for %s", character_name)
+                        
+                        # Phase 7.5c: Record character emotional state to InfluxDB for temporal analysis
+                        if updated_state and self.temporal_client:
+                            try:
+                                await self.temporal_client.record_character_emotional_state(
+                                    bot_name=character_name,
+                                    user_id=message_context.user_id,
+                                    enthusiasm=updated_state.enthusiasm,
+                                    stress=updated_state.stress,
+                                    contentment=updated_state.contentment,
+                                    empathy=updated_state.empathy,
+                                    confidence=updated_state.confidence,
+                                    dominant_state=updated_state.get_dominant_state()
+                                )
+                                logger.debug(
+                                    "📊 TEMPORAL: Recorded character emotional state to InfluxDB (dominant: %s)",
+                                    updated_state.get_dominant_state()
+                                )
+                            except AttributeError:
+                                # record_character_emotional_state method not yet in all environments
+                                logger.debug("Character emotional state InfluxDB recording not available in this environment")
+                            except Exception as e:
+                                logger.debug("Failed to record character emotional state to InfluxDB: %s", e)
+                                
+                except Exception as e:
+                    logger.debug("Failed to update character emotional state: %s", e)
+            
             # Phase 7.6: Intelligent Emoji Decoration (NEW - Database-driven post-LLM enhancement)
             # Try to initialize emoji selector if not yet available (lazy initialization)
             if not self.emoji_selector:
@@ -491,9 +623,11 @@ class MessageProcessor:
                 try:
                     # Step 1: Filter inappropriate emojis from LLM's own response
                     # (e.g., remove celebration emojis when user is in distress)
+                    # Use emotion_data (primary) or emotion_analysis (fallback) for compatibility
+                    user_emotion = ai_components.get('emotion_data') or ai_components.get('emotion_analysis')
                     filtered_response = self.emoji_selector.filter_inappropriate_emojis(
                         message=response,
-                        user_emotion_data=ai_components.get('emotion_analysis')
+                        user_emotion_data=user_emotion
                     )
                     
                     if filtered_response != response:
@@ -507,7 +641,7 @@ class MessageProcessor:
                     emoji_selection = await self.emoji_selector.select_emojis(
                         character_name=self.character_name,
                         bot_emotion_data=bot_emotion or {},
-                        user_emotion_data=ai_components.get('emotion_analysis'),
+                        user_emotion_data=user_emotion,  # Use same emotion data as filter above
                         detected_topics=ai_components.get('detected_topics', []),
                         response_type=ai_components.get('response_type'),
                         message_content=response,
@@ -4958,6 +5092,12 @@ class MessageProcessor:
                     if memory_boost and isinstance(memory_boost, dict):
                         memory_count = memory_boost.get('memory_count', 0)
                         logger.info(f"🧠 MEMORY BOOST: {memory_count} relevant memories available for prompt injection")
+            
+            # 🎭 CHARACTER EMOTIONAL STATE: Add bot's own emotional state (biochemical modeling)
+            character_emotional_state = ai_components.get('character_emotional_state')
+            if character_emotional_state:
+                ai_components['comprehensive_context']['character_emotional_state'] = character_emotional_state
+                logger.info("🎭 CHARACTER STATE: Added bot emotional state to comprehensive_context for prompt injection")
             
             # 🚀 COMPREHENSIVE CONTEXT INTEGRATION: Add all AI components to pipeline
             comprehensive_context = ai_components.get('comprehensive_context')

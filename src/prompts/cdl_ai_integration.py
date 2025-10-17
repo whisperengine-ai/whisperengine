@@ -1494,7 +1494,47 @@ class CDLAIPromptIntegration:
                         if primary_emotion and confidence > 0.5:
                             guidance_parts.append(f"🎭 EMOTION: Detected {primary_emotion} (confidence: {confidence:.2f}) - respond with appropriate empathy")
                     
-                    # 🎯 ADAPTIVE LEARNING INTELLIGENCE
+                    # � EMOTION-DRIVEN PROMPT MODIFIERS (WhisperEngine's "Biochemical Modeling")
+                    # Leverage existing RoBERTa emotion data to dynamically adjust response style
+                    try:
+                        from src.intelligence.emotion_prompt_modifier import create_emotion_prompt_modifier
+                        
+                        # Try to get emotion data from multiple possible sources
+                        emotion_data = (
+                            pipeline_dict.get('emotion_analysis') or 
+                            comprehensive_context.get('emotion_analysis') or
+                            {}
+                        )
+                        
+                        if emotion_data:
+                            # Determine character archetype for appropriate modifiers
+                            character_archetype = None
+                            if character.identity.archetype:
+                                archetype_lower = character.identity.archetype.lower()
+                                if 'real' in archetype_lower or 'honest' in archetype_lower:
+                                    character_archetype = "real_world"
+                                elif 'fantasy' in archetype_lower or 'mystical' in archetype_lower:
+                                    character_archetype = "fantasy"
+                                elif 'ai' in archetype_lower or 'conscious' in archetype_lower:
+                                    character_archetype = "narrative_ai"
+                            
+                            emotion_modifier = create_emotion_prompt_modifier(
+                                confidence_threshold=0.7,
+                                intensity_threshold=0.5
+                            )
+                            
+                            emotion_guidance = emotion_modifier.create_system_prompt_addition(
+                                emotion_data=emotion_data,
+                                character_archetype=character_archetype
+                            )
+                            
+                            if emotion_guidance:
+                                guidance_parts.append(emotion_guidance)
+                                logger.info("🎭 EMOTION MODIFIERS: Applied biochemical-style response guidance")
+                    except Exception as e:
+                        logger.debug("Could not apply emotion prompt modifiers: %s", e)
+                    
+                    # �🎯 ADAPTIVE LEARNING INTELLIGENCE
                     # Inject relationship depth, conversation quality, and confidence metrics
                     relationship_data = comprehensive_context.get('relationship_state')
                     if relationship_data and isinstance(relationship_data, dict):
@@ -1569,7 +1609,22 @@ class CDLAIPromptIntegration:
                             f"(Performance Score: {overall_score:.2f}, Status: {performance_status})"
                         )
                     
-                    # 🎯 STEP 7: Intelligent Question Generation - Add curiosity questions
+                    # � CHARACTER EMOTIONAL STATE (Biochemical Modeling - Bot's Own Emotions)
+                    # Add guidance based on character's current emotional state (not user's)
+                    character_state = comprehensive_context.get('character_emotional_state')
+                    if character_state and hasattr(character_state, 'get_prompt_guidance'):
+                        try:
+                            state_guidance = character_state.get_prompt_guidance()
+                            if state_guidance:
+                                guidance_parts.append(state_guidance)
+                                logger.info(
+                                    "🎭 CHARACTER STATE GUIDANCE: Added %s state to prompt",
+                                    character_state.get_dominant_state()
+                                )
+                        except Exception as e:
+                            logger.debug("Failed to get character state guidance: %s", e)
+                    
+                    # �🎯 STEP 7: Intelligent Question Generation - Add curiosity questions
                     try:
                         if self.semantic_router:
                             curiosity_questions = await self.generate_curiosity_questions(

@@ -1640,6 +1640,16 @@ class VectorEmojiIntelligence:
             return personalized_emojis[0] if personalized_emojis else "🔮", EmojiResponseContext.MYSTICAL_WONDER
         
         # Default based on communication style preference (NOT in distress)
+        # 🚨 CRITICAL FIX: Check user emotion before using positive emojis
+        # Don't default to 😊 if user is sad/anxious/angry
+        if current_emotion in ["sadness", "fear", "anger", "anxiety"]:
+            logger.info("🎭 Default fallback: User emotion is %s - using empathy emoji instead of 😊", current_emotion)
+            empathy_emoji = self._select_emotion_aware_empathy_emoji(
+                emotional_state=emotional_state,
+                bot_character=bot_character
+            )
+            return empathy_emoji, EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
+        
         if communication_style.get("prefers_brief_responses", False):
             personalized_emojis = await self._get_personalized_character_emojis(
                 user_id=user_id, bot_character=bot_character, emotion_category="acknowledgment"

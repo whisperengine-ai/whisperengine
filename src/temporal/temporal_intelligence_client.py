@@ -372,6 +372,77 @@ class TemporalIntelligenceClient:
             logger.error("Failed to record user emotion: %s", e)
             return False
 
+    async def record_character_emotional_state(
+        self,
+        bot_name: str,
+        user_id: str,
+        enthusiasm: float,
+        stress: float,
+        contentment: float,
+        empathy: float,
+        confidence: float,
+        dominant_state: str,
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record character's 5-dimensional emotional state to InfluxDB
+        
+        Captures the bot's persistent emotional state for temporal analysis of
+        character growth and emotional evolution patterns. This enables:
+        - Visualizing character emotional evolution over time
+        - Detecting patterns in emotional responses
+        - Tracking character growth and relationship-specific emotional states
+        - Foundation for proactive emotional awareness
+        
+        Args:
+            bot_name: Name of the bot (elena, marcus, etc.)
+            user_id: User identifier
+            enthusiasm: Enthusiasm level (0.0-1.0) - dopamine-like motivation/energy
+            stress: Stress level (0.0-1.0) - cortisol-like pressure/tension
+            contentment: Contentment level (0.0-1.0) - serotonin-like satisfaction
+            empathy: Empathy level (0.0-1.0) - oxytocin-like connection/warmth
+            confidence: Confidence level (0.0-1.0) - self-assurance/capability
+            dominant_state: Human-readable dominant state (overwhelmed, energized, etc.)
+            session_id: Optional session identifier
+            timestamp: Optional timestamp (defaults to current time)
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("character_emotional_state") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("dominant_state", dominant_state)
+            
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("enthusiasm", enthusiasm) \
+                .field("stress", stress) \
+                .field("contentment", contentment) \
+                .field("empathy", empathy) \
+                .field("confidence", confidence)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug(
+                "📊 TEMPORAL: Recorded character emotional state for %s/%s (dominant: %s, stress: %.2f, enthusiasm: %.2f)",
+                bot_name, user_id, dominant_state, stress, enthusiasm
+            )
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record character emotional state: %s", e)
+            return False
+
     async def record_memory_aging_metrics(
         self,
         bot_name: str,
