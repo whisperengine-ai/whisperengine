@@ -3935,7 +3935,8 @@ class VectorMemoryManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 25  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
+        limit: int = 25,  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
+        emotion_hint: Optional[str] = None  # 🎭 NEW: Optional emotion hint from RoBERTa analysis
     ) -> List[Dict[str, Any]]:
         """
         Retrieve memories relevant to the given query using intelligent vector selection.
@@ -3944,6 +3945,13 @@ class VectorMemoryManager:
         - Emotional queries → emotion vector (feelings, mood, emotional state)
         - Pattern queries → semantic vector (relationship patterns, behavioral trends)
         - Content queries → content vector (semantic meaning, topics, facts)
+        
+        Args:
+            user_id: User identifier for memory retrieval
+            query: Query text for semantic search
+            limit: Maximum number of memories to retrieve
+            emotion_hint: Optional emotion label from RoBERTa analysis (joy, sadness, anger, fear, etc.)
+                         If provided, bypasses keyword-based emotion detection
         """
         import time
         
@@ -3976,18 +3984,32 @@ class VectorMemoryManager:
             # 🎭 INTELLIGENT VECTOR SELECTION: Route to appropriate named vector based on query intent
             query_lower = query.lower()
             
-            # Emotional queries → use emotion vector for better emotional context matching
-            emotional_keywords = ['feel', 'feeling', 'felt', 'mood', 'emotion', 'emotional', 
-                                 'happy', 'sad', 'angry', 'excited', 'worried', 'anxious',
-                                 'joyful', 'depressed', 'upset', 'frustrated', 'content']
-            if any(keyword in query_lower for keyword in emotional_keywords):
-                logger.info(f"🎭 EMOTIONAL QUERY DETECTED: '{query}' - Using emotion vector search")
+            # 🎭 ENHANCED EMOTION DETECTION: Use RoBERTa hint if provided, or fallback to keyword detection
+            use_emotion_vector = False
+            emotion_source = "none"
+            
+            if emotion_hint:
+                # Priority 1: Trust RoBERTa emotion analysis from MessageProcessor
+                use_emotion_vector = True
+                emotion_source = f"roberta:{emotion_hint}"
+                logger.info(f"🎭 EMOTION HINT PROVIDED: '{emotion_hint}' - Using emotion vector search")
+            else:
+                # Priority 2: Fallback to keyword-based detection for direct memory API calls
+                emotional_keywords = ['feel', 'feeling', 'felt', 'mood', 'emotion', 'emotional', 
+                                     'happy', 'sad', 'angry', 'excited', 'worried', 'anxious',
+                                     'joyful', 'depressed', 'upset', 'frustrated', 'content']
+                if any(keyword in query_lower for keyword in emotional_keywords):
+                    use_emotion_vector = True
+                    emotion_source = "keyword_detection"
+                    logger.info(f"🎭 EMOTIONAL QUERY DETECTED (keywords): '{query}' - Using emotion vector search")
+            
+            if use_emotion_vector:
                 try:
                     emotion_results = await self.vector_store.search_memories_with_qdrant_intelligence(
                         query=query,
                         user_id=user_id,
                         top_k=limit,
-                        emotional_context=query  # Use same query for emotion matching
+                        emotional_context=emotion_hint or query  # Use hint if available, else query
                     )
                     
                     if emotion_results:
@@ -4000,10 +4022,11 @@ class VectorMemoryManager:
                                 "metadata": r.get("metadata", {}),
                                 "memory_type": r.get("memory_type", "conversation"),
                                 "emotional": True,
-                                "search_type": "emotion_vector"
+                                "search_type": "emotion_vector",
+                                "emotion_source": emotion_source  # Track whether RoBERTa or keyword detection
                             })
                         
-                        logger.debug(f"🎭 EMOTION VECTOR: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                        logger.debug(f"🎭 EMOTION VECTOR ({emotion_source}): Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
                         return formatted_results
                 except Exception as e:
                     logger.warning(f"Emotion vector search failed, falling back to content: {e}")
