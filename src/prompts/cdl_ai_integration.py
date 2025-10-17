@@ -3545,9 +3545,14 @@ Stay authentic to {character.identity.name}'s personality while being transparen
             field_title = field_name.replace('_', ' ').title()
             
             if isinstance(field_value, dict):
-                # 🚨 FIX: Properly format nested dicts (values_and_beliefs, ai_identity_handling)
-                # Check if dict has standard keys like 'description', 'philosophy', etc.
-                if 'description' in field_value:
+                # 🚨 FIX: Properly format nested dicts (values_and_beliefs, ai_identity_handling, communication_style)
+                # Check if dict has standard keys like 'value', 'description', 'philosophy', etc.
+                if 'value' in field_value and 'description' in field_value:
+                    # Communication style format: {'value': 'High', 'description': 'Engagement level'}
+                    value = field_value.get('value', '')
+                    if value:  # Only show if there's an actual value
+                        section_parts.append(f"\n📋 {field_title}: {value}")
+                elif 'description' in field_value:
                     # Values/beliefs format: {'key': 'fear_1', 'description': 'text', 'importance': 'high'}
                     desc = field_value.get('description', '')
                     importance = field_value.get('importance', '')
