@@ -21,9 +21,12 @@ services:
       - POSTGRES_USER=whisperengine
       - POSTGRES_PASSWORD=whisperengine_password
       - POSTGRES_DB=whisperengine
+      - MIGRATION_MODE=dev  # DEV mode: graceful handling when Docker image lacks latest migrations
     volumes:
       - ./scripts:/app/scripts  # Live mount for migration scripts
       - ./sql:/app/sql:ro       # Live mount for SQL files
+      - ./alembic:/app/alembic  # Live mount for Alembic migrations (DEV mode)
+      - ./alembic.ini:/app/alembic.ini:ro  # Live mount for Alembic config
     networks:
       - bot_network
     depends_on:
@@ -178,8 +181,7 @@ services:
   whisperengine-bot-builder:
     build:
       context: .
-      dockerfile: Dockerfile.bundled-models
-      target: production
+      dockerfile: Dockerfile
     image: whisperengine-bot:${VERSION:-latest}
     profiles:
       - build-only

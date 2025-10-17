@@ -216,7 +216,16 @@ async def run_migrations():
         
         if alembic_version_exists:
             print("🔍 Detected Alembic-managed database - running Alembic migrations...")
-            print("ℹ️  PRODUCTION MODE: Using Alembic incremental migrations")
+            
+            # Check migration mode - DEV allows graceful handling of missing migrations
+            migration_mode = os.getenv('MIGRATION_MODE', 'production').lower()
+            is_dev_mode = migration_mode == 'dev'
+            
+            if is_dev_mode:
+                print("ℹ️  DEV MODE: Graceful migration handling enabled")
+                print("   (Docker image may not have latest migration files yet)")
+            else:
+                print("ℹ️  PRODUCTION MODE: Using Alembic incremental migrations")
             
             # Run Alembic migrations
             # Set the database URL for Alembic
@@ -238,10 +247,26 @@ async def run_migrations():
                     print(f"❌ Alembic migration failed!")
                     print(f"STDOUT: {result.stdout}")
                     print(f"STDERR: {result.stderr}")
+                    
+                    # In DEV mode, allow graceful failure if migration files are missing
+                    if is_dev_mode and "Can't locate revision" in result.stderr:
+                        print("⚠️  DEV MODE: Migration file not found in Docker image")
+                        print("   This is expected when developing new migrations")
+                        print("   The database schema is ahead of the Docker image")
+                        print("   ✅ Allowing container to start - bots will still work")
+                        return 0  # Don't fail - allow container to start
+                    
                     return 1
                     
             except Exception as e:
                 print(f"❌ Failed to run Alembic migrations: {e}")
+                
+                # In DEV mode, be more forgiving of errors
+                if is_dev_mode:
+                    print("⚠️  DEV MODE: Exception during migration")
+                    print("   ✅ Allowing container to start anyway")
+                    return 0
+                
                 return 1
         
         # QUICKSTART MODE: Apply comprehensive 00_init.sql ONLY, skip incremental migrations
