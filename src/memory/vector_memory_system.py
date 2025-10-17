@@ -4752,6 +4752,24 @@ class VectorMemoryManager:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []
     
+    async def get_conversation_summary_with_recommendations(
+        self,
+        user_id: str,
+        conversation_history: List[Dict[str, Any]],
+        limit: int = 5
+    ) -> Dict[str, str]:
+        """
+        Delegate to VectorMemoryStore for conversation summary generation.
+        
+        🚀 QDRANT RECOMMENDATION: Zero-LLM conversation summarization
+        using vector similarity for topic detection.
+        """
+        return await self.vector_store.get_conversation_summary_with_recommendations(
+            user_id=user_id,
+            conversation_history=conversation_history,
+            limit=limit
+        )
+    
     async def search_memories(
         self,
         user_id: str,
