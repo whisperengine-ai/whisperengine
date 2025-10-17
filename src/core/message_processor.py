@@ -319,6 +319,42 @@ class MessageProcessor:
             logger.warning("Emotional context engine initialization failed: %s", e)
             self.emotional_context_engine = None
         
+        # Initialize Proactive Conversation Engagement Engine for natural topic suggestions
+        try:
+            from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
+            
+            # Get personality profiler if available (for personality-based topic suggestions)
+            personality_profiler = None
+            if hasattr(self, 'bot_core') and self.bot_core:
+                personality_profiler = getattr(self.bot_core, 'personality_profiler', None)
+            
+            self.engagement_engine = ProactiveConversationEngagementEngine(
+                emotional_engine=self._shared_emotion_analyzer,  # Correct parameter name
+                personality_profiler=personality_profiler,
+                memory_manager=self.memory_manager,  # Add memory manager for conversation history
+                stagnation_threshold_minutes=10,  # Conservative: 10 min before suggesting topics
+                engagement_check_interval_minutes=5,  # Check every 5 min
+                max_proactive_suggestions_per_hour=3  # Conservative: max 3 suggestions/hour
+            )
+            logger.info("🎯 Proactive Conversation Engagement Engine initialized")
+            
+            # Store in bot_core for access by integration point (line 3041)
+            if hasattr(self, 'bot_core') and self.bot_core:
+                self.bot_core.engagement_engine = self.engagement_engine
+            
+            # Log configuration for debugging
+            logger.info("🎯 ENGAGEMENT CONFIG: Stagnation threshold: %d min, Check interval: %d min, Max suggestions: %d/hour",
+                       self.engagement_engine.stagnation_threshold.total_seconds() / 60,
+                       self.engagement_engine.engagement_check_interval.total_seconds() / 60,
+                       self.engagement_engine.max_suggestions_per_hour)
+                       
+        except ImportError as e:
+            logger.warning("Proactive engagement engine not available: %s", e)
+            self.engagement_engine = None
+        except Exception as e:
+            logger.error("Proactive engagement engine initialization failed: %s", e)
+            self.engagement_engine = None
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
@@ -3592,26 +3628,73 @@ class MessageProcessor:
 
     async def _process_proactive_engagement(self, user_id: str, content: str, 
                                           message_context: MessageContext) -> Optional[Dict[str, Any]]:
-        """Process Phase 4.3 Proactive Engagement Analysis."""
+        """Process Proactive Conversation Engagement for natural topic suggestions."""
+        logger.debug("🎯 STARTING PROACTIVE ENGAGEMENT ANALYSIS for user %s", user_id)
         try:
             if not self.bot_core or not hasattr(self.bot_core, 'engagement_engine'):
+                logger.debug("🎯 Engagement engine not available")
                 return None
             
-            # Create adapter for Discord-specific component
-            discord_message = create_discord_message_adapter(message_context)
+            engagement_engine = self.bot_core.engagement_engine
             
-            # Process proactive engagement
-            engagement_result = await self.bot_core.engagement_engine.analyze_engagement_potential(
+            # Get recent conversation history for analysis
+            from datetime import datetime
+            conversation_context = []
+            if self.memory_manager:
+                recent_memories = await self.memory_manager.get_conversation_history(
+                    user_id=user_id,
+                    limit=10
+                )
+                if recent_memories:
+                    for memory in recent_memories:
+                        if isinstance(memory, dict):
+                            conversation_context.append({
+                                'content': memory.get('content', ''),
+                                'role': memory.get('role', 'user'),
+                                'timestamp': memory.get('timestamp', datetime.now())
+                            })
+            
+            # Add current message to context
+            conversation_context.append({
+                'content': content,
+                'role': 'user',
+                'timestamp': datetime.now()
+            })
+            
+            # Get thread info if available
+            current_thread_info = None
+            if hasattr(self.bot_core, 'conversation_thread_manager'):
+                # Get thread info from thread manager if needed
+                pass  # Thread manager integration optional
+            
+            # Analyze conversation engagement
+            engagement_analysis = await engagement_engine.analyze_conversation_engagement(
                 user_id=user_id,
-                message=discord_message,
-                conversation_history=[]
+                context_id=f"discord_{user_id}",
+                recent_messages=conversation_context,
+                current_thread_info=current_thread_info
             )
             
-            logger.debug(f"Proactive engagement analysis successful for user {user_id}")
-            return engagement_result
+            # Extract key data for prompt integration
+            result = {
+                'intervention_needed': engagement_analysis.get('intervention_needed', False),
+                'recommended_strategy': engagement_analysis.get('recommended_strategy'),
+                'flow_state': engagement_analysis.get('flow_analysis', {}).get('current_state'),
+                'stagnation_risk': engagement_analysis.get('stagnation_analysis', {}).get('risk_level'),
+                'recommendations': engagement_analysis.get('recommendations', [])
+            }
+            
+            if result['intervention_needed']:
+                logger.info("🎯 PROACTIVE ENGAGEMENT: Intervention recommended - Strategy: %s, Risk: %s",
+                          result['recommended_strategy'], result['stagnation_risk'])
+            else:
+                logger.debug("🎯 PROACTIVE ENGAGEMENT: No intervention needed - Flow state: %s",
+                           result['flow_state'])
+            
+            return result
             
         except Exception as e:
-            logger.debug(f"Proactive engagement analysis failed: {e}")
+            logger.error("🎯 Proactive engagement analysis failed: %s", e)
             return None
 
     async def _process_human_like_memory(self, user_id: str, content: str, 
