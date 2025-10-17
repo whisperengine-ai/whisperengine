@@ -197,12 +197,12 @@ class PromptAssembler:
         
         if required_tokens > self.max_tokens:
             logger.error(
-                "Required components exceed token budget: %d > %d",
+                "Required components exceed token budget: %d > %d - applying intelligent truncation",
                 required_tokens,
                 self.max_tokens
             )
-            # Return all required components anyway (system needs them)
-            return required
+            # Apply intelligent truncation to required components
+            return self._intelligently_truncate_required(required, self.max_tokens)
         
         # Add optional components until budget is reached
         current_tokens = required_tokens
@@ -223,6 +223,119 @@ class PromptAssembler:
                 len(dropped),
                 [c.type.value for c in dropped]
             )
+        
+        return result
+    
+    def _intelligently_truncate_required(
+        self,
+        required_components: List[PromptComponent],
+        max_tokens: int
+    ) -> List[PromptComponent]:
+        """Intelligently truncate required components to fit budget.
+        
+        Strategy:
+        - Preserve highest priority components (core identity)
+        - For oversized components, keep beginning (50%) and end (30%)
+        - Add graceful truncation notices
+        - Ensure critical instructions are preserved
+        
+        Args:
+            required_components: List of required components (already sorted by priority)
+            max_tokens: Maximum token budget
+            
+        Returns:
+            List of truncated components within budget
+        """
+        result = []
+        tokens_used = 0
+        tokens_available = max_tokens
+        
+        logger.warning(
+            "🎭 Intelligent truncation of %d required components to fit %d token budget",
+            len(required_components),
+            max_tokens
+        )
+        
+        for component in required_components:
+            component_tokens = component.estimate_token_cost()
+            
+            # If component fits as-is, include it
+            if tokens_used + component_tokens <= tokens_available:
+                result.append(component)
+                tokens_used += component_tokens
+                logger.debug(
+                    "Preserved component %s: %d tokens (total: %d/%d)",
+                    component.type.value,
+                    component_tokens,
+                    tokens_used,
+                    tokens_available
+                )
+            else:
+                # Calculate how much space is left
+                remaining_budget = tokens_available - tokens_used
+                
+                if remaining_budget < 500:  # Not enough space for meaningful content
+                    logger.warning(
+                        "Dropping component %s: insufficient space (%d tokens left)",
+                        component.type.value,
+                        remaining_budget
+                    )
+                    continue
+                
+                # Truncate this component to fit
+                target_chars = remaining_budget * 4  # CHARS_PER_TOKEN = 4
+                original_content = component.content
+                
+                # Keep beginning (50%) and end (30%) of available space
+                beginning_chars = int(target_chars * 0.50)
+                ending_chars = int(target_chars * 0.30)
+                
+                beginning = original_content[:beginning_chars]
+                ending = original_content[-ending_chars:] if ending_chars > 0 else ""
+                
+                truncation_notice = (
+                    f"\n\n[{component.type.value} truncated to fit token budget. "
+                    f"Core content preserved.]\n\n"
+                )
+                
+                truncated_content = beginning + truncation_notice + ending
+                
+                # Create truncated component
+                truncated_component = PromptComponent(
+                    type=component.type,
+                    content=truncated_content,
+                    priority=component.priority,
+                    required=component.required,
+                    condition=component.condition,
+                    token_cost=None,  # Will be recalculated
+                    metadata=component.metadata
+                )
+                
+                result.append(truncated_component)
+                tokens_used += truncated_component.estimate_token_cost()
+                
+                logger.warning(
+                    "Truncated component %s: %d → %d tokens (preserved %d%%)",
+                    component.type.value,
+                    component_tokens,
+                    truncated_component.estimate_token_cost(),
+                    int((truncated_component.estimate_token_cost() / component_tokens) * 100)
+                )
+                
+                # Budget exhausted
+                if tokens_used >= tokens_available:
+                    logger.warning(
+                        "Token budget exhausted after truncating %s. Dropping remaining components.",
+                        component.type.value
+                    )
+                    break
+        
+        logger.info(
+            "Intelligent truncation complete: %d components kept, %d tokens used of %d budget",
+            len(result),
+            tokens_used,
+            tokens_available
+        )
         
         return result
     

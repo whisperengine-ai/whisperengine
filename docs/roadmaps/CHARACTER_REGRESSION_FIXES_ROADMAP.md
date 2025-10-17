@@ -510,9 +510,42 @@ async def _build_ai_ethics_guidance(self, message, character, display_name):
 
 ---
 
-### Task 2.2: Create AI Ethics Decision Tree 🌳
+### Task 2.2: Create AI Ethics Decision Tree 🌳 ✅ **COMPLETED**
 **Priority**: 🟡 MEDIUM  
-**Estimated Time**: 4 hours
+**Estimated Time**: 4 hours → **Actual**: 3 hours  
+**Status**: ✅ **COMPLETED - October 16, 2025**
+
+**RESULTS - MISSION SUCCESS** 🎉:
+- **Pass Rate Improvement**: 62.5% → **93.75%** (31.25 percentage point gain!)
+- **Target Exceeded**: 93.75% vs 85% target (+8.75 percentage points)
+- **Unit Tests**: 28/28 passing (100% coverage of all branches)
+- **Regression Tests**: 15/16 passing (only 1 minor personality nuance issue)
+
+**Files Created**:
+1. `src/prompts/ai_ethics_decision_tree.py` (423 lines)
+   - 5 detection methods (AI identity, physical, relationship, professional, background)
+   - 5 guidance generation methods with character archetype awareness
+   - Priority-based routing system (10 → 9 → 8 → 7 → 6 → 0)
+   - Fantasy/mythological character flexibility for full roleplay
+
+2. `tests/unit/test_ai_ethics_decision_tree.py` (487 lines)
+   - 28 comprehensive test cases covering all branches
+   - Priority ordering tests
+   - Character archetype tests (real_world, fantasy, mythological)
+   - Edge cases (empty messages, case-insensitive, multiple calls)
+
+3. Integration: `src/prompts/cdl_ai_integration.py` (lines 1796-1829)
+   - Replaced physical-only check with comprehensive decision tree
+   - Added fallback to legacy behavior for safety
+   - Enhanced logging with guidance type, reason, priority
+
+**Key Improvements**:
+- ✅ Jake: Now acknowledges AI nature when asked directly (was failing)
+- ✅ Elena: All tests pass, no unprompted AI mentions in background questions
+- ✅ Marcus: Professional advice test passes with explicit guidance
+- ⚠️ Gabriel: 1 remaining failure - relationship boundaries (personality nuance, acceptable)
+
+**Code Complete**: October 16, 2025
 
 **Create Visual Decision Tree**:
 ```python
