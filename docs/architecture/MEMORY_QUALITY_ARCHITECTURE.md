@@ -44,14 +44,16 @@ Keep if:
 └─ DROP everything else - noise for attention mechanism
 ```
 
-### **Principle 3: Conversation Pairs, Not Fragments**
+### **Principle 3: User Intent Over Bot Responses**
 ```
-❌ FRAGMENT: "I love sushi especially..." [truncated]
-✅ COMPLETE: "User: I love sushi\nYou: That's wonderful! Salmon is..."
+❌ WRONG: Retrieve everything - user + bot paired responses
+✅ RIGHT: Retrieve what user SAID - that's what triggers recall
 
-Result:
-- Fragments: 50% usability, waste tokens on incomplete info
-- Complete: 100% usability, every token carries meaning
+Reality Check:
+- User asks: "Remember when I told you about my cheese project?"
+- What matters: USER's original statement about the project
+- Bot's response: Already stored in full in recent conversation (last 6 messages)
+- Semantic search: Returns USER messages that match query
 ```
 
 ### **Principle 4: Dynamic Context Budget**
@@ -84,9 +86,9 @@ Total Target: 8-12K tokens (practical attention window)
 │   ├─ Last 3 exchanges: FULL (1.5K)
 │   ├─ Messages 4-10: Complete if relevant, else drop (1.5-2.5K)
 │   └─ Older: Omitted (not in working memory)
-├─ Semantic Retrieval: 2-3K tokens (ONLY when needed)
-│   ├─ "Remember X?" query: 3-5 conversation pairs
-│   ├─ Casual reference: 1-2 conversation pairs
+├─ Semantic Retrieval: 0-2K tokens (ONLY when needed)
+│   ├─ "Remember X?" query: 5-7 individual user messages
+│   ├─ High relevance threshold: Score >0.75
 │   └─ No recall signal: SKIP (0 tokens)
 └─ Safety buffer: 1K tokens
 
@@ -119,10 +121,11 @@ Quality Metrics:
 │                                                             │
 │  Tier 3: SEMANTIC RETRIEVAL (On-demand only)               │
 │  ├─ Triggered by: "Remember", "tell me about", "we talked" │
-│  ├─ Budget: 0-3K tokens (dynamic)                          │
-│  ├─ Format: 3-5 complete conversation pairs                │
+│  ├─ Budget: 0-2K tokens (dynamic)                          │
+│  ├─ Format: 5-7 individual user messages (full content)    │
 │  ├─ Threshold: Score >0.75 (high relevance only)           │
 │  └─ Why: Vivid recall when user asks, nothing otherwise    │
+│  └─ Note: Recent conversation already has bot responses     │
 │                                                             │
 │  Tier 4: USER FACTS (Structured knowledge)                 │
 │  ├─ Always included: Core preferences/info                 │
