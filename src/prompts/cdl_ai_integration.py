@@ -609,7 +609,9 @@ class CDLAIPromptIntegration:
                     # LONG-TERM MEMORY: Get conversation summary for context beyond the limit
                     if hasattr(self.memory_manager, 'get_conversation_summary_with_recommendations'):
                         summary_data = await self.memory_manager.get_conversation_summary_with_recommendations(
-                            user_id=user_id, limit=20  # Get broader context for summary
+                            user_id=user_id,
+                            conversation_history=conversation_history,  # 🐛 FIX: Pass required parameter
+                            limit=20  # Get broader context for summary
                         )
                         if summary_data and summary_data.get('topic_summary'):
                             conversation_summary = summary_data['topic_summary']
@@ -1695,69 +1697,12 @@ class CDLAIPromptIntegration:
                     
                     prompt += f"\n\n� EMPATHY GUIDANCE: Respond with nuanced empathy matching their emotional complexity and communication style."
 
-        # Add memory context intelligence with temporal filtering
-        if relevant_memories:
-            from datetime import datetime, timezone, timedelta
-            
-            # Filter out very recent memories (< 2 hours old) since they'll be in full conversation
-            two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
-            older_memories = []
-            
-            for memory in relevant_memories[:10]:  # Consider top 10 semantic matches
-                # Extract timestamp
-                memory_time = None
-                if hasattr(memory, 'timestamp'):
-                    memory_time = memory.timestamp
-                elif isinstance(memory, dict):
-                    if 'timestamp' in memory:
-                        memory_time = memory['timestamp']
-                    elif 'payload' in memory and isinstance(memory['payload'], dict):
-                        memory_time = memory['payload'].get('timestamp')
-                
-                # Parse timestamp if string and ensure timezone-aware
-                if isinstance(memory_time, str):
-                    try:
-                        memory_time = datetime.fromisoformat(memory_time.replace('Z', '+00:00'))
-                        # Ensure timezone-aware for comparison
-                        if memory_time.tzinfo is None:
-                            memory_time = memory_time.replace(tzinfo=timezone.utc)
-                    except:
-                        memory_time = None
-                elif isinstance(memory_time, datetime) and memory_time.tzinfo is None:
-                    # Handle datetime objects without timezone info
-                    memory_time = memory_time.replace(tzinfo=timezone.utc)
-                
-                # Include if older than 2 hours (or timestamp unknown for safety)
-                if memory_time is None or memory_time < two_hours_ago:
-                    older_memories.append((memory, memory_time))
-            
-            if older_memories:
-                prompt += f"\n\n🧠 RELEVANT CONVERSATION CONTEXT (older conversations):\n"
-                
-                for i, (memory, memory_time) in enumerate(older_memories[:5], 1):  # Show top 5 older memories
-                    # Handle both dict and object memory formats
-                    if hasattr(memory, 'content'):
-                        content = memory.content  # Object format - full content
-                    elif isinstance(memory, dict) and 'content' in memory:
-                        content = memory['content']  # Dict format - full content
-                    elif isinstance(memory, dict) and 'payload' in memory and isinstance(memory['payload'], dict):
-                        # Qdrant format: content might be in payload
-                        content = memory['payload'].get('content', str(memory))
-                    else:
-                        content = str(memory)  # Fallback
-                    
-                    # Add temporal context
-                    time_context = ""
-                    if memory_time:
-                        time_ago = datetime.now(timezone.utc) - memory_time
-                        if time_ago.days > 0:
-                            time_context = f" ({time_ago.days} day{'s' if time_ago.days != 1 else ''} ago)"
-                        else:
-                            hours_ago = int(time_ago.total_seconds() / 3600)
-                            time_context = f" ({hours_ago} hour{'s' if hours_ago != 1 else ''} ago)"
-                    
-                    # Show full content without truncation - we have the token budget now
-                    prompt += f"{i}. {content}{time_context}\n"
+        # 🗑️ REMOVED: Raw snippet section replaced by conversation summary above
+        # The semantic search results (relevant_memories) are used internally for:
+        # 1. Conversation summary generation (topics/themes)
+        # 2. Episodic intelligence extraction (emotional moments)
+        # 3. Background for recommendations in vector system
+        # Raw dumping of memory content was redundant and confusing.
 
         # 🌟 EPISODIC INTELLIGENCE: Character reflective thoughts based on memorable moments
         try:
