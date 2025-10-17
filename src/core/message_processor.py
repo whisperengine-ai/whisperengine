@@ -2092,8 +2092,10 @@ class MessageProcessor:
         logger.info(f"🚀 STRUCTURED CONTEXT: Building for user {message_context.user_id}")
         
         # Initialize assembler with token budget (approximate - converted to chars in components)
-        # Most models support 4K-8K context, we'll target ~6K tokens = ~24K chars for system message
-        assembler = create_prompt_assembler(max_tokens=6000)
+        # Phase 2A: Upgraded to 16K tokens (~64K chars) for rich character personalities
+        # Modern models support 128K-200K tokens - we're targeting ~18% utilization (24K total)
+        # See: docs/architecture/TOKEN_BUDGET_ANALYSIS.md for rationale
+        assembler = create_prompt_assembler(max_tokens=16000)
         
         # ================================
         # COMPONENT 1: Core System Prompt
@@ -4684,11 +4686,11 @@ class MessageProcessor:
             logger.info("📊 CONTEXT SIZE: %d messages, ~%d tokens before truncation", 
                        len(final_context), pre_truncation_tokens)
             
-            # Apply smart truncation (preserves system message + recent 2-4 messages, drops oldest first)
-            # 🚨 WALL-OF-TEXT PROTECTION: Only keep 2-4 recent messages if user is spamming long content
+            # Apply smart truncation (preserves system message + recent messages, drops oldest first)
+            # Phase 2A: Upgraded to 8K conversation history for deep conversation memory (30-40 messages)
             final_context, tokens_removed = truncate_context(
                 final_context, 
-                max_tokens=2000,  # Production data: P90 = 3572 total - 1400 system = 2000 for conversation
+                max_tokens=8000,  # Phase 2A: Upgraded from 2000 to 8000 for sophisticated conversations
                 min_recent_messages=2  # ADAPTIVE: Guarantees last 1 exchange minimum, but keeps MORE if they fit budget
             )
             

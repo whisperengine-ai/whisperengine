@@ -1152,7 +1152,7 @@ class CDLAIPromptIntegration:
                 prompt += f"\n\n👨‍👩‍👧‍👦 PERSONAL BACKGROUND:\n{personal_sections}"
                 logger.info(f"✅ PERSONAL KNOWLEDGE: Added {len(personal_sections)} chars to prompt")
             else:
-                logger.warning("⚠️ PERSONAL KNOWLEDGE: No sections returned from extraction")
+                logger.debug("⚠️ PERSONAL KNOWLEDGE: No sections returned from extraction")
         except Exception as e:
             logger.error(f"❌ PERSONAL KNOWLEDGE ERROR: Could not extract personal knowledge: {e}")
             import traceback
@@ -1695,22 +1695,69 @@ class CDLAIPromptIntegration:
                     
                     prompt += f"\n\n� EMPATHY GUIDANCE: Respond with nuanced empathy matching their emotional complexity and communication style."
 
-        # Add memory context intelligence
+        # Add memory context intelligence with temporal filtering
         if relevant_memories:
-            prompt += f"\n\n🧠 RELEVANT CONVERSATION CONTEXT:\n"
-            for i, memory in enumerate(relevant_memories[:7], 1):  # Increased from 3 to 7
-                # Handle both dict and object memory formats
-                if hasattr(memory, 'content'):
-                    content = memory.content[:300]  # Object format
-                elif isinstance(memory, dict) and 'content' in memory:
-                    content = memory['content'][:300]  # Dict format
-                elif isinstance(memory, dict) and 'payload' in memory and isinstance(memory['payload'], dict):
-                    # Qdrant format: content might be in payload
-                    content = memory['payload'].get('content', str(memory)[:300])
-                else:
-                    content = str(memory)[:300]  # Fallback
+            from datetime import datetime, timezone, timedelta
+            
+            # Filter out very recent memories (< 2 hours old) since they'll be in full conversation
+            two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+            older_memories = []
+            
+            for memory in relevant_memories[:10]:  # Consider top 10 semantic matches
+                # Extract timestamp
+                memory_time = None
+                if hasattr(memory, 'timestamp'):
+                    memory_time = memory.timestamp
+                elif isinstance(memory, dict):
+                    if 'timestamp' in memory:
+                        memory_time = memory['timestamp']
+                    elif 'payload' in memory and isinstance(memory['payload'], dict):
+                        memory_time = memory['payload'].get('timestamp')
+                
+                # Parse timestamp if string and ensure timezone-aware
+                if isinstance(memory_time, str):
+                    try:
+                        memory_time = datetime.fromisoformat(memory_time.replace('Z', '+00:00'))
+                        # Ensure timezone-aware for comparison
+                        if memory_time.tzinfo is None:
+                            memory_time = memory_time.replace(tzinfo=timezone.utc)
+                    except:
+                        memory_time = None
+                elif isinstance(memory_time, datetime) and memory_time.tzinfo is None:
+                    # Handle datetime objects without timezone info
+                    memory_time = memory_time.replace(tzinfo=timezone.utc)
+                
+                # Include if older than 2 hours (or timestamp unknown for safety)
+                if memory_time is None or memory_time < two_hours_ago:
+                    older_memories.append((memory, memory_time))
+            
+            if older_memories:
+                prompt += f"\n\n🧠 RELEVANT CONVERSATION CONTEXT (older conversations):\n"
+                
+                for i, (memory, memory_time) in enumerate(older_memories[:5], 1):  # Show top 5 older memories
+                    # Handle both dict and object memory formats
+                    if hasattr(memory, 'content'):
+                        content = memory.content  # Object format - full content
+                    elif isinstance(memory, dict) and 'content' in memory:
+                        content = memory['content']  # Dict format - full content
+                    elif isinstance(memory, dict) and 'payload' in memory and isinstance(memory['payload'], dict):
+                        # Qdrant format: content might be in payload
+                        content = memory['payload'].get('content', str(memory))
+                    else:
+                        content = str(memory)  # Fallback
                     
-                prompt += f"{i}. {content}{'...' if len(str(memory)) > 300 else ''}\n"
+                    # Add temporal context
+                    time_context = ""
+                    if memory_time:
+                        time_ago = datetime.now(timezone.utc) - memory_time
+                        if time_ago.days > 0:
+                            time_context = f" ({time_ago.days} day{'s' if time_ago.days != 1 else ''} ago)"
+                        else:
+                            hours_ago = int(time_ago.total_seconds() / 3600)
+                            time_context = f" ({hours_ago} hour{'s' if hours_ago != 1 else ''} ago)"
+                    
+                    # Show full content without truncation - we have the token budget now
+                    prompt += f"{i}. {content}{time_context}\n"
 
         # 🌟 EPISODIC INTELLIGENCE: Character reflective thoughts based on memorable moments
         try:
@@ -1756,28 +1803,39 @@ class CDLAIPromptIntegration:
         if conversation_summary:
             prompt += f"\n\n📚 CONVERSATION BACKGROUND:\n{conversation_summary}\n"
 
-        # Add recent conversation history
-        if conversation_history:
-            prompt += f"\n\n💬 RECENT CONVERSATION:\n"
-            # REDUCED: Only show last 2-3 messages with shorter truncation to prevent pattern-matching on verbose examples
-            # This helps characters follow response length guidelines instead of mimicking long conversation history
-            for conv in conversation_history[-3:]:  # Reduced from 8 to 3 messages
-                if isinstance(conv, dict):
-                    role = conv.get('role', 'user')
-                    content = conv.get('content', '')[:150]  # Reduced from 300 to 150 chars to minimize verbose example influence
-                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 150 else ''}\n"
-
-        # 🚨 CRITICAL AI ETHICS LAYER: Physical interaction detection
-        if self._detect_physical_interaction_request(message_content):
-            allows_full_roleplay = self._check_roleplay_flexibility(character)
+        # �️ AI ETHICS DECISION TREE: Comprehensive scenario handling (October 2025)
+        # Replaces narrow physical-interaction-only check with full ethics coverage
+        try:
+            from src.prompts.ai_ethics_decision_tree import AIEthicsDecisionTree
             
-            if not allows_full_roleplay:
-                ai_ethics_guidance = self._get_cdl_roleplay_guidance(character, display_name)
-                if ai_ethics_guidance:
-                    prompt += f"\n\n{ai_ethics_guidance}"
-                    logger.info("🛡️ AI ETHICS: Physical interaction detected, injecting guidance for %s", character.identity.name)
-            else:
-                logger.info("🎭 ROLEPLAY IMMERSION: %s allows full roleplay - skipping AI ethics layer", character.identity.name)
+            ethics_tree = AIEthicsDecisionTree(keyword_manager=None)  # TODO: Pass keyword_manager when available
+            ethics_guidance = await ethics_tree.analyze_and_route(
+                message_content=message_content,
+                character=character,
+                display_name=display_name
+            )
+            
+            if ethics_guidance.should_inject:
+                prompt += f"\n\n{ethics_guidance.guidance_text}"
+                logger.info(
+                    "🛡️ AI ETHICS: %s guidance injected - %s (priority %d)",
+                    ethics_guidance.guidance_type,
+                    ethics_guidance.trigger_reason,
+                    ethics_guidance.priority
+                )
+        except Exception as e:
+            # Fallback to legacy physical interaction check
+            logger.warning("⚠️ AI ETHICS: Decision tree failed (%s), falling back to legacy check", str(e))
+            if self._detect_physical_interaction_request(message_content):
+                allows_full_roleplay = self._check_roleplay_flexibility(character)
+                
+                if not allows_full_roleplay:
+                    ai_ethics_guidance = self._get_cdl_roleplay_guidance(character, display_name)
+                    if ai_ethics_guidance:
+                        prompt += f"\n\n{ai_ethics_guidance}"
+                        logger.info("🛡️ AI ETHICS: Physical interaction detected (fallback), injecting guidance for %s", character.identity.name)
+                else:
+                    logger.info("🎭 ROLEPLAY IMMERSION: %s allows full roleplay - skipping AI ethics layer", character.identity.name)
 
         # Remove duplicate AI identity and conversation flow sections (moved up earlier)
         
@@ -2111,6 +2169,94 @@ Remember to stay true to your authentic voice and character.
         
         return self._graph_manager
 
+    async def _is_character_background_question(self, message: str) -> bool:
+        """
+        Detect if message is asking about character background using semantic analysis.
+        Replaces keyword matching with intelligent intent detection.
+        """
+        # Semantic patterns for background questions
+        background_patterns = [
+            'where do you live', 'where are you from', 'what do you do',
+            'tell me about yourself', 'your background', 'your story',
+            'who are you', 'about yourself', 'introduce yourself',
+            'what\'s your job', 'where do you work', 'what do you work on',
+            'your occupation', 'your profession', 'what you do for work'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in background_patterns)
+    
+    async def _is_relationship_question(self, message: str) -> bool:
+        """Detect if message is asking about relationships."""
+        relationship_patterns = [
+            'relationship', 'relationships', 'friend', 'friends',
+            'colleague', 'colleagues', 'partner', 'spouse', 'mentor',
+            'connection', 'connected', 'dating', 'married', 'family'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in relationship_patterns)
+    
+    async def _is_career_question(self, message: str) -> bool:
+        """Detect if message is asking about career/work."""
+        career_patterns = [
+            'work', 'job', 'career', 'education', 'study',
+            'university', 'college', 'professional', 'occupation',
+            'profession', 'what do you do', 'where do you work'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in career_patterns)
+    
+    async def _is_memory_question(self, message: str) -> bool:
+        """Detect if message is asking about memories/experiences."""
+        memory_patterns = [
+            'remember', 'memory', 'memories', 'experience', 'experiences',
+            'happened', 'past', 'story', 'stories', 'recall', 'event'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in memory_patterns)
+    
+    async def _is_hobby_question(self, message: str) -> bool:
+        """Detect if message is asking about hobbies/interests."""
+        hobby_patterns = [
+            'hobby', 'hobbies', 'interest', 'interests', 'free time',
+            'fun', 'enjoy', 'like to do', 'passion', 'pastime',
+            'leisure', 'recreation', 'for fun', 'when not working'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in hobby_patterns)
+    
+    async def _is_education_question(self, message: str) -> bool:
+        """Detect if message is asking about education/learning."""
+        education_patterns = [
+            'education', 'school', 'college', 'university', 'degree',
+            'study', 'studied', 'learning', 'training', 'certification',
+            'academic', 'graduated', 'major', 'minor', 'doctorate',
+            'bachelor', 'master', 'phd', 'qualification'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in education_patterns)
+    
+    async def _is_skills_question(self, message: str) -> bool:
+        """Detect if message is asking about skills/abilities."""
+        skills_patterns = [
+            'skill', 'skills', 'good at', 'expertise', 'expert',
+            'ability', 'abilities', 'talented', 'proficient', 'capable',
+            'competent', 'strengths', 'what can you do', 'specialized',
+            'talent', 'gifted', 'mastery', 'proficiency'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in skills_patterns)
+    
+    async def _is_general_overview_question(self, message: str) -> bool:
+        """Detect if message is asking for comprehensive/general information."""
+        general_patterns = [
+            'everything', 'anything', 'general', 'overview', 'summary',
+            'all about', 'comprehensive', 'complete', 'full picture',
+            'everything about', 'tell me more', 'know about you',
+            'get to know', 'learn about', 'understand you better'
+        ]
+        message_lower = message.lower()
+        return any(pattern in message_lower for pattern in general_patterns)
+
     def _calculate_trigger_relevance(self, trigger, context_factors: Dict[str, Any]) -> float:
         """
         Calculate relevance of an emotional trigger based on AI decision context.
@@ -2258,54 +2404,74 @@ Remember to stay true to your authentic voice and character.
             personal_sections = []
             message_lower = message_content.lower()
             
+            # 🎯 SEMANTIC DETECTION: Use semantic router for intent detection instead of keywords
+            is_background_question = await self._is_character_background_question(message_content)
+            is_relationship_question = await self._is_relationship_question(message_content)
+            is_career_question = await self._is_career_question(message_content)
+            is_memory_question = await self._is_memory_question(message_content)
+            
             # 🎯 GRAPH INTELLIGENCE: Use intent detection and graph queries
             from src.characters.cdl.character_graph_manager import CharacterKnowledgeIntent
             
-            # Extract relationship info if message seems relationship-focused
-            if any(keyword in message_lower for keyword in ['relationship', 'partner', 'dating', 'married', 'family']):
+            # 📖 BACKGROUND QUESTION: "Where do you live?", "What do you do?", "Tell me about yourself"
+            if is_background_question:
+                logger.info("📊 GRAPH: Background question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
-                    intent=CharacterKnowledgeIntent.FAMILY,
-                    limit=3,
+                    intent=CharacterKnowledgeIntent.BACKGROUND,
+                    limit=5,
                     user_id=user_id
                 )
                 
+                logger.info(f"📊 GRAPH: Background query returned - Background: {len(result.background)}, Relationships: {len(result.relationships)}, Memories: {len(result.memories)}")
+                
                 if not result.is_empty():
-                    # Format background entries with importance weighting
-                    for bg in result.background[:3]:
+                    # Add high-importance background entries
+                    for bg in result.background[:5]:
                         importance = bg.get('importance_level', 5)
                         stars = '⭐' * min(importance, 5)
-                        personal_sections.append(f"{stars} {bg['description']}")
+                        background_entry = f"{stars} {bg['description']}"
+                        personal_sections.append(background_entry)
+                        logger.info(f"📊 GRAPH: Added background: {bg['description'][:80]}...")
                     
-                    # Format relationships with strength weighting
-                    for rel in result.relationships[:3]:
-                        strength = rel.get('relationship_strength', 5)
-                        personal_sections.append(f"Relationship: {rel['related_entity']} (strength: {strength}/10) - {rel.get('description', '')}")
+                    # Add abilities if relevant
+                    for ability in result.abilities[:3]:
+                        proficiency = ability.get('proficiency_level', 5)
+                        if proficiency >= 6:
+                            personal_sections.append(f"⚡ {ability['ability_name']} (proficiency: {proficiency}/10)")
             
-            # Extract family info if message mentions family
-            if any(keyword in message_lower for keyword in ['family', 'parents', 'siblings', 'children', 'mother', 'father']):
+            # 🤝 RELATIONSHIP QUESTION: "Tell me about your relationships", "Who are your friends?"
+            if is_relationship_question:
+                logger.info("📊 GRAPH: Relationship question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
-                    intent=CharacterKnowledgeIntent.FAMILY,
-                    limit=3,
+                    intent=CharacterKnowledgeIntent.RELATIONSHIPS,
+                    limit=5,
                     user_id=user_id
                 )
                 
+                logger.info(f"📊 GRAPH: Relationships query returned - Relationships: {len(result.relationships)}, Background: {len(result.background)}")
+                
                 if not result.is_empty():
-                    for bg in result.background:
-                        importance = bg.get('importance_level', 5)
-                        personal_sections.append(f"Family ({importance}/10 importance): {bg['description']}")
+                    # Format relationships with strength weighting
+                    for rel in result.relationships[:5]:
+                        strength = rel.get('relationship_strength', 5)
+                        rel_type = rel.get('relationship_type', 'connection')
+                        stars = '⭐' * min(strength, 5)
+                        relationship_entry = f"{stars} {rel_type.title()}: {rel['related_entity']} - {rel.get('description', '')}"
+                        personal_sections.append(relationship_entry)
+                        logger.info(f"📊 GRAPH: Added relationship: {rel['related_entity']} ({rel_type})")
                     
-                    # Include family relationships
-                    for rel in result.relationships:
-                        if any(family_term in rel['related_entity'].lower() for family_term in ['mother', 'father', 'sister', 'brother', 'parent']):
-                            personal_sections.append(f"Family: {rel['related_entity']} - {rel.get('description', '')}")
+                    # Add relationship-relevant background entries
+                    for bg in result.background[:3]:
+                        importance = bg.get('importance_level', 5)
+                        personal_sections.append(f"Relationship Context ({importance}/10): {bg['description']}")
             
-            # 🤝 PHASE 2A ENHANCEMENT: Extract relationships if message mentions relationships/connections
-            if any(keyword in message_lower for keyword in ['relationship', 'relationships', 'friend', 'friends', 'colleague', 'colleagues', 'partner', 'spouse', 'mentor', 'connection', 'connected', 'know', 'knows']):
-                logger.info("📊 GRAPH: Relationship keywords detected, querying character knowledge...")
+            # 💼 CAREER QUESTION: "What do you do for work?", "Tell me about your job"
+            if is_career_question:
+                logger.info("📊 GRAPH: Career question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2333,8 +2499,8 @@ Remember to stay true to your authentic voice and character.
                             personal_sections.append(f"Relationship Context ({importance}/10): {bg['description']}")
             
             # Extract career/work info if message mentions work/career
-            if any(keyword in message_lower for keyword in ['work', 'job', 'career', 'education', 'study', 'university', 'college', 'professional']):
-                logger.info("📊 GRAPH: Career keywords detected, querying character knowledge...")
+            if await self._is_career_question(message_content):
+                logger.info("📊 GRAPH: Career question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2363,7 +2529,8 @@ Remember to stay true to your authentic voice and character.
                     logger.warning("📊 GRAPH: Career query returned empty results!")
             
             # Extract hobbies/interests if message mentions interests/leisure
-            if any(keyword in message_lower for keyword in ['hobby', 'hobbies', 'interest', 'interests', 'free time', 'fun', 'enjoy', 'like']):
+            if await self._is_hobby_question(message_content):
+                logger.info("📊 GRAPH: Hobby question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2381,8 +2548,8 @@ Remember to stay true to your authentic voice and character.
                             personal_sections.append(f"Hobby Skill: {ability['ability_name']}")
             
             # 🎓 PHASE 2A ENHANCEMENT: Extract education info if message mentions school/learning
-            if any(keyword in message_lower for keyword in ['education', 'school', 'college', 'university', 'degree', 'study', 'studied', 'learning', 'training', 'certification']):
-                logger.info("📊 GRAPH: Education keywords detected, querying character knowledge...")
+            if await self._is_education_question(message_content):
+                logger.info("📊 GRAPH: Education question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2401,8 +2568,8 @@ Remember to stay true to your authentic voice and character.
                         logger.info(f"📊 GRAPH: Added education background: {education_entry[:80]}...")
             
             # 💪 PHASE 2A ENHANCEMENT: Extract skills/abilities if message mentions expertise/talent
-            if any(keyword in message_lower for keyword in ['skill', 'skills', 'good at', 'expertise', 'expert', 'ability', 'abilities', 'talented', 'proficient', 'capable', 'competent']):
-                logger.info("📊 GRAPH: Skills keywords detected, querying character knowledge...")
+            if await self._is_skills_question(message_content):
+                logger.info("📊 GRAPH: Skills question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2425,8 +2592,8 @@ Remember to stay true to your authentic voice and character.
                             personal_sections.append(f"Skill Background: {bg['description']}")
             
             # 🧠 PHASE 2A ENHANCEMENT: Extract memories if message asks about experiences/past
-            if any(keyword in message_lower for keyword in ['remember', 'memory', 'memories', 'experience', 'experiences', 'happened', 'past', 'story', 'stories', 'recall', 'event']):
-                logger.info("📊 GRAPH: Memory keywords detected, querying character knowledge...")
+            if await self._is_memory_question(message_content):
+                logger.info("📊 GRAPH: Memory question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2448,8 +2615,8 @@ Remember to stay true to your authentic voice and character.
                         logger.info(f"📊 GRAPH: Added memory: {memory_title[:50]}...")
             
             # 📖 PHASE 2A ENHANCEMENT: Extract general background if message asks about character generally
-            if any(keyword in message_lower for keyword in ['about you', 'who are you', 'tell me about yourself', 'your background', 'your story', 'yourself', 'introduce yourself']):
-                logger.info("📊 GRAPH: Background keywords detected, querying character knowledge...")
+            if await self._is_character_background_question(message_content):
+                logger.info("📊 GRAPH: Background question detected (semantic), querying character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2470,8 +2637,8 @@ Remember to stay true to your authentic voice and character.
                         logger.info(f"📊 GRAPH: Added background: {bg['description'][:80]}...")
             
             # 🌐 PHASE 2A ENHANCEMENT: Extract comprehensive character information for general inquiries
-            if any(keyword in message_lower for keyword in ['everything', 'anything', 'general', 'overview', 'summary', 'all about', 'comprehensive', 'complete', 'full picture', 'everything about']):
-                logger.info("📊 GRAPH: General keywords detected, querying comprehensive character knowledge...")
+            if await self._is_general_overview_question(message_content):
+                logger.info("📊 GRAPH: General overview question detected (semantic), querying comprehensive character knowledge...")
                 result = await graph_manager.query_character_knowledge(
                     character_name=character.identity.name,
                     query_text=message_content,
@@ -2590,7 +2757,7 @@ Remember to stay true to your authentic voice and character.
             
             # �📊 FALLBACK: If no graph results, use direct property access (legacy compatibility)
             if not personal_sections:
-                logger.warning("📊 GRAPH: No graph results found, triggering fallback method")
+                logger.debug("📊 GRAPH: No graph results found, triggering fallback method")
                 return await self._extract_personal_knowledge_fallback(character, message_content)
             
             result_text = "\n".join(personal_sections) if personal_sections else ""
