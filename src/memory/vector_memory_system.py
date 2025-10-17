@@ -58,6 +58,13 @@ from src.memory.multi_vector_intelligence import (
 # Import vector fusion for Phase 1 Task 3: Multi-Vector Fusion
 from src.memory.vector_fusion import create_vector_fusion_coordinator, VectorFusionCoordinator
 
+# Import query classifier for Phase 2 Task 2.2: Hybrid Vector Routing
+from src.memory.query_classifier import (
+    create_query_classifier,
+    QueryClassifier,
+    QueryCategory
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -3742,10 +3749,18 @@ class VectorMemoryManager:
                 vector_memory_system=self.vector_store,
                 intelligence=multi_vector_intelligence
             )
-            logger.info("🎯 Multi-vector intelligence coordinator initialized with InfluxDB logging")
+            logger.info("🎯 MULTI-VECTOR: Intelligence coordinator initialized for Sprint 2")
         except Exception as e:
-            logger.warning(f"🎯 Multi-vector coordinator initialization failed: {e}")
+            logger.warning("🎯 MULTI-VECTOR: Coordinator initialization failed: %s", str(e))
             self._multi_vector_coordinator = None
+        
+        # 🎯 PHASE 2: Initialize QueryClassifier for intelligent vector routing
+        try:
+            self._query_classifier = create_query_classifier()
+            logger.info("🎯 PHASE 2: QueryClassifier initialized for hybrid vector routing")
+        except Exception as e:
+            logger.warning("🎯 PHASE 2: QueryClassifier initialization failed: %s", str(e))
+            self._query_classifier = None
         
         logger.info("VectorMemoryManager initialized - local-first single source of truth ready")
     
@@ -4287,6 +4302,269 @@ class VectorMemoryManager:
         except Exception as e:
             logger.error(f"Failed to retrieve memories: {e}")
             return []
+    
+    # 🎯 PHASE 2 TASK 2.2: Hybrid Vector Routing Helper Methods
+    
+    async def _search_single_vector(
+        self,
+        vector_name: str,
+        query: str,
+        user_id: str,
+        limit: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Search a single named vector (Phase 2 helper method).
+        
+        Args:
+            vector_name: Name of vector to search ('content', 'emotion', 'semantic')
+            query: Search query
+            user_id: User identifier
+            limit: Maximum results
+            
+        Returns:
+            List of memory dictionaries with search metadata
+        """
+        try:
+            embedding_result = list(self.vector_store.embedder.embed([query]))[0]
+            # Handle both numpy arrays and plain lists
+            query_embedding = embedding_result.tolist() if hasattr(embedding_result, 'tolist') else embedding_result
+            
+            search_result = self.vector_store.client.search(
+                collection_name=self.vector_store.collection_name,
+                query_vector=(vector_name, query_embedding),
+                query_filter=models.Filter(
+                    must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                ),
+                limit=limit,
+                with_payload=True,
+                score_threshold=0.1  # Low threshold for broad recall
+            )
+            
+            results = []
+            for r in search_result:
+                if r.payload:
+                    results.append({
+                        "id": str(r.id),
+                        "content": r.payload.get("content", ""),
+                        "score": r.score,
+                        "timestamp": r.payload.get("timestamp", ""),
+                        "metadata": r.payload.get("metadata", {}),
+                        "memory_type": r.payload.get("memory_type", "conversation"),
+                        "search_type": f"{vector_name}_vector",
+                        "vector_used": vector_name
+                    })
+            
+            logger.debug("🎯 Single vector search (%s): %d results", vector_name, len(results))
+            return results
+            
+        except Exception as e:
+            logger.warning("Single vector search failed (%s): %s", vector_name, str(e))
+            return []
+    
+    async def _search_multi_vector_fusion(
+        self,
+        vectors: List[str],
+        weights: List[float],
+        query: str,
+        user_id: str,
+        limit: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Search multiple vectors and fuse results with RRF (Phase 2 helper method).
+        
+        Args:
+            vectors: List of vector names to search
+            weights: Weights for each vector (for future use)
+            query: Search query
+            user_id: User identifier
+            limit: Maximum results
+            
+        Returns:
+            Fused and ranked memory list
+        """
+        try:
+            # Search each vector
+            results_by_vector = {}
+            
+            for vector_name in vectors:
+                vector_results = await self._search_single_vector(
+                    vector_name=vector_name,
+                    query=query,
+                    user_id=user_id,
+                    limit=limit
+                )
+                results_by_vector[vector_name] = vector_results
+            
+            # Fuse using RRF
+            if not results_by_vector:
+                return []
+            
+            fusion_coordinator = create_vector_fusion_coordinator()
+            fused_results = fusion_coordinator.rrf.fuse(results_by_vector, limit=limit)
+            
+            # Add fusion metadata
+            for result in fused_results:
+                result['search_type'] = 'multi_vector_fusion'
+                result['vectors_used'] = vectors
+            
+            logger.info("🔀 Multi-vector fusion: %d results from %d vectors", 
+                       len(fused_results), len(vectors))
+            return fused_results
+            
+        except Exception as e:
+            logger.warning("Multi-vector fusion failed: %s", str(e))
+            return []
+    
+    async def retrieve_relevant_memories_phase2(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 25,
+        emotion_data: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        🎯 PHASE 2: Query-classifier-based intelligent vector routing.
+        
+        This method uses QueryClassifier to determine optimal vector strategy:
+        - Factual queries → content vector only (fast path)
+        - Emotional queries → content + emotion fusion
+        - Conversational queries → content + semantic fusion
+        - Temporal queries → chronological scroll
+        - General queries → content vector (default)
+        
+        Args:
+            user_id: User identifier
+            query: Search query
+            limit: Maximum results
+            emotion_data: Pre-analyzed RoBERTa emotion data (optional)
+                         Expected keys: emotional_intensity, dominant_emotion
+        
+        Returns:
+            List of relevant memories with routing metadata
+        """
+        import time
+        start_time = time.time()
+        
+        try:
+            # Step 1: Detect temporal queries (highest priority)
+            is_temporal = await self.vector_store._detect_temporal_query_with_qdrant(query, user_id)
+            
+            # Step 2: Classify query using QueryClassifier
+            if self._query_classifier:
+                category = await self._query_classifier.classify_query(
+                    query=query,
+                    emotion_data=emotion_data,
+                    is_temporal=is_temporal
+                )
+                
+                # Get vector strategy for this category
+                strategy = self._query_classifier.get_vector_strategy(category)
+                
+                logger.info("🎯 PHASE 2 ROUTING: query='%s...' → category=%s → strategy=%s",
+                           query[:40], category.value, strategy['description'])
+                
+                # Step 3: Route based on category
+                if category == QueryCategory.TEMPORAL:
+                    # Use existing temporal logic
+                    results = await self.vector_store._handle_temporal_query_with_qdrant(
+                        query, user_id, limit
+                    )
+                    # Format results
+                    formatted_results = []
+                    for r in results:
+                        formatted_results.append({
+                            "content": r.get("content", ""),
+                            "score": r.get("score", 1.0),
+                            "timestamp": r.get("timestamp", ""),
+                            "metadata": r.get("metadata", {}),
+                            "memory_type": r.get("memory_type", "conversation"),
+                            "search_type": "temporal_chronological",
+                            "query_category": "temporal"
+                        })
+                    
+                    logger.debug("🎯 TEMPORAL: %d results in %.1fms",
+                               len(formatted_results), (time.time() - start_time) * 1000)
+                    return formatted_results
+                
+                elif category == QueryCategory.FACTUAL:
+                    # Single content vector (fast path)
+                    results = await self._search_single_vector(
+                        vector_name="content",
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    for r in results:
+                        r['query_category'] = 'factual'
+                    
+                    logger.debug("🧠 FACTUAL: %d results in %.1fms",
+                               len(results), (time.time() - start_time) * 1000)
+                    return results
+                
+                elif category == QueryCategory.EMOTIONAL:
+                    # Multi-vector fusion: content + emotion
+                    results = await self._search_multi_vector_fusion(
+                        vectors=strategy['vectors'],
+                        weights=strategy['weights'],
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    for r in results:
+                        r['query_category'] = 'emotional'
+                    
+                    logger.debug("🎭 EMOTIONAL: %d results in %.1fms",
+                               len(results), (time.time() - start_time) * 1000)
+                    return results
+                
+                elif category == QueryCategory.CONVERSATIONAL:
+                    # Multi-vector fusion: content + semantic
+                    results = await self._search_multi_vector_fusion(
+                        vectors=strategy['vectors'],
+                        weights=strategy['weights'],
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    for r in results:
+                        r['query_category'] = 'conversational'
+                    
+                    logger.debug("💬 CONVERSATIONAL: %d results in %.1fms",
+                               len(results), (time.time() - start_time) * 1000)
+                    return results
+                
+                else:  # GENERAL
+                    # Single content vector (default)
+                    results = await self._search_single_vector(
+                        vector_name="content",
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    for r in results:
+                        r['query_category'] = 'general'
+                    
+                    logger.debug("🔍 GENERAL: %d results in %.1fms",
+                               len(results), (time.time() - start_time) * 1000)
+                    return results
+            
+            else:
+                # Fallback if QueryClassifier not initialized
+                logger.warning("QueryClassifier not available - falling back to legacy routing")
+                return await self.retrieve_relevant_memories(
+                    user_id=user_id,
+                    query=query,
+                    limit=limit
+                )
+        
+        except Exception as e:
+            logger.error("Phase 2 routing failed: %s", str(e))
+            # Fallback to legacy method
+            return await self.retrieve_relevant_memories(
+                user_id=user_id,
+                query=query,
+                limit=limit
+            )
     
     async def retrieve_relevant_memories_fidelity_first(
         self,
