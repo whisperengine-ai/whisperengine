@@ -903,7 +903,43 @@ class CDLAIPromptIntegration:
             if hasattr(big_five, 'neuroticism'):
                 prompt += f"- {get_adaptive_trait_info(big_five.neuroticism, 'neuroticism')}\n"
 
-        # � VOICE & COMMUNICATION STYLE: Consolidated section matching complete_prompt_examples format
+        # 🌟 CHARACTER LEARNING MOMENTS INTEGRATION
+        # Connects detected learning moments to LLM prompt for natural character growth expression
+        try:
+            if pipeline_dict and 'ai_components' in pipeline_dict:
+                ai_components = pipeline_dict['ai_components']
+                
+                if isinstance(ai_components, dict) and 'character_learning_moments' in ai_components:
+                    learning_data = ai_components['character_learning_moments']
+                    
+                    if learning_data and learning_data.get('surface_moment'):
+                        integration = learning_data.get('suggested_integration', {})
+                        suggested_response = integration.get('suggested_response', '')
+                        moment_type = integration.get('type', 'unknown')
+                        confidence = integration.get('confidence', 0.0)
+                        integration_point = integration.get('integration_point', '')
+                        character_voice = integration.get('character_voice', '')
+                        
+                        if suggested_response:
+                            prompt += f"\n\n🌟 NATURAL LEARNING MOMENT OPPORTUNITY:\n"
+                            prompt += f"**Type**: {moment_type}\n"
+                            prompt += f"**Confidence**: {confidence:.2f}\n"
+                            prompt += f"**Suggested Expression**: \"{suggested_response}\"\n"
+                            if integration_point:
+                                prompt += f"**Natural Integration Point**: {integration_point}\n"
+                            if character_voice:
+                                prompt += f"**Voice Adaptation**: {character_voice}\n"
+                            prompt += "\n**GUIDANCE**: If conversationally appropriate, consider naturally "
+                            prompt += "weaving this learning insight into your response. This should "
+                            prompt += "feel organic and character-appropriate - not forced. Only include "
+                            prompt += "this if it flows naturally with the current conversation context.\n"
+                            
+                            logger.info("🌟 LEARNING MOMENT: Added to prompt (type=%s, confidence=%.2f)", 
+                                       moment_type, confidence)
+        except Exception as e:
+            logger.debug("Could not integrate learning moments: %s", e)
+
+        # VOICE & COMMUNICATION STYLE: Consolidated section matching complete_prompt_examples format
         voice_section = await self._build_voice_communication_section(character)
         if voice_section:
             prompt += f"\n\n{voice_section}"

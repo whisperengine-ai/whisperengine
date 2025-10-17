@@ -524,12 +524,16 @@ class DiscordBotCore:
                 self.logger.warning("⚠️ Empathy Calibrator not available for integration")
             
             # Phase 4.1: Memory-Triggered Moments - REMOVED (phantom feature)
-            # Memory moments removed - vector memory provides conversation continuity
-            self.logger.debug("💭 Memory-Triggered Moments removed (phantom feature) - vector memory provides this functionality")
+            # NOTE: Character Learning Moments system provides similar functionality
+            # Character Learning system actively detects memory surprises and growth insights
+            self.logger.debug("💭 Memory-Triggered Moments removed (phantom feature) - Character Learning system provides working alternative")
             
             # Phase 4.2: Advanced Thread Manager - REMOVED (phantom feature)
-            # Thread manager was removed as phantom feature - no integration needed
-            self.logger.debug("🧵 Advanced Thread Manager removed (phantom feature) - skipping integration")
+            # Advanced Thread Manager was documented in roadmaps but never actually implemented.
+            # Like Memory-Triggered Moments, it existed only in planning documents with no working code.
+            # Discord's native threading system provides adequate thread management without custom implementation.
+            # ALTERNATIVE: Use Discord's built-in thread features for conversation organization.
+            self.logger.debug("🧵 Advanced Thread Manager removed (phantom feature) - Discord native threading sufficient")
             
             # Phase 4.3: Proactive Engagement Engine
             if hasattr(self, 'engagement_engine') and self.engagement_engine:
@@ -703,12 +707,19 @@ class DiscordBotCore:
             self.empathy_calibrator = None
 
         # Initialize Phase 4.1: Memory-Triggered Personality Moments - REMOVED (phantom feature)
+        # NOTE: Character Learning Moments system provides similar functionality via:
+        # - src/characters/learning/character_learning_moment_detector.py
+        # - src/characters/learning/enhanced_memory_surprise_trigger.py
         self.logger.info("💭 Phase 4.1: Memory-Triggered Personality Moments removed (phantom feature)")
         self.memory_moments = None
-        self.logger.debug("🧠 Memory-triggered personality moments removed - vector memory provides this functionality")
+        self.logger.debug("🧠 Memory-triggered personality moments removed - Character Learning system provides working alternative")
 
         # Initialize Phase 4.2: Advanced Thread Manager
-        # Phase 4.2: Advanced Thread Manager removed as phantom feature
+        # Phase 4.2: Advanced Thread Manager - REMOVED (phantom feature)
+        # Advanced Thread Manager was documented in Phase 4 roadmaps but never actually implemented.
+        # Only documentation existed - no working code, no integration, no user impact.
+        # Discord's native threading system provides adequate functionality without custom implementation.
+        # ALTERNATIVE: Use Discord's built-in thread management features for conversation organization.
         self.logger.info("🧵 Phase 4.2: Advanced Thread Manager removed (phantom feature)")
         self._thread_manager_task = None
         self.thread_manager = None
