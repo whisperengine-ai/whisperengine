@@ -1748,7 +1748,84 @@ class CDLAIPromptIntegration:
         if conversation_summary:
             prompt += f"\n\n📚 CONVERSATION BACKGROUND:\n{conversation_summary}\n"
 
-        # �️ AI ETHICS DECISION TREE: Comprehensive scenario handling (October 2025)
+        # 🧠 UNIFIED CHARACTER INTELLIGENCE: Inject memory boost and coordinated intelligence
+        # This replaces the old raw snippet approach with properly coordinated intelligence
+        try:
+            if pipeline_dict and 'enhanced_context' in pipeline_dict:
+                enhanced_context = pipeline_dict['enhanced_context']
+                
+                if isinstance(enhanced_context, dict) and 'unified_character_intelligence' in enhanced_context:
+                    unified_intel = enhanced_context['unified_character_intelligence']
+                    
+                    if isinstance(unified_intel, dict):
+                        system_contributions = unified_intel.get('system_contributions', {})
+                        
+                        # Extract memory_boost (semantic search results from vector memory)
+                        memory_boost = system_contributions.get('memory_boost')
+                        if memory_boost and isinstance(memory_boost, dict):
+                            memories = memory_boost.get('memories', [])
+                            
+                            if memories and len(memories) > 0:
+                                from datetime import datetime, timezone, timedelta
+                                
+                                prompt += "\n\n🧠 RELEVANT PAST CONVERSATIONS:\n"
+                                prompt += "(Semantically similar conversations to provide context)\n\n"
+                                
+                                for i, memory in enumerate(memories[:5], 1):  # Top 5 semantic matches
+                                    # Handle both dict and object memory formats
+                                    if isinstance(memory, dict):
+                                        content = memory.get('content', '')
+                                        timestamp = memory.get('timestamp', '')
+                                        score = memory.get('score', 0.0)
+                                    else:
+                                        content = getattr(memory, 'content', '')
+                                        timestamp = getattr(memory, 'timestamp', '')
+                                        score = getattr(memory, 'score', 0.0)
+                                    
+                                    # Calculate time ago
+                                    time_context = ""
+                                    if timestamp:
+                                        try:
+                                            if isinstance(timestamp, str):
+                                                memory_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                            else:
+                                                memory_time = timestamp
+                                            
+                                            # Ensure timezone-aware
+                                            if memory_time.tzinfo is None:
+                                                memory_time = memory_time.replace(tzinfo=timezone.utc)
+                                            
+                                            time_ago = datetime.now(timezone.utc) - memory_time
+                                            if time_ago.days > 0:
+                                                time_context = f" ({time_ago.days} day{'s' if time_ago.days != 1 else ''} ago)"
+                                            else:
+                                                hours_ago = int(time_ago.total_seconds() / 3600)
+                                                if hours_ago > 0:
+                                                    time_context = f" ({hours_ago} hour{'s' if hours_ago != 1 else ''} ago)"
+                                        except Exception as e:
+                                            logger.debug(f"Could not parse timestamp for memory: {e}")
+                                    
+                                    # Add relevance score context
+                                    relevance_context = f" [relevance: {score:.2f}]" if score > 0 else ""
+                                    
+                                    # Show memory with context
+                                    prompt += f"{i}. {content}{time_context}{relevance_context}\n"
+                                
+                                logger.info(f"🧠 MEMORY BOOST: Injected {len(memories[:5])} relevant memories into prompt")
+                        
+                        # Extract conversation intelligence (recent conversation continuity)
+                        conversation_intel = system_contributions.get('conversation_intelligence')
+                        if conversation_intel and isinstance(conversation_intel, dict):
+                            recent_convos = conversation_intel.get('recent_conversations', [])
+                            if recent_convos and len(recent_convos) > 0:
+                                logger.debug(f"🧠 CONVERSATION INTEL: {len(recent_convos)} recent conversations already in conversation_history")
+                                # Note: Recent conversations are already in conversation_history parameter
+                                # so we don't duplicate them here
+        except Exception as e:
+            logger.error(f"🧠 UNIFIED: Failed to inject unified character intelligence: {e}")
+            # Continue without memory boost if it fails
+
+        # AI ETHICS DECISION TREE: Comprehensive scenario handling (October 2025)
         # Replaces narrow physical-interaction-only check with full ethics coverage
         try:
             from src.prompts.ai_ethics_decision_tree import AIEthicsDecisionTree

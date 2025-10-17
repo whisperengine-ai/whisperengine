@@ -4839,24 +4839,42 @@ class MessageProcessor:
                 except Exception as e:
                     logger.debug(f"Failed to add context analysis to pipeline: {e}")
             
-            # 🎯 ADAPTIVE LEARNING INTEGRATION: Add relationship and confidence data to COMPREHENSIVE CONTEXT
+            # 🎯 COMPREHENSIVE CONTEXT ASSEMBLY: Consolidate ALL AI intelligence for CDL integration
             # This must happen BEFORE comprehensive context is copied to pipeline!
+            
+            # Get or create comprehensive_context in ai_components
+            if 'comprehensive_context' not in ai_components:
+                ai_components['comprehensive_context'] = {}
+            
+            # Add adaptive learning data (relationship state, confidence)
             relationship_data = ai_components.get('relationship_state')
             confidence_data = ai_components.get('conversation_confidence')
             
-            if relationship_data or confidence_data:
-                # Get or create comprehensive_context in ai_components
-                if 'comprehensive_context' not in ai_components:
-                    ai_components['comprehensive_context'] = {}
+            if relationship_data:
+                ai_components['comprehensive_context']['relationship_state'] = relationship_data
+                logger.info("🎯 RELATIONSHIP: Added relationship data to comprehensive_context for prompt injection")
+            
+            if confidence_data:
+                ai_components['comprehensive_context']['conversation_confidence'] = confidence_data
+                logger.info("🎯 CONFIDENCE: Added confidence data to comprehensive_context for prompt injection")
+            
+            # 🧠 UNIFIED CHARACTER INTELLIGENCE: Add coordinated intelligence from all systems
+            unified_intelligence = ai_components.get('unified_character_intelligence')
+            if unified_intelligence and isinstance(unified_intelligence, dict):
+                ai_components['comprehensive_context']['unified_character_intelligence'] = unified_intelligence
+                logger.info("🧠 UNIFIED: Added unified character intelligence to comprehensive_context for prompt injection")
                 
-                # Add adaptive learning data INSIDE comprehensive_context (CDL integration reads from here)
-                if relationship_data:
-                    ai_components['comprehensive_context']['relationship_state'] = relationship_data
-                    logger.info("🎯 RELATIONSHIP: Added relationship data to comprehensive_context for prompt injection")
-                
-                if confidence_data:
-                    ai_components['comprehensive_context']['conversation_confidence'] = confidence_data
-                    logger.info("🎯 CONFIDENCE: Added confidence data to comprehensive_context for prompt injection")
+                # Log what intelligence systems contributed
+                system_contributions = unified_intelligence.get('system_contributions', {})
+                if system_contributions:
+                    contributing_systems = list(system_contributions.keys())
+                    logger.info(f"🧠 UNIFIED: Contributing systems: {', '.join(contributing_systems)}")
+                    
+                    # Specifically log memory_boost if present (this is the semantic search results)
+                    memory_boost = system_contributions.get('memory_boost')
+                    if memory_boost and isinstance(memory_boost, dict):
+                        memory_count = memory_boost.get('memory_count', 0)
+                        logger.info(f"🧠 MEMORY BOOST: {memory_count} relevant memories available for prompt injection")
             
             # 🚀 COMPREHENSIVE CONTEXT INTEGRATION: Add all AI components to pipeline
             comprehensive_context = ai_components.get('comprehensive_context')
