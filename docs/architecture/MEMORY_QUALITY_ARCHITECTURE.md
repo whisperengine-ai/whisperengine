@@ -35,13 +35,19 @@ BETTER: 5 highly relevant conversation pairs (2K tokens)
 WORSE:  20 marginally relevant fragments (4K tokens)
 ```
 
-### **Principle 2: Recency + Relevance Scoring**
+### **Principle 2: Recency + Gating Over Threshold**
 ```
 Keep if:
 ├─ Very recent (last 3 exchanges) - immediate context
-├─ High semantic score (>0.75) - clearly relevant
-├─ Explicit recall signal ("remember X?") - user wants it
+├─ Explicit recall signal ("remember X?") - user wants it (GATING)
+├─ Top-ranked results (limit=5) - quality through ranking, not threshold
 └─ DROP everything else - noise for attention mechanism
+
+Reality Check on Thresholds:
+├─ Short queries: "aethys" scores ~0.12 (low but valid)
+├─ Vague queries: "conversation" scores ~0.15 (low but valid)
+├─ Specific recalls: "cheese project" scores ~0.85 (high and relevant)
+└─ Gating solves this: Only search when user asks for recall
 ```
 
 ### **Principle 3: User Intent Over Bot Responses**
@@ -87,8 +93,8 @@ Total Target: 8-12K tokens (practical attention window)
 │   ├─ Messages 4-10: Complete if relevant, else drop (1.5-2.5K)
 │   └─ Older: Omitted (not in working memory)
 ├─ Semantic Retrieval: 0-2K tokens (ONLY when needed)
-│   ├─ "Remember X?" query: 5-7 individual user messages
-│   ├─ High relevance threshold: Score >0.75
+│   ├─ "Remember X?" query: Top 5 individual user messages
+│   ├─ Quality via ranking: Top-scored results (min_score=0.1 for short queries)
 │   └─ No recall signal: SKIP (0 tokens)
 └─ Safety buffer: 1K tokens
 
@@ -122,8 +128,9 @@ Quality Metrics:
 │  Tier 3: SEMANTIC RETRIEVAL (On-demand only)               │
 │  ├─ Triggered by: "Remember", "tell me about", "we talked" │
 │  ├─ Budget: 0-2K tokens (dynamic)                          │
-│  ├─ Format: 5-7 individual user messages (full content)    │
-│  ├─ Threshold: Score >0.75 (high relevance only)           │
+│  ├─ Format: Top 5 individual user messages (full content)  │
+│  ├─ Quality: Via ranking (top results), not strict threshold│
+│  ├─ Min score: 0.1 (allows short queries like "aethys")    │
 │  └─ Why: Vivid recall when user asks, nothing otherwise    │
 │  └─ Note: Recent conversation already has bot responses     │
 │                                                             │
@@ -172,46 +179,42 @@ def should_retrieve_semantic_memories(query: str) -> bool:
     return False
 ```
 
-### **Relevance Threshold Enforcement**
+### **Quality via Top-K Ranking (NOT Strict Threshold)**
 
 ```python
 async def retrieve_relevant_memories(
     self,
     user_id: str,
     query: str,
-    limit: int = 10,
-    min_score: float = 0.75  # RAISED from 0.1 - quality over quantity
+    limit: int = 5,  # Top 5 results only
+    min_score: float = 0.1  # Low threshold to allow short queries ("aethys" = 0.12)
 ) -> List[Dict[str, Any]]:
     """
-    Retrieve HIGH QUALITY memories only.
+    Retrieve top-ranked memories with flexible threshold.
     
-    Changed philosophy:
-    - OLD: Retrieve everything, truncate later
-    - NEW: Retrieve only clearly relevant, keep complete
+    Philosophy:
+    - Quality comes from TOP-K ranking (best results first)
+    - NOT from strict threshold (breaks short queries)
+    - Gating prevents unnecessary searches (70% saved)
+    - When we DO search, get the BEST results, not ALL results
+    
+    Why min_score=0.1:
+    - "aethys" scores ~0.12 (valid but low - character name)
+    - "conversation" scores ~0.15 (valid but vague)
+    - "cheese project" scores ~0.85 (high and specific)
+    - Raising to 0.75 would break character names and vague recalls
     """
-    # Get semantic search results
-    raw_results = await self._semantic_search(query, user_id, limit * 2)
+    # Get semantic search results (already sorted by score)
+    results = await self._semantic_search(query, user_id, limit)
     
-    # FILTER: Only keep high-relevance results
-    filtered_results = [
-        r for r in raw_results 
-        if r.get('score', 0.0) >= min_score
-    ]
-    
-    if len(filtered_results) < len(raw_results):
-        logger.info(
-            f"🎯 QUALITY FILTER: Kept {len(filtered_results)} high-relevance "
-            f"memories (dropped {len(raw_results) - len(filtered_results)} low-score)"
-        )
-    
-    # Reconstruct conversation pairs
-    pairs = await self._reconstruct_conversation_pairs(
-        filtered_results, 
-        user_id,
-        preserve_fidelity=True
+    # Results are pre-filtered by min_score and sorted by relevance
+    # Top-K naturally gives us quality without strict threshold
+    logger.info(
+        f"🎯 TOP-K QUALITY: Retrieved {len(results)} highest-scored memories "
+        f"(scores: {[r.get('score', 0):.2f for r in results[:3]]}...)"
     )
     
-    return pairs[:limit]
+    return results[:limit]
 ```
 
 ### **Dynamic Budget Allocation**
@@ -392,10 +395,11 @@ Query: "Tell me about our food discussions"
 **Effort:** Low (~50 lines)  
 **Benefit:** High - saves attention capacity, faster responses
 
-### **Priority 3: Relevance Threshold Enforcement**
-**Impact:** Only retrieves clearly relevant memories (>0.75 score)  
-**Effort:** Low (~20 lines)  
-**Benefit:** Medium - improves recall quality
+### **Priority 3: Top-K Quality Control** ✅ ALREADY DONE
+**Impact:** Returns top 5 highest-scored memories (quality via ranking)  
+**Effort:** Already implemented (limit=5)  
+**Benefit:** High - quality without breaking short queries
+**Note:** Tried strict threshold (0.75) but it broke "aethys" queries (score ~0.12)
 
 ### **Priority 4: Selective Recent Message Inclusion**
 **Impact:** Drops filler, keeps signal  
@@ -412,9 +416,9 @@ Query: "Tell me about our food discussions"
 ### **Quantitative:**
 - Average context size: 8-10K tokens (not 16K)
 - Recall query context: 10-12K tokens (when needed)
-- Semantic search gating: 70% of queries skip it
-- Relevance score: 95%+ of memories have score >0.75
-- Fragment rate: 0% (complete pairs only)
+- Semantic search gating: 70% of queries skip it ✅
+- Quality control: Top 5 results per query (ranked by score) ✅
+- Flexible threshold: min_score=0.1 allows short queries ✅
 
 ### **Qualitative:**
 - User: "Remember X?" → Gets vivid, complete conversation

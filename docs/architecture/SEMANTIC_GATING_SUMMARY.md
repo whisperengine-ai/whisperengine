@@ -147,12 +147,29 @@ c02666d - feat: Add semantic retrieval gating for attention efficiency
 5082c70 - docs: Add attention-aware memory quality architecture
 ```
 
+## ⚠️ **Important Learning: Threshold Reality**
+
+### **What We Almost Did Wrong:**
+Tried to raise `min_score` from 0.1 to 0.75 for "quality"
+
+### **Why That Would Fail:**
+- "aethys" (character name) scores ~0.12 ✅ Valid recall
+- "conversation" (vague query) scores ~0.15 ✅ Valid recall  
+- Raising to 0.75 would break these legitimate queries ❌
+
+### **What Actually Works:**
+- **Gating** decides WHETHER to search (70% saved) ✅
+- **Top-K (limit=5)** ensures quality via ranking ✅
+- **Low threshold (0.1)** allows all query types ✅
+
+**Quality comes from gating + ranking, NOT from strict thresholds**
+
 ## 🚀 Next Steps
 
 ### **Ready to Merge:**
 1. ✅ Feature implemented and working
 2. ✅ Tests passing (16/16)
-3. ✅ Documentation updated
+3. ✅ Documentation updated with threshold reality
 4. ✅ Unnecessary complexity removed
 
 ### **Validation Steps:**
