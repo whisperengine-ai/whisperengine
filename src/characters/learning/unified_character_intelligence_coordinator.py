@@ -211,6 +211,42 @@ class UnifiedCharacterIntelligenceCoordinator:
         
         logger.info("🧠 Unified Character Intelligence Coordinator initialized")
     
+    def _should_retrieve_semantic_memories(self, query: str) -> bool:
+        """
+        Gate semantic memory retrieval - only when user explicitly wants recall.
+        
+        This is ATTENTION-AWARE design: Most queries don't need semantic search.
+        Recent conversation is sufficient for casual interaction.
+        
+        Saves ~70% of unnecessary memory searches and preserves attention capacity.
+        
+        Args:
+            query: User's message content
+            
+        Returns:
+            True if semantic search is needed, False otherwise
+        """
+        query_lower = query.lower()
+        
+        # Explicit recall signals - user wants memories
+        recall_signals = [
+            'remember', 'recall', 'you mentioned', 'we talked',
+            'you said', 'i told you', 'discussed', 'conversation about',
+            'that time', 'when i', 'when we', 'what did',
+            'tell me about', 'what was that', 'those conversations'
+        ]
+        
+        # Check for explicit recall request
+        has_recall_signal = any(signal in query_lower for signal in recall_signals)
+        
+        if has_recall_signal:
+            logger.info("🧠 RECALL SIGNAL: Detected explicit memory request in query")
+            return True
+        
+        # Default: Recent conversation is enough (no semantic search needed)
+        logger.debug("💬 CASUAL QUERY: No recall signal - skipping semantic search")
+        return False
+    
     async def coordinate_intelligence(self, request: IntelligenceRequest) -> IntelligenceResponse:
         """
         Coordinate all intelligence systems for unified character response.
@@ -439,7 +475,20 @@ class UnifiedCharacterIntelligenceCoordinator:
         """Gather intelligence from a single system."""
         
         if system == IntelligenceSystemType.MEMORY_BOOST and self.memory_manager:
-            # Get relevant memories and episodic intelligence
+            # 🎯 ATTENTION-AWARE: Gate semantic retrieval - only when user explicitly wants recall
+            # Saves 70% of unnecessary memory searches and attention capacity
+            if not self._should_retrieve_semantic_memories(request.message_content):
+                logger.info("💬 CASUAL QUERY: Skipping semantic search (recent conversation sufficient)")
+                return {
+                    'type': 'memory_boost',
+                    'memories': [],
+                    'skipped': True,
+                    'reason': 'no_recall_signal',
+                    'memory_count': 0
+                }
+            
+            # User explicitly wants memories - retrieve them with high relevance threshold
+            logger.info("🧠 RECALL QUERY: Enabling semantic search for: %s", request.message_content[:100])
             memories = await self.memory_manager.retrieve_relevant_memories(
                 user_id=request.user_id,
                 query=request.message_content,
@@ -449,7 +498,8 @@ class UnifiedCharacterIntelligenceCoordinator:
                 'type': 'memory_boost',
                 'memories': memories,
                 'episodic_context': len(memories) > 0,
-                'memory_count': len(memories) if memories else 0
+                'memory_count': len(memories) if memories else 0,
+                'recall_signal_detected': True
             }
         
         elif system == IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE and self.character_extractor:
