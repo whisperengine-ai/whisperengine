@@ -903,6 +903,65 @@ class CDLAIPromptIntegration:
             if hasattr(big_five, 'neuroticism'):
                 prompt += f"- {get_adaptive_trait_info(big_five.neuroticism, 'neuroticism')}\n"
 
+        # 📚 CHARACTER LEARNING PERSISTENCE INTEGRATION
+        # Retrieves long-term learned insights from PostgreSQL for character evolution
+        try:
+            from src.characters.learning.character_insight_storage import create_character_insight_storage
+            
+            # Get character_id from character name
+            bot_name = self._get_safe_bot_name(character)
+            if bot_name and bot_name != 'unknown':
+                try:
+                    # Get character data to extract ID
+                    from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+                    from src.database.postgres_pool_manager import get_postgres_pool
+                    
+                    pool = await get_postgres_pool()
+                    if pool:
+                        enhanced_manager = create_enhanced_cdl_manager(pool)
+                        character_data = await enhanced_manager.get_character_by_name(bot_name)
+                        
+                        if character_data and 'id' in character_data:
+                            character_id = character_data['id']
+                            
+                            # Create storage and retrieve recent insights
+                            storage = await create_character_insight_storage()
+                            recent_insights = await storage.get_recent_insights(
+                                character_id=character_id,
+                                days_back=30,  # Last 30 days
+                                limit=5  # Max 5 most recent/important insights
+                            )
+                            
+                            if recent_insights:
+                                prompt += f"\n\n📚 YOUR RECENT SELF-DISCOVERIES:\n"
+                                prompt += "These are insights you've gained through conversations. Use them naturally when relevant:\n\n"
+                                
+                                for insight in recent_insights:
+                                    # Format insight with confidence indicator
+                                    confidence_emoji = "✨" if insight.confidence_score > 0.8 else "💫" if insight.confidence_score > 0.6 else "🌟"
+                                    prompt += f"- {confidence_emoji} {insight.insight_content}\n"
+                                    if insight.triggers:
+                                        prompt += f"  (Relevant when discussing: {', '.join(insight.triggers[:3])})\n"
+                                
+                                logger.info("📚 CHARACTER LEARNING: Added %d persistent insights to prompt for %s", 
+                                          len(recent_insights), bot_name)
+                            else:
+                                logger.debug("📚 CHARACTER LEARNING: No recent insights found for %s", bot_name)
+                        else:
+                            logger.debug("📚 CHARACTER LEARNING: Character '%s' not found in database", bot_name)
+                    else:
+                        logger.debug("📚 CHARACTER LEARNING: PostgreSQL pool not available")
+                        
+                except Exception as storage_error:
+                    logger.debug("📚 CHARACTER LEARNING: Could not retrieve insights: %s", storage_error)
+            else:
+                logger.debug("📚 CHARACTER LEARNING: Bot name not available")
+                
+        except ImportError:
+            logger.debug("📚 CHARACTER LEARNING: Storage not available (modules not found)")
+        except Exception as e:
+            logger.debug("📚 CHARACTER LEARNING: Integration failed: %s", e)
+        
         # 🌟 CHARACTER LEARNING MOMENTS INTEGRATION
         # Connects detected learning moments to LLM prompt for natural character growth expression
         try:

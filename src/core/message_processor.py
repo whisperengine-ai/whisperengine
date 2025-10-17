@@ -361,6 +361,12 @@ class MessageProcessor:
             logger.error("Proactive engagement engine initialization failed: %s", e)
             self.engagement_engine = None
         
+        # Character Learning Persistence: Layer 1 (PostgreSQL) - Lazy initialization
+        self.character_insight_storage = None
+        self.character_insight_extractor = None
+        self._character_learning_initialized = False
+        self._character_learning_lock = asyncio.Lock()
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
@@ -431,6 +437,77 @@ class MessageProcessor:
         except Exception as e:
             logger.warning("Database emoji selector initialization failed: %s", e)
             self._emoji_selector_init_attempted = True  # Don't retry on failure
+    
+    async def _ensure_character_learning_persistence_initialized(self):
+        """
+        Ensure character learning persistence components are initialized (lazy initialization).
+        
+        Requires postgres_pool from bot_core. Only initializes once.
+        
+        Returns:
+            bool: True if learning persistence is available
+        """
+        # Fast path: already initialized
+        if self._character_learning_initialized:
+            return (self.character_insight_storage is not None and 
+                   self.character_insight_extractor is not None)
+        
+        # Use lock to prevent multiple simultaneous initialization attempts
+        async with self._character_learning_lock:
+            # Double-check after acquiring lock
+            if self._character_learning_initialized:
+                return (self.character_insight_storage is not None and 
+                       self.character_insight_extractor is not None)
+            
+            try:
+                from src.characters.learning.character_insight_storage import create_character_insight_storage
+                from src.characters.learning.character_self_insight_extractor import create_character_self_insight_extractor
+                
+                # Check if postgres_pool is available (validates PostgreSQL is ready)
+                postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+                if postgres_pool:
+                    # Initialize storage layer with environment variables
+                    # Note: create_character_insight_storage creates its own pool
+                    postgres_host = os.getenv("POSTGRES_HOST", "localhost")
+                    postgres_port = int(os.getenv("POSTGRES_PORT", "5433"))
+                    postgres_db = os.getenv("POSTGRES_DB", "whisperengine")
+                    postgres_user = os.getenv("POSTGRES_USER", "whisperengine")
+                    postgres_password = os.getenv("POSTGRES_PASSWORD", "whisperengine")
+                    
+                    self.character_insight_storage = await create_character_insight_storage(
+                        postgres_host=postgres_host,
+                        postgres_port=postgres_port,
+                        postgres_db=postgres_db,
+                        postgres_user=postgres_user,
+                        postgres_password=postgres_password
+                    )
+                    
+                    # Initialize extractor
+                    self.character_insight_extractor = create_character_self_insight_extractor(
+                        min_confidence=0.6,  # Only persist high-confidence insights
+                        min_importance=4     # Only persist moderately important insights
+                    )
+                    
+                    logger.info("📚 Character Learning Persistence initialized (Layer 1: PostgreSQL)")
+                else:
+                    logger.debug("📚 PostgreSQL pool not available - character learning persistence disabled")
+                    self.character_insight_storage = None
+                    self.character_insight_extractor = None
+            
+            except ImportError as e:
+                logger.warning("📚 Character learning persistence not available: %s", e)
+                self.character_insight_storage = None
+                self.character_insight_extractor = None
+            except Exception as e:
+                logger.error("📚 Character learning persistence initialization failed: %s", e)
+                self.character_insight_storage = None
+                self.character_insight_extractor = None
+            
+            # Mark as initialized (even if failed, don't retry)
+            self._character_learning_initialized = True
+            
+            return (self.character_insight_storage is not None and 
+                   self.character_insight_extractor is not None)
 
     @handle_errors(category=ErrorCategory.VALIDATION, severity=ErrorSeverity.HIGH)
     async def process_message(self, message_context: MessageContext) -> ProcessingResult:
@@ -3727,6 +3804,15 @@ class MessageProcessor:
                     }
                     for moment in learning_moments
                 ]
+                
+                # 📚 CHARACTER LEARNING PERSISTENCE: Store insights for long-term memory
+                # Persist learning moments to PostgreSQL for character evolution
+                await self._persist_learning_moments(
+                    learning_moments=learning_moments,
+                    character_name=character_name,
+                    user_id=user_id,
+                    conversation_context=content[:500]  # Truncated conversation summary
+                )
             
             logger.info("🌟 Learning moment detection successful for %s (detected %d moments)", 
                        character_name, len(learning_moments))
@@ -3735,6 +3821,78 @@ class MessageProcessor:
         except Exception as e:
             logger.error("🌟 Learning moment detection failed: %s", str(e))
             return None
+    
+    async def _persist_learning_moments(
+        self,
+        learning_moments: List,
+        character_name: str,
+        user_id: str,
+        conversation_context: Optional[str] = None
+    ) -> None:
+        """
+        Persist detected learning moments to PostgreSQL for long-term character learning.
+        
+        Args:
+            learning_moments: List of LearningMoment objects detected
+            character_name: Character name (e.g., 'elena', 'marcus')
+            user_id: Discord user ID
+            conversation_context: Optional conversation summary
+        """
+        try:
+            # Ensure learning persistence is initialized (lazy)
+            persistence_available = await self._ensure_character_learning_persistence_initialized()
+            if not persistence_available or not learning_moments:
+                logger.debug("📚 Learning persistence unavailable or no moments to persist")
+                return
+            
+            # Get character_id from database
+            from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+            from src.database.postgres_pool_manager import get_postgres_pool
+            
+            pool = await get_postgres_pool()
+            if not pool:
+                logger.warning("📚 PostgreSQL pool not available - cannot persist insights")
+                return
+            
+            enhanced_manager = create_enhanced_cdl_manager(pool)
+            character_data = await enhanced_manager.get_character_by_name(character_name)
+            
+            if not character_data or 'id' not in character_data:
+                logger.warning("📚 Character '%s' not found in database - cannot persist insights", character_name)
+                return
+            
+            character_id = character_data['id']
+            
+            # Extract insights from learning moments
+            insights = self.character_insight_extractor.extract_insights_from_learning_moments(
+                learning_moments=learning_moments,
+                character_id=character_id,
+                conversation_context=conversation_context
+            )
+            
+            if not insights:
+                logger.debug("📚 No insights extracted from %d learning moments (filtered by quality)", 
+                           len(learning_moments))
+                return
+            
+            # Store insights in PostgreSQL
+            stored_count = 0
+            for insight in insights:
+                try:
+                    insight_id = await self.character_insight_storage.store_insight(insight)
+                    stored_count += 1
+                    logger.info("📚 Stored insight #%d: [%s] %s", 
+                              insight_id, insight.insight_type, insight.insight_content[:60])
+                except Exception as store_error:
+                    # Log but continue - don't fail entire process for one insight
+                    logger.warning("📚 Failed to store insight: %s", store_error)
+            
+            logger.info("📚 CHARACTER LEARNING PERSISTENCE: Stored %d/%d insights for %s", 
+                       stored_count, len(insights), character_name)
+        
+        except Exception as e:
+            # Log error but don't fail message processing
+            logger.error("📚 Learning moment persistence failed: %s", e, exc_info=True)
 
     async def _process_thread_management(self, user_id: str, content: str, 
                                        message_context: MessageContext) -> Optional[Dict[str, Any]]:
