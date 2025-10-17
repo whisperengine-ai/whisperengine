@@ -4008,10 +4008,49 @@ class VectorMemoryManager:
                 except Exception as e:
                     logger.warning(f"Emotion vector search failed, falling back to content: {e}")
             
+            # 🎯 SEMANTIC VECTOR: Pattern/relationship queries use semantic vector for conceptual understanding
+            semantic_keywords = ['pattern', 'usually', 'always', 'never', 'tend', 'habit', 
+                               'relationship', 'between', 'connect', 'relate', 'similar',
+                               'what did we', 'remember when', 'talked about', 'discussed',
+                               'our conversation', 'we spoke about', 'you mentioned']
+            if any(keyword in query_lower for keyword in semantic_keywords):
+                logger.info(f"🎯 SEMANTIC QUERY DETECTED: '{query}' - Using semantic vector for conceptual patterns")
+                try:
+                    # Use semantic vector via Qdrant's named vector search
+                    search_result = self.client.search(
+                        collection_name=self.collection_name,
+                        query_vector=(
+                            "semantic",  # Named vector for conceptual understanding
+                            self.embedding_generator.embed(query).tolist()
+                        ),
+                        query_filter=models.Filter(
+                            must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                        ),
+                        limit=limit,
+                        with_payload=True,
+                        score_threshold=0.65  # Slightly lower threshold for semantic patterns
+                    )
+                    
+                    if search_result:
+                        formatted_results = []
+                        for r in search_result:
+                            if r.payload:
+                                formatted_results.append({
+                                    "content": r.payload.get("content", ""),
+                                    "score": r.score,
+                                    "timestamp": r.payload.get("timestamp", ""),
+                                    "metadata": r.payload.get("metadata", {}),
+                                    "memory_type": r.payload.get("memory_type", "conversation"),
+                                    "semantic": True,
+                                    "search_type": "semantic_vector"
+                                })
+                        
+                        logger.debug(f"🎯 SEMANTIC VECTOR: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                        return formatted_results
+                except Exception as e:
+                    logger.warning(f"Semantic vector search failed, falling back to content: {e}")
+            
             # Default: Content vector for semantic meaning and topics
-            # NOTE: Pattern/semantic vector routing disabled due to infinite recursion
-            # get_memory_clusters_for_roleplay() internally calls retrieve_relevant_memories()
-            # TODO: Refactor to prevent recursion before re-enabling pattern routing
             logger.debug(f"🧠 CONTENT QUERY: '{query}' - Using content vector (default)")
             
             # 🚀 SIMPLIFIED: Trust vector embeddings for semantic search
