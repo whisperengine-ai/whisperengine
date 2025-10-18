@@ -572,7 +572,7 @@ class MessageProcessor:
             
             # Phase 5.5: Enhanced conversation context with AI intelligence
             conversation_context = await self._build_conversation_context_with_ai_intelligence(
-                message_context, relevant_memories, ai_components
+                message_context, conversation_context, ai_components
             )
             
             # Phase 6: Image processing if attachments present
@@ -2367,7 +2367,7 @@ class MessageProcessor:
         relevant_memories: List[Dict[str, Any]]
     ) -> List[Dict[str, str]]:
         """
-        🚀 STRUCTURED CONVERSATION CONTEXT BUILDING (Phase 2)
+        🚀 STRUCTURED CONVERSATION CONTEXT BUILDING (Phase 2 + CDL Integration)
         
         Build conversation context using PromptAssembler for structured, maintainable prompt generation.
         This replaces string concatenation with component-based assembly, enabling:
@@ -2377,58 +2377,256 @@ class MessageProcessor:
         - Model-specific formatting
         - Better debugging and testing
         
+        🎭 CDL INTEGRATION: Character Definition Language components are now integrated directly
+        into the PromptAssembler system, eliminating the dual-path prompt assembly that was
+        wasting ~150ms per message. Character identity, personality, backstory, and other CDL
+        data are now added as prioritized PromptComponents alongside memories and user facts.
+        
+        📊 CDL IMPLEMENTATION STATUS (7/11 components working):
+        ✅ IMPLEMENTED:
+          1. CHARACTER_IDENTITY (Priority 1) - Name, role, archetype, essence
+          2. CHARACTER_MODE (Priority 2) - AI identity handling approach
+          5. AI_IDENTITY_GUIDANCE (Priority 5) - Context-aware AI disclosure
+          6. TEMPORAL_AWARENESS (Priority 6) - Current date/time
+          8. CHARACTER_PERSONALITY (Priority 8) - Big Five personality traits
+         10. CHARACTER_VOICE (Priority 10) - Speaking style, linguistic patterns
+         16. KNOWLEDGE_CONTEXT (Priority 16) - User facts and preferences
+        
+        ⏳ NOT IMPLEMENTED (with TODOs in code below):
+          3. CHARACTER_BACKSTORY (Priority 3) - Professional history, formative experiences
+          4. CHARACTER_PRINCIPLES (Priority 4) - Core values, beliefs, motivations
+          7. USER_PERSONALITY (Priority 7) - User's Big Five profile
+         11. CHARACTER_RELATIONSHIPS (Priority 11) - User-character relationship dynamics
+        
         Returns: List of messages in OpenAI chat format (role + content)
         """
         logger.info(f"🚀 STRUCTURED CONTEXT: Building for user {message_context.user_id}")
         
         # Initialize assembler with token budget (approximate - converted to chars in components)
-        # Phase 2A: Upgraded to 16K tokens (~64K chars) for rich character personalities
-        # Modern models support 128K-200K tokens - we're targeting ~18% utilization (24K total)
+        # Phase 2B: Upgraded to 20K tokens (~80K chars) for CDL integration
+        # Previous: 16K tokens for basic prompts
+        # Modern models support 128K-200K tokens - we're targeting ~15% utilization (30K total)
         # See: docs/architecture/TOKEN_BUDGET_ANALYSIS.md for rationale
-        assembler = create_prompt_assembler(max_tokens=16000)
+        # See: docs/architecture/CDL_COMPONENT_MAPPING.md for CDL priority structure
+        assembler = create_prompt_assembler(max_tokens=20000)
         
         # ================================
-        # COMPONENT 1: Core System Prompt
+        # CDL COMPONENTS 1-2: Character Identity & Mode (Priorities 1-2)
         # ================================
-        from src.utils.helpers import get_current_time_context
-        time_context = get_current_time_context()
+        # 🎭 CDL CHARACTER: Load character identity and mode from database
+        from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+        from src.prompts.cdl_component_factories import (
+            create_character_identity_component,
+            create_character_mode_component,
+            create_ai_identity_guidance_component,
+            create_character_personality_component,
+            create_character_voice_component,
+        )
+        from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+        from src.database.postgres_pool_manager import get_postgres_pool
         
-        core_system = f"CURRENT DATE & TIME: {time_context}"
-        assembler.add_component(create_core_system_component(core_system, priority=1))
+        try:
+            bot_name = get_normalized_bot_name_from_env()
+            pool = await get_postgres_pool()
+            if pool:
+                enhanced_manager = create_enhanced_cdl_manager(pool)
+                
+                # Component 1: Character Identity (Priority 1)
+                identity_component = await create_character_identity_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name
+                )
+                if identity_component:
+                    assembler.add_component(identity_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character identity for {bot_name}")
+                else:
+                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character identity found for {bot_name}")
+                
+                # Component 2: Character Mode (Priority 2) - AI identity handling
+                mode_component = await create_character_mode_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name
+                )
+                if mode_component:
+                    assembler.add_component(mode_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character mode for {bot_name}")
+                else:
+                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character mode found for {bot_name}")
+                
+                # TODO: Component 3: Character Backstory (Priority 3) - NOT IMPLEMENTED
+                # Reason: Lower priority - backstory provides depth but not critical for basic responses
+                # Requires: Professional history, formative experiences, personal background from CDL
+                # Factory exists: create_character_backstory_component() in cdl_component_factories.py
+                # Estimated tokens: 300-700
+                
+                # TODO: Component 4: Character Principles (Priority 4) - NOT IMPLEMENTED
+                # Reason: Lower priority - core values/beliefs add depth but not essential for personality
+                # Requires: Core values, beliefs, motivations from CDL database
+                # Factory exists: create_character_principles_component() in cdl_component_factories.py
+                # Estimated tokens: 200-600
+                
+                # Component 5: AI Identity Guidance (Priority 5) - Context-aware AI disclosure
+                ai_guidance_component = await create_ai_identity_guidance_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name,
+                    message_content=message_context.content
+                )
+                if ai_guidance_component:
+                    assembler.add_component(ai_guidance_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added AI identity guidance for {bot_name}")
+                # Note: No warning if None - this is context-dependent (only when user asks about AI)
+                
+                # Component 8: Character Personality (Priority 8) - Big Five personality traits
+                personality_component = await create_character_personality_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name
+                )
+                if personality_component:
+                    assembler.add_component(personality_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character personality for {bot_name}")
+                else:
+                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character personality found for {bot_name}")
+                
+                # Component 10: Character Voice (Priority 10) - Speaking style and linguistic patterns
+                voice_component = await create_character_voice_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name
+                )
+                if voice_component:
+                    assembler.add_component(voice_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character voice for {bot_name}")
+                else:
+                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character voice found for {bot_name}")
+                
+                # TODO: Component 11: Character Relationships (Priority 11) - NOT IMPLEMENTED
+                # Reason: Requires relationship tracking system for user-character dynamics
+                # Complexity: High - needs relationship state management, key moments, interaction patterns
+                # Requires: Relationship data from PostgreSQL (relationship_type, connection_strength, key_moments)
+                # Factory exists: create_character_relationships_component() in cdl_component_factories.py
+                # Estimated tokens: 400
+                # Blocked by: Relationship management system not yet implemented
+                # Note: This would enable characters to reference shared history and relationship depth
+            else:
+                logger.warning("⚠️ STRUCTURED CONTEXT: No database pool - skipping CDL components")
+        except Exception as e:
+            logger.warning(f"⚠️ STRUCTURED CONTEXT: Failed to load CDL components: {e}")
         
         # ================================
-        # COMPONENT 2: Attachment Guard (if needed)
+        # CDL COMPONENT 6: Temporal Awareness (Priority 6)
+        # ================================
+        # 🕒 CDL TEMPORAL: Current date/time context for temporal grounding
+        from src.prompts.cdl_component_factories import create_temporal_awareness_component
+        
+        try:
+            temporal_component = await create_temporal_awareness_component(priority=6)
+            if temporal_component:
+                assembler.add_component(temporal_component)
+                logger.info("✅ STRUCTURED CONTEXT: Added CDL temporal awareness")
+            else:
+                # Fallback to legacy if CDL component fails
+                from src.utils.helpers import get_current_time_context
+                time_context = get_current_time_context()
+                time_component = PromptComponent(
+                    type=PromptComponentType.TIME_CONTEXT,
+                    content=f"CURRENT DATE & TIME: {time_context}",
+                    priority=6,
+                    required=True
+                )
+                assembler.add_component(time_component)
+                logger.warning("⚠️ STRUCTURED CONTEXT: Using legacy time context (CDL temporal component failed)")
+        except Exception as e:
+            # Fallback to legacy on exception
+            logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL temporal component error: {e}")
+            from src.utils.helpers import get_current_time_context
+            time_context = get_current_time_context()
+            time_component = PromptComponent(
+                type=PromptComponentType.TIME_CONTEXT,
+                content=f"CURRENT DATE & TIME: {time_context}",
+                priority=6,
+                required=True
+            )
+            assembler.add_component(time_component)
+        
+        # TODO: Component 7: User Personality (Priority 7) - NOT IMPLEMENTED
+        # Reason: Requires Big Five personality analysis system for users
+        # Complexity: Medium - needs user behavior analysis and personality inference
+        # Requires: User's Big Five personality profile from PostgreSQL database
+        # Factory exists: create_user_personality_component() in cdl_component_factories.py
+        # Estimated tokens: 250
+        # Blocked by: User personality analysis system not yet implemented
+        
+        # ================================
+        # COMPONENT 5: Attachment Guard (if needed)
         # ================================
         if message_context.attachments and len(message_context.attachments) > 0:
-            bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
+            bot_name_for_guard = os.getenv('DISCORD_BOT_NAME', 'Assistant')
             attachment_guard = (
-                f"Image policy: respond only in-character ({bot_name}), never output analysis sections, "
+                f"Image policy: respond only in-character ({bot_name_for_guard}), never output analysis sections, "
                 f"headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
             )
             assembler.add_component(PromptComponent(
                 type=PromptComponentType.ATTACHMENT_GUARD,
                 content=attachment_guard,
-                priority=2,
+                priority=3,
                 required=True
             ))
         
         # ================================
-        # COMPONENT 3: User Facts and Preferences
+        # CDL COMPONENT 16: Knowledge Context (User Facts)
         # ================================
+        # 📚 CDL KNOWLEDGE: User facts and learned information
+        # Note: Eventually replace with separate USER_PERSONALITY (Priority 7) + KNOWLEDGE_CONTEXT (Priority 16)
+        from src.prompts.cdl_component_factories import create_knowledge_context_component
+        
+        # Get user facts from existing system
         user_facts_content = await self._build_user_facts_content(
             message_context.user_id, 
             message_context.content  # Pass message content for context-based filtering
         )
+        
         if user_facts_content:
-            assembler.add_component(create_user_facts_component(
-                user_facts_content,
-                priority=3
-            ))
-            logger.info(f"✅ STRUCTURED CONTEXT: Added user facts ({len(user_facts_content)} chars)")
+            # Try CDL knowledge context component first
+            try:
+                # Parse user facts into list format for CDL component
+                user_facts_list = []
+                if user_facts_content:
+                    # Split by newlines and clean up
+                    facts = user_facts_content.split('\n')
+                    for fact in facts:
+                        fact = fact.strip()
+                        if fact and fact.startswith('-'):
+                            user_facts_list.append(fact[1:].strip())
+                        elif fact and not fact.startswith('Known facts'):
+                            user_facts_list.append(fact)
+                
+                knowledge_component = await create_knowledge_context_component(
+                    user_facts=user_facts_list,
+                    priority=16
+                )
+                
+                if knowledge_component:
+                    assembler.add_component(knowledge_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL knowledge context ({len(knowledge_component.content)} chars)")
+                else:
+                    # Fallback to legacy user facts component
+                    assembler.add_component(create_user_facts_component(
+                        user_facts_content,
+                        priority=16
+                    ))
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added legacy user facts ({len(user_facts_content)} chars)")
+            except Exception as e:
+                # Fallback to legacy on error
+                logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL knowledge component error: {e}")
+                assembler.add_component(create_user_facts_component(
+                    user_facts_content,
+                    priority=16
+                ))
+                logger.info(f"✅ STRUCTURED CONTEXT: Added legacy user facts ({len(user_facts_content)} chars)")
         
         # ================================
-        # COMPONENT 4: Memory Narrative (or anti-hallucination warning)
+        # COMPONENT 7: Memory Narrative (or anti-hallucination warning)
         # ================================
+        # Note: Uses legacy MEMORY type at priority 13 (CDL EPISODIC_MEMORIES priority)
         memory_narrative = await self._build_memory_narrative_structured(
             message_context.user_id, 
             relevant_memories
@@ -2437,31 +2635,40 @@ class MessageProcessor:
         if memory_narrative:
             assembler.add_component(create_memory_component(
                 f"RELEVANT MEMORIES: {memory_narrative}",
-                priority=5
+                priority=13  # Priority 13: Episodic memories from CDL mapping
             ))
             logger.info(f"✅ STRUCTURED CONTEXT: Added memory narrative ({len(memory_narrative)} chars)")
         else:
-            assembler.add_component(create_anti_hallucination_component(priority=5))
+            assembler.add_component(create_anti_hallucination_component(priority=13))
             logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories)")
         
         # ================================
-        # COMPONENT 5: Conversation Summary (if available)
+        # COMPONENT 8: Conversation Summary - REMOVED (October 2025)
         # ================================
-        conversation_summary = await self._get_conversation_summary_structured(message_context.user_id)
-        if conversation_summary:
-            assembler.add_component(PromptComponent(
-                type=PromptComponentType.CONVERSATION_FLOW,
-                content=f"CONVERSATION FLOW: {conversation_summary}",
-                priority=6,
-                required=False  # Optional - can be dropped if over budget
-            ))
-            logger.info(f"✅ STRUCTURED CONTEXT: Added conversation summary ({len(conversation_summary)} chars)")
+        # REMOVED: Zero-LLM "CONVERSATION FLOW" keyword extraction summary
+        # 
+        # REASONS FOR REMOVAL:
+        # 1. REDUNDANT with semantic memories: "PAST CONVERSATIONS" already shows rich conversation history
+        # 2. REDUNDANT with recent history: Last 15 message pairs provide immediate context
+        # 3. TOO VAGUE: Zero-LLM keyword extraction produces generic summaries like "focusing on marine ecosystem topics"
+        #    when semantic memories already show specific details (ocean acidification, coral pH, thesis deadline)
+        # 4. NO UNIQUE VALUE: Doesn't provide information not already visible in conversation history
+        # 5. WASTES TOKENS: Prompt space better used for MORE semantic memories or longer recent history
+        # 6. USER FACTS provide unique persistent data (from knowledge graph) - that's the real "background"
+        #
+        # CONTEXT ARCHITECTURE (KEPT):
+        # - ✅ PAST CONVERSATIONS: 10 semantic memories with User/Elena conversation turns (rich historical context)
+        # - ✅ USER FACTS: Knowledge graph data (unique profile: location, job, pets, preferences)  
+        # - ✅ RECENT HISTORY: 15 message pairs (immediate conversation continuity)
+        #
+        # This provides complete context without vague summaries that add no value.
         
         # ================================
-        # COMPONENT 6: Communication Style Guidance
+        # COMPONENT 8: Communication Style Guidance
         # ================================
-        bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
-        assembler.add_component(create_guidance_component(bot_name, priority=7))
+        # Note: Uses legacy GUIDANCE type at priority 17 (CDL RESPONSE_STYLE priority)
+        bot_name_for_guidance = os.getenv('DISCORD_BOT_NAME', 'Assistant')
+        assembler.add_component(create_guidance_component(bot_name_for_guidance, priority=17))  # Priority 17: Response style
         
         # ================================
         # ASSEMBLE SYSTEM MESSAGE
@@ -2512,8 +2719,11 @@ class MessageProcessor:
         user_facts = []
         conversation_memories = []
         
+        # Get character name for personalized conversation turn labels
+        character_display_name = self.character_name.capitalize() if self.character_name else "Bot"
+        
         # Separate facts from conversation memories
-        for memory in relevant_memories[:10]:  # Limit to prevent token overflow
+        for memory in relevant_memories[:15]:  # Increased from 10 to 15 for richer semantic context
             content = memory.get("content", "")
             metadata = memory.get("metadata", {})
             
@@ -2522,26 +2732,97 @@ class MessageProcessor:
                 if fact:
                     user_facts.append(fact)
             elif content:
-                # Conversation memory
-                if "User:" in content and "Bot:" in content:
-                    conversation_memories.append(f"{content[:500]}")
+                # 🔑 HYBRID APPROACH FIX: Extract bot response from metadata for full conversation context
+                # This provides complete conversation turns (User + CharacterName) instead of just user messages
+                bot_response = metadata.get('bot_response', '') if isinstance(metadata, dict) else ''
+                
+                if bot_response:
+                    # Format as full conversation turn with character's name (e.g., "User: / Elena:")
+                    # This reinforces character identity and makes conversation history feel more personal
+                    conversation_turn = f"User: {content[:300]}\n   {character_display_name}: {bot_response[:300]}"
+                    conversation_memories.append(conversation_turn)
                 else:
-                    conversation_memories.append(f"{content[:500]}")
+                    # Fallback: Check if already formatted with labels, or just use content
+                    if "User:" in content and ("Bot:" in content or character_display_name in content):
+                        conversation_memories.append(f"{content[:500]}")
+                    else:
+                        conversation_memories.append(f"{content[:500]}")
         
         # Build narrative with structure
         if user_facts:
             memory_parts.append(f"USER FACTS: {'; '.join(user_facts)}")
         
         if conversation_memories:
-            memory_parts.append(f"PAST CONVERSATIONS: {' | '.join(conversation_memories[:5])}")
+            # 🔑 HYBRID APPROACH: Show 10 conversation memories (increased from 5) with pipe delimiter
+            # Rationale: More extractive semantic context while reducing recent chronological messages
+            memory_parts.append(f"PAST CONVERSATIONS: {' | '.join(conversation_memories[:10])}")
         
         return " || ".join(memory_parts) if memory_parts else ""
     
     async def _get_conversation_summary_structured(self, user_id: str) -> str:
-        """Get conversation summary for structured context."""
-        # Simplified: Conversation summary logic can be added later
-        # For now, return empty string to keep Phase 2 focused on structure
-        return ""
+        """
+        Get conversation summary for structured context using zero-LLM Qdrant summarization.
+        
+        Uses semantic vector similarity to detect conversation themes and topics
+        without requiring LLM calls. Provides context about ongoing conversation flow.
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            Formatted conversation summary string, or empty if no summary available
+        """
+        try:
+            # Check if memory manager has summarization capability
+            if not self.memory_manager or not hasattr(self.memory_manager, 'get_conversation_summary_with_recommendations'):
+                logger.debug("📚 CONVERSATION SUMMARY: Memory manager lacks summarization capability")
+                return ""
+            
+            # Get recent conversation history for pattern analysis
+            recent_messages = await self._get_recent_messages_structured(user_id)
+            if not recent_messages:
+                logger.debug("📚 CONVERSATION SUMMARY: No recent messages for summarization")
+                return ""
+            
+            # Call Qdrant-based zero-LLM summarization
+            summary_data = await self.memory_manager.get_conversation_summary_with_recommendations(
+                user_id=user_id,
+                conversation_history=recent_messages,
+                limit=20  # Analyze up to 20 related conversations for patterns
+            )
+            
+            if not summary_data or not summary_data.get('topic_summary'):
+                logger.debug("📚 CONVERSATION SUMMARY: No summary generated")
+                return ""
+            
+            # Extract summary components
+            topic_summary = summary_data.get('topic_summary', '')
+            themes = summary_data.get('conversation_themes', '')
+            method = summary_data.get('recommendation_method', 'unknown')
+            related_count = summary_data.get('related_conversations_found', 0)
+            
+            # Format summary for prompt
+            summary_parts = []
+            
+            if topic_summary:
+                summary_parts.append(topic_summary)
+            
+            # Add theme context if available and different from summary
+            if themes and themes not in topic_summary.lower():
+                summary_parts.append(f"Themes: {themes}")
+            
+            # Add pattern indicator if significant related conversations found
+            if related_count > 5:
+                summary_parts.append(f"(recurring topic - {related_count} related conversations)")
+            
+            final_summary = ". ".join(summary_parts)
+            
+            logger.info(f"✅ CONVERSATION SUMMARY: Generated via {method} ({len(final_summary)} chars, {related_count} related)")
+            return final_summary
+            
+        except Exception as e:
+            logger.warning(f"⚠️ CONVERSATION SUMMARY: Failed to generate summary: {e}")
+            return ""
     
     async def _build_user_facts_content(self, user_id: str, message_content: str = "") -> str:
         """
@@ -2731,21 +3012,35 @@ class MessageProcessor:
     async def _get_recent_messages_structured(self, user_id: str) -> List[Dict[str, str]]:
         """Get recent conversation messages for structured context."""
         try:
+            # 🚨 FIX: Increased from 20 to 30 to prevent cutting off recent conversation context
+            # With active users (300+ interactions), 20 was insufficient for 24h window
+            # This retrieves up to 60 messages from Qdrant, then takes the 30 most recent
             recent_messages = await self.memory_manager.get_conversation_history(
                 user_id=user_id,
-                limit=20
+                limit=30
             )
             
             if not recent_messages:
                 return []
             
+            logger.info(f"🔍 CONVERSATION HISTORY DEBUG: Retrieved {len(recent_messages)} messages from memory")
+            for idx, msg in enumerate(recent_messages):
+                role = msg.get('role', 'unknown')
+                content_preview = msg.get('content', '')[:80]
+                timestamp = msg.get('timestamp', 'no-timestamp')
+                logger.debug(f"  [{idx}] role={role}, ts={timestamp}, content='{content_preview}...'")
+            
             formatted_messages = []
             skip_next_bot_response = False
             
             # Split into older (truncated) vs recent (detailed)
-            recent_full_count = 6
+            # 🚨 FIX: Increased from 6 to 10 to match increased limit of 30
+            # Last 10 messages get full content, older ones truncated to 500 chars
+            recent_full_count = 10
             older_messages = recent_messages[:-recent_full_count] if len(recent_messages) > recent_full_count else []
             recent_full_messages = recent_messages[-recent_full_count:] if len(recent_messages) > recent_full_count else recent_messages
+            
+            logger.info(f"🔍 MESSAGE SPLIT: {len(older_messages)} older (truncated), {len(recent_full_messages)} recent (full)")
             
             # Process older messages (truncated to 500 chars)
             for msg in older_messages:
@@ -2768,6 +3063,7 @@ class MessageProcessor:
                 truncated = content[:500] + "..." if len(content) > 500 else content
                 role = "assistant" if is_bot else "user"
                 formatted_messages.append({"role": role, "content": truncated})
+                logger.debug(f"  ✅ ADDED older message: role={role}, len={len(truncated)}")
             
             # Process recent messages (tiered: last 3 full, others 400 chars)
             for idx, msg in enumerate(recent_full_messages):
@@ -2777,10 +3073,12 @@ class MessageProcessor:
                 is_bot = role_value in ['bot', 'assistant']
                 
                 if content.startswith("!"):
+                    logger.debug(f"  ⏭️  SKIPPED (command): role={role_value}, content='{content[:50]}...'")
                     skip_next_bot_response = True
                     continue
                 
                 if is_bot and skip_next_bot_response:
+                    logger.debug(f"  ⏭️  SKIPPED (after command): role={role_value}, content='{content[:50]}...'")
                     skip_next_bot_response = False
                     continue
                 
@@ -2796,7 +3094,9 @@ class MessageProcessor:
                 
                 role = "assistant" if is_bot else "user"
                 formatted_messages.append({"role": role, "content": message_content})
+                logger.debug(f"  ✅ ADDED recent message [{idx}]: role={role}, is_most_recent={is_most_recent}, len={len(message_content)}")
             
+            logger.info(f"🔍 FINAL RESULT: {len(formatted_messages)} messages added to conversation context")
             return formatted_messages
             
         except Exception as e:
@@ -2804,19 +3104,18 @@ class MessageProcessor:
             return []
 
     async def _build_conversation_context_with_ai_intelligence(
-        self, message_context: MessageContext, relevant_memories: List[Dict[str, Any]], ai_components: Dict[str, Any]
+        self, message_context: MessageContext, conversation_context: List[Dict[str, str]], ai_components: Dict[str, Any]
     ) -> List[Dict[str, str]]:
         """
         Enhance conversation context with AI intelligence guidance.
         
-        🚨 CRITICAL: This method ENHANCES the structured context from Phase 4,
-        it does NOT rebuild from scratch. We accept the pre-built structured context
+        ✅ This method ENHANCES the structured context from Phase 4,
+        it does NOT rebuild from scratch. We receive the pre-built structured context
         and just add TrendWise adaptation and AI intelligence guidance to it.
         """
-        # 🚨 CRITICAL FIX: Use structured context from Phase 4, don't rebuild!
+        # ✅ FIXED: Accept conversation_context as parameter instead of rebuilding
         # The conversation_context is ALREADY built by _build_conversation_context_structured()
-        # We just need to enhance it with AI intelligence additions
-        conversation_context = await self._build_conversation_context_structured(message_context, relevant_memories)
+        # We just enhance it with AI intelligence additions
         
         # TrendWise Adaptive Learning: Add confidence adaptation guidance
         if self.confidence_adapter:
@@ -5102,16 +5401,11 @@ class MessageProcessor:
                                ai_components: Dict[str, Any]) -> str:
         """Generate AI response using the conversation context."""
         try:
-            # Apply CDL character enhancement
-            enhanced_context = await self._apply_cdl_character_enhancement(
-                message_context.user_id, conversation_context, message_context, ai_components
-            )
+            # ✅ UNIFIED PROMPT ASSEMBLY: conversation_context already has all CDL components
+            # from _build_conversation_context_structured() - no need for legacy enhancement
+            final_context = conversation_context
             
-            # 🎭 CRITICAL FIX: Use enhanced context if CDL enhancement succeeded, otherwise use original
-            # The emotion enhancement is already included in CDL enhancement, so no need for separate step
-            final_context = enhanced_context if enhanced_context else conversation_context
-            
-            # � TOKEN BUDGET ENFORCEMENT: Prevent oversized context from walls of text
+            # 🎯 TOKEN BUDGET ENFORCEMENT: Prevent oversized context from walls of text
             # This is STAGE 2 management (full conversation array) - happens AFTER PromptAssembler (system message only)
             from src.utils.context_size_manager import truncate_context, count_context_tokens
             
@@ -5192,232 +5486,6 @@ class MessageProcessor:
         except (ImportError, AttributeError, ValueError, TypeError) as e:
             logger.error("Response generation failed: %s", str(e))
             return "I apologize, but I'm having trouble generating a response right now. Please try again."
-
-    async def _apply_cdl_character_enhancement(self, user_id: str, conversation_context: List[Dict[str, str]], 
-                                             message_context: MessageContext, ai_components: Dict[str, Any]) -> Optional[List[Dict[str, str]]]:
-        """
-        🎭 SOPHISTICATED CDL CHARACTER INTEGRATION 🎭
-        
-        Apply sophisticated CDL character enhancement to conversation context with full AI pipeline integration.
-        Restored from original events.py implementation with complete VectorAIPipelineResult creation.
-        
-        This injects character-aware prompts that combine:
-        - CDL character personality, backstory, and voice
-        - AI pipeline emotional analysis and memory networks  
-        - Real-time conversation context and relationship dynamics
-        - Context analysis insights from sophisticated AI processing
-        - Phase 4 comprehensive context and human-like intelligence
-        """
-        try:
-            import os
-            logger.info("🎭 CDL CHARACTER DEBUG: Starting sophisticated enhancement for user %s", user_id)
-            
-            # Use database-only character loading (character_file parameter is legacy compatibility)
-            bot_name = os.getenv("DISCORD_BOT_NAME", "Unknown")
-            logger.info("🎭 CDL CHARACTER: Using database-only character loading for %s bot, user %s", 
-                       bot_name, user_id)
-            
-            logger.info("🎭 CDL CHARACTER: User %s using database character for bot: %s", user_id, bot_name)
-            
-            # Import CDL integration modules
-            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
-            from src.prompts.ai_pipeline_vector_integration import VectorAIPipelineResult
-            from datetime import datetime
-            
-            # 🚀 SOPHISTICATED PIPELINE RESULT CREATION: Map ALL AI components to VectorAIPipelineResult
-            pipeline_result = VectorAIPipelineResult(
-                user_id=user_id,
-                message_content=message_context.content,
-                timestamp=datetime.now(),
-                # Map emotion data to emotional_state - keep as dict for processing, convert to str only if needed
-                emotional_state=ai_components.get('external_emotion_data') or ai_components.get('emotion_data'),
-                mood_assessment=ai_components.get('external_emotion_data') if isinstance(ai_components.get('external_emotion_data'), dict) else None,
-                # Map personality data 
-                personality_profile=ai_components.get('personality_context') if isinstance(ai_components.get('personality_context'), dict) else None,
-                # Map conversation intelligence data
-                enhanced_context=ai_components.get('conversation_intelligence') if isinstance(ai_components.get('conversation_intelligence'), dict) else None
-            )
-            
-            # 🎭 CRITICAL FIX: Add emotion_analysis mapping for CDL integration  
-            # The CDL system looks for 'emotion_analysis' in pipeline_dict, but we store under 'emotion_data'
-            emotion_data = ai_components.get('emotion_data')
-            logger.debug(f"🎭 DEBUG: emotion_data type: {type(emotion_data)}, content: {emotion_data}")
-            if emotion_data and isinstance(emotion_data, dict):
-                # Add emotion_analysis as direct attribute to pipeline result for CDL integration
-                setattr(pipeline_result, 'emotion_analysis', emotion_data)
-                logger.info("🎭 EMOTION FIX: Added emotion_analysis attribute to pipeline for CDL integration")
-            else:
-                logger.warning(f"🎭 EMOTION WARNING: emotion_data is not a dict - type: {type(emotion_data)}, value: {emotion_data}")
-            
-            # 🎯 SOPHISTICATED CONTEXT ANALYSIS INTEGRATION: Add context analysis insights to pipeline result
-            context_analysis = ai_components.get('context_analysis')
-            if context_analysis and not isinstance(context_analysis, Exception):
-                try:
-                    # Convert context analysis to dict for pipeline compatibility
-                    context_dict = {
-                        'needs_ai_guidance': getattr(context_analysis, 'needs_ai_guidance', False),
-                        'needs_memory_context': getattr(context_analysis, 'needs_memory_context', False),
-                        'needs_personality': getattr(context_analysis, 'needs_personality', False),
-                        'needs_voice_style': getattr(context_analysis, 'needs_voice_style', False),
-                        'is_greeting': getattr(context_analysis, 'is_greeting', False),
-                        'is_simple_question': getattr(context_analysis, 'is_simple_question', False),
-                        'confidence_scores': getattr(context_analysis, 'confidence_scores', {}),
-                    }
-                    # Add to enhanced_context if available, otherwise create new field
-                    if isinstance(pipeline_result.enhanced_context, dict):
-                        pipeline_result.enhanced_context['context_analysis'] = context_dict
-                    else:
-                        pipeline_result.enhanced_context = {'context_analysis': context_dict}
-                    
-                    logger.info("🎯 CDL: Enhanced pipeline with context analysis insights")
-                except Exception as e:
-                    logger.debug(f"Failed to add context analysis to pipeline: {e}")
-            
-            # 🎯 COMPREHENSIVE CONTEXT ASSEMBLY: Consolidate ALL AI intelligence for CDL integration
-            # This must happen BEFORE comprehensive context is copied to pipeline!
-            
-            # Get or create comprehensive_context in ai_components
-            if 'comprehensive_context' not in ai_components:
-                ai_components['comprehensive_context'] = {}
-            
-            # Add adaptive learning data (relationship state, confidence, emotional adaptation)
-            relationship_data = ai_components.get('relationship_state')
-            confidence_data = ai_components.get('conversation_confidence')
-            emotional_adaptation = ai_components.get('emotional_adaptation')
-            
-            if relationship_data:
-                ai_components['comprehensive_context']['relationship_state'] = relationship_data
-                logger.info("🎯 RELATIONSHIP: Added relationship data to comprehensive_context for prompt injection")
-            
-            if confidence_data:
-                ai_components['comprehensive_context']['conversation_confidence'] = confidence_data
-                logger.info("🎯 CONFIDENCE: Added confidence data to comprehensive_context for prompt injection")
-            
-            if emotional_adaptation:
-                ai_components['comprehensive_context']['emotional_adaptation'] = emotional_adaptation
-                logger.info("🎯 EMOTIONAL ADAPTATION: Added tactical Big Five shifts to comprehensive_context for prompt injection")
-            
-            # 🧠 UNIFIED CHARACTER INTELLIGENCE: Add coordinated intelligence from all systems
-            unified_intelligence = ai_components.get('unified_character_intelligence')
-            if unified_intelligence and isinstance(unified_intelligence, dict):
-                ai_components['comprehensive_context']['unified_character_intelligence'] = unified_intelligence
-                logger.info("🧠 UNIFIED: Added unified character intelligence to comprehensive_context for prompt injection")
-                
-                # Log what intelligence systems contributed
-                system_contributions = unified_intelligence.get('system_contributions', {})
-                if system_contributions:
-                    contributing_systems = list(system_contributions.keys())
-                    logger.info(f"🧠 UNIFIED: Contributing systems: {', '.join(contributing_systems)}")
-                    
-                    # Specifically log memory_boost if present (this is the semantic search results)
-                    memory_boost = system_contributions.get('memory_boost')
-                    if memory_boost and isinstance(memory_boost, dict):
-                        memory_count = memory_boost.get('memory_count', 0)
-                        logger.info(f"🧠 MEMORY BOOST: {memory_count} relevant memories available for prompt injection")
-            
-            # 🎭 CHARACTER EMOTIONAL STATE: Add bot's own emotional state (biochemical modeling)
-            character_emotional_state = ai_components.get('character_emotional_state')
-            if character_emotional_state:
-                ai_components['comprehensive_context']['character_emotional_state'] = character_emotional_state
-                logger.info("🎭 CHARACTER STATE: Added bot emotional state to comprehensive_context for prompt injection")
-            
-            # 🚀 COMPREHENSIVE CONTEXT INTEGRATION: Add all AI components to pipeline
-            comprehensive_context = ai_components.get('comprehensive_context')
-            if comprehensive_context and isinstance(comprehensive_context, dict):
-                # Merge comprehensive context into pipeline enhanced_context
-                if isinstance(pipeline_result.enhanced_context, dict):
-                    pipeline_result.enhanced_context.update(comprehensive_context)
-                else:
-                    pipeline_result.enhanced_context = comprehensive_context.copy()
-                
-                logger.info("🎯 CDL: Enhanced pipeline with comprehensive context from sophisticated AI processing (includes adaptive learning features)")
-            
-            # Use centralized character system if available, otherwise create new instance
-            if self.bot_core and hasattr(self.bot_core, 'character_system'):
-                cdl_integration = self.bot_core.character_system
-                logger.info("🎭 CDL: Using centralized character system for %s", user_id)
-            else:
-                # Fallback: Create CDL integration instance with knowledge_router if available
-                knowledge_router = getattr(self.bot_core, 'knowledge_router', None) if self.bot_core else None
-                cdl_integration = CDLAIPromptIntegration(
-                    vector_memory_manager=self.memory_manager,
-                    llm_client=self.llm_client,
-                    knowledge_router=knowledge_router,
-                    bot_core=self.bot_core  # Pass bot_core for personality profiler access
-                )
-                logger.warning("⚠️ CDL: Using fallback CDL instance for %s - character system not initialized", user_id)
-            
-            # Get user's display name for better identification
-            user_display_name = message_context.metadata.get('discord_author_name') if message_context.metadata else None
-            
-            # 🚀 FULL INTELLIGENCE: Use complete character-aware prompt with all emotional intelligence
-            print(f"🚀 ABOUT TO CALL create_unified_character_prompt for user {user_id}", flush=True)
-            character_prompt = await cdl_integration.create_unified_character_prompt(
-                user_id=user_id,
-                message_content=message_context.content,
-                pipeline_result=pipeline_result,
-                user_name=user_display_name
-                # character_file parameter removed - using database-only approach
-            )
-            print(f"✅ RETURNED FROM create_unified_character_prompt - prompt length: {len(character_prompt)}", flush=True)
-            
-            # 🎯 WORKFLOW INTEGRATION: Inject workflow transaction context into character prompt
-            workflow_prompt_injection = message_context.metadata.get('workflow_prompt_injection') if message_context.metadata else None
-            if workflow_prompt_injection:
-                character_prompt += f"\n\n🎯 ACTIVE TRANSACTION CONTEXT:\n{workflow_prompt_injection}"
-                logger.info("🎯 WORKFLOW: Injected transaction context into character prompt (%d chars)", len(workflow_prompt_injection))
-            
-            # � DISABLED: VECTOR-NATIVE ENHANCEMENT (replaced by structured prompt assembly)
-            # The vector_native_prompt_manager had hardcoded stub implementations that added
-            # generic topics like "dreams, creativity, existence" to ALL characters.
-            # Structured prompt assembly (Phase 4) already handles context properly.
-            # 
-            # LEGACY CODE (removed):
-            # - Used vector_native_prompt_manager.create_contextualized_prompt()
-            # - Added hardcoded topics, patterns, emotional states
-            # - Caused all characters to mention "dreams, creativity, existence"
-            #
-            # NEW APPROACH: Character prompt from CDL is already complete and accurate
-            # No additional "enhancement" needed - structured prompts handle everything
-            logger.debug("🎯 VECTOR-NATIVE: Skipped legacy enhancement (using structured prompts from Phase 4)")
-            
-            # Clone the conversation context and replace/enhance system message
-            enhanced_context = conversation_context.copy()
-            
-            # 🚨 CRITICAL FIX: Replace ONLY the first system message with character prompt
-            # but PRESERVE any additional system messages (RELEVANT MEMORIES, CONVERSATION FLOW)
-            system_message_found = False
-            for i, msg in enumerate(enhanced_context):
-                if msg.get('role') == 'system':
-                    enhanced_context[i] = {
-                        'role': 'system',
-                        'content': character_prompt
-                    }
-                    system_message_found = True
-                    logger.info("🎭 CDL CHARACTER: Replaced FIRST system message with character prompt (%d chars)", len(character_prompt))
-                    # 🚨 CRITICAL: Don't break here! Let other system messages (memories, conversation flow) remain
-                    break
-            
-            # If no system message found, add character prompt as first message
-            if not system_message_found:
-                enhanced_context.insert(0, {
-                    'role': 'system', 
-                    'content': character_prompt
-                })
-                logger.info("🎭 CDL CHARACTER: Added character prompt as new system message (%d chars)", len(character_prompt))
-            
-            # 🚨 DEBUG: Log what system messages we have in final enhanced context
-            system_msg_count = sum(1 for msg in enhanced_context if msg.get('role') == 'system')
-            logger.info("🎭 CDL CHARACTER: Final enhanced context has %d system messages and %d total messages", 
-                       system_msg_count, len(enhanced_context))
-            
-            logger.info("🎭 CDL CHARACTER: Enhanced conversation context with database-only character for %s", bot_name)
-            return enhanced_context
-            
-        except Exception as e:
-            logger.error("🎭 CDL CHARACTER ERROR: Failed to apply character enhancement: %s", e)
-            logger.error("🎭 CDL CHARACTER ERROR: Falling back to original conversation context")
-            return None
 
     async def _add_mixed_emotion_context(self, conversation_context: List[Dict[str, str]], 
                                        content: str, user_id: str, emotion_data, external_emotion_data) -> List[Dict[str, str]]:

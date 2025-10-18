@@ -749,27 +749,24 @@ class CDLAIPromptIntegration:
             
             if self.memory_manager:
                 try:
+                    # 🎯 SEMANTIC CONTEXT: Retrieve more semantically relevant past conversations (extractive)
+                    # This provides rich background context with specific details from related discussions
                     relevant_memories = await self.memory_manager.retrieve_relevant_memories(
-                        user_id=user_id, query=message_content, limit=10
+                        user_id=user_id, query=message_content, limit=15  # Increased from 10 to 15 for richer context
                     )
+                    
+                    # 📜 RECENT FLOW: Get shorter recent conversation for immediate continuity
+                    # Reduced from 20 to 10 to make room for semantic context while maintaining flow
                     conversation_history = await self.memory_manager.get_conversation_history(
-                        user_id=user_id, limit=3
+                        user_id=user_id, limit=10  # Reduced from 20→10: shorter recent history, more semantic context
                     )
                     
-                    # LONG-TERM MEMORY: Get conversation summary for context beyond the limit
-                    if hasattr(self.memory_manager, 'get_conversation_summary_with_recommendations'):
-                        summary_data = await self.memory_manager.get_conversation_summary_with_recommendations(
-                            user_id=user_id,
-                            conversation_history=conversation_history,  # 🐛 FIX: Pass required parameter
-                            limit=20  # Get broader context for summary
-                        )
-                        if summary_data and summary_data.get('topic_summary'):
-                            conversation_summary = summary_data['topic_summary']
-                            logger.info("🧠 LONG-TERM: Retrieved conversation summary: %s", conversation_summary[:100])
+                    # ❌ REMOVED: Vague abstractive summary - replaced by extractive semantic memories
+                    # The "🧠 RELEVANT PAST CONVERSATIONS" section (lines 2014+) provides this context better
+                    # with full sentence details instead of lossy summarization
                     
-                    logger.info("🧠 UNIFIED: Retrieved %d memories, %d conversation entries, summary: %s", 
-                               len(relevant_memories), len(conversation_history), 
-                               "Yes" if conversation_summary else "No")
+                    logger.info("🧠 MEMORY STRATEGY: %d semantic memories (extractive context) + %d recent messages (flow continuity)", 
+                               len(relevant_memories), len(conversation_history))
                         
                 except Exception as e:
                     logger.error("❌ MEMORY ERROR: Could not retrieve memories: %s", e)
@@ -1993,9 +1990,9 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("✨ EPISODIC INTELLIGENCE: Failed to extract episodic memories: %s", str(e))
 
-        # Add long-term conversation summary for continuity beyond recent history
-        if conversation_summary:
-            prompt += f"\n\n📚 CONVERSATION BACKGROUND:\n{conversation_summary}\n"
+        # ❌ REMOVED: Vague abstractive summary section
+        # Replaced by extractive "🧠 RELEVANT PAST CONVERSATIONS" with full sentence details
+        # This provides better context without lossy summarization
 
         # 🧠 UNIFIED CHARACTER INTELLIGENCE: Inject memory boost and coordinated intelligence
         # This replaces the old raw snippet approach with properly coordinated intelligence
@@ -2018,18 +2015,23 @@ class CDLAIPromptIntegration:
                                 from datetime import datetime, timezone, timedelta
                                 
                                 prompt += "\n\n🧠 RELEVANT PAST CONVERSATIONS:\n"
-                                prompt += "(Semantically similar conversations to provide context)\n\n"
+                                prompt += "(Semantically related discussions with full context)\n\n"
                                 
-                                for i, memory in enumerate(memories[:5], 1):  # Top 5 semantic matches
+                                for i, memory in enumerate(memories[:10], 1):  # Top 10 semantic matches (increased from 5)
                                     # Handle both dict and object memory formats
                                     if isinstance(memory, dict):
                                         content = memory.get('content', '')
                                         timestamp = memory.get('timestamp', '')
                                         score = memory.get('score', 0.0)
+                                        metadata = memory.get('metadata', {})
                                     else:
                                         content = getattr(memory, 'content', '')
                                         timestamp = getattr(memory, 'timestamp', '')
                                         score = getattr(memory, 'score', 0.0)
+                                        metadata = getattr(memory, 'metadata', {})
+                                    
+                                    # 🔑 KEY FIX: Extract bot response from metadata for full conversation context
+                                    bot_response = metadata.get('bot_response', '') if isinstance(metadata, dict) else ''
                                     
                                     # Calculate time ago
                                     time_context = ""
@@ -2057,10 +2059,15 @@ class CDLAIPromptIntegration:
                                     # Add relevance score context
                                     relevance_context = f" [relevance: {score:.2f}]" if score > 0 else ""
                                     
-                                    # Show memory with context
-                                    prompt += f"{i}. {content}{time_context}{relevance_context}\n"
+                                    # 🔑 KEY FIX: Show FULL conversation turn (user + bot) for complete context
+                                    # This provides much richer semantic background than user message alone
+                                    if bot_response:
+                                        prompt += f"{i}. User: {content}\n   Bot: {bot_response}{time_context}{relevance_context}\n"
+                                    else:
+                                        # Fallback if no bot response (shouldn't happen for conversation pairs)
+                                        prompt += f"{i}. {content}{time_context}{relevance_context}\n"
                                 
-                                logger.info(f"🧠 MEMORY BOOST: Injected {len(memories[:5])} relevant memories into prompt")
+                                logger.info(f"🧠 SEMANTIC CONTEXT: Injected {len(memories[:10])} extractive memories (increased from 5 for richer context)")
                         
                         # Extract conversation intelligence (recent conversation continuity)
                         conversation_intel = system_contributions.get('conversation_intelligence')

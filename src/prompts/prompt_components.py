@@ -16,12 +16,55 @@ from typing import Optional, Callable, Dict, Any
 
 
 class PromptComponentType(Enum):
-    """Types of prompt components for structured assembly.
+    """Types of prompt components for structured prompt assembly.
     
     Components are assembled in priority order (lower number = higher priority).
     This enum provides semantic names for component types while allowing
     flexible priority assignment at runtime.
+    
+    Phase 2 (Oct 2025): Added CDL (Character Definition Language) component types
+    for unified prompt assembly. This eliminates dual prompt paths by merging
+    CDL character data directly into PromptAssembler components.
     """
+    # ==========================================
+    # CDL CHARACTER COMPONENTS (Priority 1-17)
+    # ==========================================
+    # These replace the legacy CDL enhancement system that previously
+    # built prompts separately and replaced the system message.
+    
+    # Character foundation (Priority 1-6)
+    CHARACTER_IDENTITY = "character_identity"           # Priority 1: Name, occupation, description
+    CHARACTER_MODE = "character_mode"                   # Priority 2: Trigger-based interaction mode
+    CHARACTER_BACKSTORY = "character_backstory"         # Priority 3: Professional/personal history
+    CHARACTER_PRINCIPLES = "character_principles"       # Priority 4: Values, beliefs, motivations
+    AI_IDENTITY_GUIDANCE = "ai_identity_guidance"       # Priority 5: AI disclosure handling
+    TEMPORAL_AWARENESS = "temporal_awareness"           # Priority 6: Current date/time
+    
+    # User and character personality (Priority 7-10)
+    USER_PERSONALITY = "user_personality"               # Priority 7: User facts, preferences
+    CHARACTER_PERSONALITY = "character_personality"     # Priority 8: Big Five traits
+    CHARACTER_LEARNING = "character_learning"           # Priority 9: Self-discoveries, insights
+    CHARACTER_VOICE = "character_voice"                 # Priority 10: Speech patterns, style
+    
+    # Relationships and emotions (Priority 11-12)
+    CHARACTER_RELATIONSHIPS = "character_relationships" # Priority 11: NPC relationships
+    EMOTIONAL_TRIGGERS = "emotional_triggers"           # Priority 12: Emotion response guidance
+    
+    # Memory and intelligence (Priority 13-15)
+    EPISODIC_MEMORIES = "episodic_memories"            # Priority 13: Memorable moments
+    CONVERSATION_SUMMARY = "conversation_summary"       # Priority 14: Long-term conversation themes
+    UNIFIED_INTELLIGENCE = "unified_intelligence"       # Priority 15: Coordinated AI intelligence
+    
+    # Context and style (Priority 16-17)
+    KNOWLEDGE_CONTEXT = "knowledge_context"             # Priority 16: Intent-based facts
+    RESPONSE_STYLE = "response_style"                   # Priority 17: Final style reminder
+    
+    # ==========================================
+    # LEGACY COMPONENTS (Phase 1)
+    # ==========================================
+    # Kept for backward compatibility. These are gradually being
+    # replaced by the CDL component system above.
+    
     # Core system components (highest priority)
     CORE_SYSTEM = "core_system"
     TIME_CONTEXT = "time_context"
@@ -35,7 +78,6 @@ class PromptComponentType(Enum):
     
     # Guidance and behavior components
     GUIDANCE = "guidance"
-    CHARACTER_VOICE = "character_voice"
     COMMUNICATION_STYLE = "communication_style"
     
     # AI intelligence components
