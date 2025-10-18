@@ -1504,10 +1504,10 @@ class VectorEmojiIntelligence:
         
         # 🎭 PRIORITY 0: EMOTION MIRRORING (highest priority when conditions are met)
         # Mirror user's emotion if detected with high confidence AND high intensity
-        # ⚠️ CRITICAL FIX: Do NOT mirror distress emotions (sadness, fear, anger) - use support instead
+        # ⚠️ CRITICAL FIX: Do NOT mirror distress emotions (sadness, fear, anger, disgust) - use support instead
         if emotional_confidence > 0.7 and emotional_intensity > 0.6:
             # Skip mirroring for distress emotions - it's tone-deaf to add 😢 to a sad message
-            if current_emotion not in ["sadness", "fear", "anger"]:
+            if current_emotion not in ["sadness", "fear", "anger", "disgust", "anxiety"]:
                 mirroring_emoji = self._get_emotion_mirroring_emoji(current_emotion, emotional_intensity)
                 if mirroring_emoji:
                     logger.info(
@@ -1521,7 +1521,7 @@ class VectorEmojiIntelligence:
                     current_emotion
                 )
         
-        if current_emotion in ["sadness", "fear", "anger"] and emotional_intensity > 0.6:
+        if current_emotion in ["sadness", "fear", "anger", "disgust", "anxiety"] and emotional_intensity > 0.6:
             user_in_distress = True
             logger.debug(
                 "⚠️ User in emotional distress: %s (intensity: %.2f) - filtering celebratory emojis",
@@ -1641,8 +1641,8 @@ class VectorEmojiIntelligence:
         
         # Default based on communication style preference (NOT in distress)
         # 🚨 CRITICAL FIX: Check user emotion before using positive emojis
-        # Don't default to 😊 if user is sad/anxious/angry
-        if current_emotion in ["sadness", "fear", "anger", "anxiety"]:
+        # Don't default to 😊 if user is sad/anxious/angry/disgusted
+        if current_emotion in ["sadness", "fear", "anger", "anxiety", "disgust"]:
             logger.info("🎭 Default fallback: User emotion is %s - using empathy emoji instead of 😊", current_emotion)
             empathy_emoji = self._select_emotion_aware_empathy_emoji(
                 emotional_state=emotional_state,
