@@ -3953,23 +3953,66 @@ class VectorMemoryManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 25,  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
-        emotion_hint: Optional[str] = None  # 🎭 NEW: Optional emotion hint from RoBERTa analysis
+        limit: int = 25,
+        emotion_data: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Retrieve memories relevant to the given query using intelligent vector selection.
+        Retrieve memories using intelligent query classification and vector routing.
         
-        🚀 MULTI-VECTOR INTELLIGENCE: Automatically selects appropriate named vector based on query intent:
-        - Emotional queries → emotion vector (feelings, mood, emotional state)
-        - Pattern queries → semantic vector (relationship patterns, behavioral trends)
-        - Content queries → content vector (semantic meaning, topics, facts)
+        🚀 INTELLIGENT ROUTING: Uses QueryClassifier to determine optimal vector strategy:
+        - TEMPORAL queries → chronological scroll (existing temporal detection)
+        - FACTUAL queries → content vector only (fast path for facts/definitions)
+        - EMOTIONAL queries → content + emotion vector fusion (feelings, mood)
+        - CONVERSATIONAL queries → content + semantic vector fusion (relationship patterns)
+        - GENERAL queries → content vector (default fallback)
+        
+        This method now delegates to retrieve_relevant_memories_with_classification()
+        which provides superior query understanding compared to the old keyword-based approach.
         
         Args:
             user_id: User identifier for memory retrieval
             query: Query text for semantic search
             limit: Maximum number of memories to retrieve
-            emotion_hint: Optional emotion label from RoBERTa analysis (joy, sadness, anger, fear, etc.)
-                         If provided, bypasses keyword-based emotion detection
+            emotion_data: Optional pre-analyzed emotion from RoBERTa (avoids re-analysis)
+                         Expected keys: emotional_intensity, dominant_emotion, etc.
+        
+        Returns:
+            List of relevant memories with routing metadata
+        """
+        try:
+            # Use intelligent classification-based routing (Phase 2)
+            return await self.retrieve_relevant_memories_with_classification(
+                user_id=user_id,
+                query=query,
+                limit=limit,
+                emotion_data=emotion_data
+            )
+        except Exception as e:
+            logger.error(
+                f"Intelligent routing failed for query '{query}': {e}",
+                exc_info=True
+            )
+            # Fallback to legacy method on errors
+            logger.warning("⚠️ Falling back to legacy retrieval method")
+            return await self._legacy_retrieve_relevant_memories(
+                user_id=user_id,
+                query=query,
+                limit=limit,
+                emotion_data=emotion_data
+            )
+    
+    async def _legacy_retrieve_relevant_memories(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 25,
+        emotion_data: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        LEGACY METHOD: Old keyword-based routing (kept as fallback).
+        
+        This method uses brittle keyword matching for emotion detection.
+        Only used if intelligent routing fails.
         """
         import time
         
@@ -3999,20 +4042,24 @@ class VectorMemoryManager:
                 logger.debug(f"🎯 TEMPORAL SEARCH: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
                 return formatted_results
             
-            # 🎭 INTELLIGENT VECTOR SELECTION: Route to appropriate named vector based on query intent
+            # 🎭 LEGACY VECTOR SELECTION: Old keyword-based routing
             query_lower = query.lower()
             
-            # 🎭 ENHANCED EMOTION DETECTION: Use RoBERTa hint if provided, or fallback to keyword detection
+            # 🎭 LEGACY EMOTION DETECTION: Use RoBERTa data if provided, or fallback to keyword detection
             use_emotion_vector = False
             emotion_source = "none"
+            emotion_hint = None
             
-            if emotion_hint:
-                # Priority 1: Trust RoBERTa emotion analysis from MessageProcessor
-                use_emotion_vector = True
-                emotion_source = f"roberta:{emotion_hint}"
-                logger.info(f"🎭 EMOTION HINT PROVIDED: '{emotion_hint}' - Using emotion vector search")
-            else:
-                # Priority 2: Fallback to keyword-based detection for direct memory API calls
+            if emotion_data:
+                # Extract emotion hint from emotion_data dict
+                emotion_hint = emotion_data.get('dominant_emotion')
+                if emotion_hint:
+                    use_emotion_vector = True
+                    emotion_source = f"roberta:{emotion_hint}"
+                    logger.info(f"🎭 EMOTION DATA PROVIDED: '{emotion_hint}' - Using emotion vector search")
+            
+            if not use_emotion_vector:
+                # Fallback to keyword-based detection
                 emotional_keywords = ['feel', 'feeling', 'felt', 'mood', 'emotion', 'emotional', 
                                      'happy', 'sad', 'angry', 'excited', 'worried', 'anxious',
                                      'joyful', 'depressed', 'upset', 'frustrated', 'content']
