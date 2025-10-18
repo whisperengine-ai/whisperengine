@@ -77,11 +77,22 @@
 - **Use**: `get_normalized_bot_name_from_env()` for identification
 - **Characters loaded**: via `DISCORD_BOT_NAME` environment variable from database
 
-### **DISCORD-ONLY PLATFORM**
-- **NO web UI, NO HTTP chat APIs** for conversations - Discord messages only
-- **Health endpoints**: Only for container orchestration, not chat functionality  
-- **Testing conversations**: Requires actual Discord messages for full event pipeline
-- **API endpoints**: Health checks only - all conversations via Discord
+### **DISCORD + HTTP API PLATFORM**
+- **Primary Platform**: Discord messages with full event pipeline
+- **HTTP Chat API**: `/api/chat` endpoint available on each bot's port for testing and automation
+- **Health endpoints**: `/health` for container orchestration and monitoring
+- **Testing Strategy**: Use HTTP API for automated tests, Discord for full event pipeline validation
+- **API Format**: POST to `http://localhost:{BOT_PORT}/api/chat` with JSON payload:
+  ```json
+  {
+    "user_id": "string",
+    "message": "string",
+    "metadata": {
+      "platform": "api_test",
+      "channel_type": "dm"
+    }
+  }
+  ```
 
 ## 🎭 CHARACTER DEFINITION LANGUAGE (CDL) SYSTEM
 
@@ -362,11 +373,31 @@ export DISCORD_BOT_NAME=elena && \
 python tests/automated/test_feature_direct_validation.py
 ```
 
-### **Discord Message Testing Requirements**
-- **Discord events** (message handling, CDL integration, character responses) require actual Discord messages
-- **HTTP API endpoints**: Only health checks - no chat functionality
-- **Testing conversations**: Requires Discord messages for full event pipeline
-- **Event handler updates**: Changes need Discord message to test full pipeline
+### **HTTP Chat API Testing (PREFERRED FOR AUTOMATION)**
+```bash
+# Test any bot via HTTP chat API - use fresh user IDs for clean conversation history
+curl -X POST http://localhost:{BOT_PORT}/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "test_user_12345",
+    "message": "Your test message here",
+    "metadata": {
+      "platform": "api_test",
+      "channel_type": "dm"
+    }
+  }'
+
+# Example bot ports:
+# Elena: 9091, Marcus: 9092, Jake: 9097, Ryan: 9093
+# Gabriel: 9095, Sophia: 9096, Dream: 9094, Dotty: 9098
+# Aethys: 3007, Aetheris: 9099
+```
+
+### **Discord Message Testing**
+- **Full event pipeline**: Discord messages test complete Discord.py event handling
+- **Character responses**: Discord testing validates emoji reactions, threading, etc.
+- **HTTP API vs Discord**: HTTP API is sufficient for most conversation/memory testing
+- **When to use Discord**: Testing Discord-specific features (reactions, embeds, threading)
 
 ### **Environment Validation Commands**
 ```bash
