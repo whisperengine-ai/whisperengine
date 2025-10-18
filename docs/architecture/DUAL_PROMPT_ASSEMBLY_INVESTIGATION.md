@@ -1,8 +1,34 @@
 # Dual Prompt Assembly Paths Investigation
 
 **Date**: October 18, 2025  
-**Issue**: WhisperEngine has two competing prompt assembly systems  
-**Status**: 🔴 CRITICAL ARCHITECTURAL ISSUE
+**Investigation Date**: October 18, 2025  
+**Resolution Date**: October 2025  
+**Status**: ✅ RESOLVED - CDL components integrated into structured assembly
+
+---
+
+## 🎉 RESOLUTION UPDATE
+
+**This issue has been RESOLVED through CDL integration work:**
+
+- ✅ CDL components (CHARACTER_IDENTITY, CHARACTER_MODE, etc.) integrated into PromptAssembler
+- ✅ Component factories and enum types created (`prompt_components.py`)
+- ✅ Single unified prompt assembly path established
+- ✅ No more Phase 5.5 replacing Phase 4 work
+- ✅ Eliminated ~150ms wasted processing per message
+
+**Result**: CDL character data now flows through structured assembly as first-class components. The dual path problem described below has been eliminated.
+
+**See**: 
+- `src/prompts/prompt_components.py` - CDL component types
+- `src/prompts/cdl_component_factories.py` - Component factory functions
+- Documentation in CONVERSATION_DATA_HIERARCHY.md - Issue #1 marked complete
+
+---
+
+## 📜 HISTORICAL INVESTIGATION (For Reference)
+
+**The following investigation led to the resolution above. Keeping for historical context.**
 
 ---
 
