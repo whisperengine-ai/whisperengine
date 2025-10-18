@@ -1,0 +1,128 @@
+[
+  {
+    "test_name": "Health Check",
+    "bot_name": "elena",
+    "status": "PASS",
+    "details": "Status: healthy",
+    "timestamp": "2025-10-18T14:49:40.876527"
+  },
+  {
+    "test_name": "Chat API Basic",
+    "bot_name": "elena",
+    "status": "PASS",
+    "details": "Response: 770 chars, 8338ms",
+    "timestamp": "2025-10-18T14:49:50.250928"
+  },
+  {
+    "test_name": "Memory Storage",
+    "bot_name": "elena",
+    "status": "PASS",
+    "details": "Remembered quantum physics and number 42",
+    "timestamp": "2025-10-18T14:50:13.228522"
+  },
+  {
+    "test_name": "Character Personality",
+    "bot_name": "elena",
+    "status": "PASS",
+    "details": "Personality traits: marine, ocean, biology",
+    "timestamp": "2025-10-18T14:50:24.940996"
+  },
+  {
+    "test_name": "Temporal Context Windows",
+    "bot_name": "elena",
+    "status": "PASS",
+    "details": "Temporal awareness: recently, recent, earlier",
+    "timestamp": "2025-10-18T14:50:36.073717"
+  },
+  {
+    "test_name": "Knowledge Graph Entities",
+    "bot_name": "elena",
+    "status": "PASS",
+    "details": "Entity context: luna, minerva, max",
+    "timestamp": "2025-10-18T14:50:46.794912"
+  },
+  {
+    "test_name": "Health Check",
+    "bot_name": "jake",
+    "status": "PASS",
+    "details": "Status: healthy",
+    "timestamp": "2025-10-18T14:50:47.809472"
+  },
+  {
+    "test_name": "Chat API Basic",
+    "bot_name": "jake",
+    "status": "PASS",
+    "details": "Response: 206 chars, 2607ms",
+    "timestamp": "2025-10-18T14:50:51.450631"
+  },
+  {
+    "test_name": "Memory Storage",
+    "bot_name": "jake",
+    "status": "PASS",
+    "details": "Remembered quantum physics and number 42",
+    "timestamp": "2025-10-18T14:51:00.802561"
+  },
+  {
+    "test_name": "Character Personality",
+    "bot_name": "jake",
+    "status": "PASS",
+    "details": "Personality traits: adventure, landscape, capture",
+    "timestamp": "2025-10-18T14:51:06.417057"
+  },
+  {
+    "test_name": "Temporal Context Windows",
+    "bot_name": "jake",
+    "status": "PASS",
+    "details": "Temporal awareness: recent, before that",
+    "timestamp": "2025-10-18T14:51:12.171767"
+  },
+  {
+    "test_name": "Knowledge Graph Entities",
+    "bot_name": "jake",
+    "status": "PASS",
+    "details": "Entity context: luna, minerva, max",
+    "timestamp": "2025-10-18T14:51:22.618795"
+  },
+  {
+    "test_name": "Health Check",
+    "bot_name": "ryan",
+    "status": "PASS",
+    "details": "Status: healthy",
+    "timestamp": "2025-10-18T14:51:23.625599"
+  },
+  {
+    "test_name": "Chat API Basic",
+    "bot_name": "ryan",
+    "status": "PASS",
+    "details": "Response: 115 chars, 2228ms",
+    "timestamp": "2025-10-18T14:51:26.885841"
+  },
+  {
+    "test_name": "Memory Storage",
+    "bot_name": "ryan",
+    "status": "PASS",
+    "details": "Remembered quantum physics and number 42",
+    "timestamp": "2025-10-18T14:51:38.789516"
+  },
+  {
+    "test_name": "Character Personality",
+    "bot_name": "ryan",
+    "status": "PASS",
+    "details": "Personality traits: game, indie",
+    "timestamp": "2025-10-18T14:51:45.338556"
+  },
+  {
+    "test_name": "Temporal Context Windows",
+    "bot_name": "ryan",
+    "status": "PASS",
+    "details": "Temporal awareness: recently, recent",
+    "timestamp": "2025-10-18T14:51:51.833985"
+  },
+  {
+    "test_name": "Knowledge Graph Entities",
+    "bot_name": "ryan",
+    "status": "PASS",
+    "details": "Entity context: luna, minerva, max",
+    "timestamp": "2025-10-18T14:51:56.488862"
+  }
+]
