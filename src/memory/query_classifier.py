@@ -118,11 +118,16 @@ class QueryClassifier:
             QueryCategory enum indicating optimal routing strategy
             
         Classification Priority:
-            1. Temporal (if is_temporal=True) → chronological scroll
-            2. Factual (high-precision patterns) → content vector only
-            3. Conversational (relationship patterns) → content + semantic
-            4. Emotional (RoBERTa intensity > threshold) → content + emotion
+            1. Factual (high-precision patterns) → content vector only
+            2. Conversational (relationship patterns) → content + semantic
+            3. Emotional (keyword + RoBERTa data) → content + emotion
+            4. Temporal (if is_temporal=True) → chronological scroll
             5. General (default fallback) → content vector only
+        
+        Note: Conversational queries are checked BEFORE temporal to handle cases
+              like "What did we talk about yesterday?" which has both conversational
+              intent ("what did we talk about") and temporal markers ("yesterday").
+              The conversational aspect is more important for routing decisions.
             
         Example:
             >>> emotion_data = {'emotional_intensity': 0.45, 'dominant_emotion': 'joy'}
@@ -135,37 +140,52 @@ class QueryClassifier:
         """
         query_lower = query.lower().strip()
         
-        # Priority 1: Temporal queries (already detected by existing system)
-        # These bypass vector search entirely, use chronological scroll
-        if is_temporal:
-            logger.debug("🎯 CLASSIFIED: TEMPORAL query: '%s...'", query[:50])
-            return QueryCategory.TEMPORAL
-        
-        # Priority 2: Factual queries (high-precision patterns)
+        # Priority 1: Factual queries (high-precision patterns)
         # These use single content vector for fast, accurate retrieval
         if any(pattern in query_lower for pattern in self.factual_patterns):
             logger.debug("🎯 CLASSIFIED: FACTUAL query: '%s...'", query[:50])
             return QueryCategory.FACTUAL
         
-        # Priority 3: Conversational queries (relationship memory patterns)
+        # Priority 2: Conversational queries (relationship memory patterns)
         # These use content + semantic vector fusion
+        # Checked BEFORE temporal to handle "What did we talk about yesterday?"
         if any(pattern in query_lower for pattern in self.conversational_patterns):
             logger.debug("🎯 CLASSIFIED: CONVERSATIONAL query: '%s...'", query[:50])
             return QueryCategory.CONVERSATIONAL
         
-        # Priority 4: Emotional queries (RoBERTa emotion data)
+        # Priority 3: Emotional queries (keyword patterns + RoBERTa data)
         # These use content + emotion vector fusion
-        # Note: This uses pre-analyzed emotion data, NOT keyword matching
+        # Check BOTH keyword patterns AND RoBERTa emotion intensity
+        emotional_keywords = [
+            'feel', 'feeling', 'felt', 'emotion', 'emotional', 'mood',
+            'how are you', "how're you", 'how do you feel', 'are you okay',
+            'happy', 'sad', 'angry', 'excited', 'anxious', 'worried', 'scared'
+        ]
+        has_emotional_keyword = any(kw in query_lower for kw in emotional_keywords)
+        
+        # Check RoBERTa emotion data if available
+        has_high_emotion_intensity = False
         if emotion_data:
             emotional_intensity = emotion_data.get('emotional_intensity', 0.0)
             dominant_emotion = emotion_data.get('dominant_emotion', 'neutral')
-            
-            if emotional_intensity > self.emotion_intensity_threshold:
-                logger.debug(
-                    "🎯 CLASSIFIED: EMOTIONAL query: '%s...' (intensity: %.2f, emotion: %s)",
-                    query[:50], emotional_intensity, dominant_emotion
-                )
-                return QueryCategory.EMOTIONAL
+            has_high_emotion_intensity = emotional_intensity > self.emotion_intensity_threshold
+        
+        # Classify as EMOTIONAL if EITHER keyword match OR high RoBERTa intensity
+        if has_emotional_keyword or has_high_emotion_intensity:
+            logger.debug(
+                "🎯 CLASSIFIED: EMOTIONAL query: '%s...' (keyword: %s, roberta_intensity: %.2f)",
+                query[:50], has_emotional_keyword, 
+                emotion_data.get('emotional_intensity', 0.0) if emotion_data else 0.0
+            )
+            return QueryCategory.EMOTIONAL
+        
+        # Priority 4: Temporal queries (fallback for pure temporal queries)
+        # These bypass vector search entirely, use chronological scroll
+        # Note: Checked AFTER conversational to avoid misclassifying
+        # "What did we talk about yesterday?" as pure temporal
+        if is_temporal:
+            logger.debug("🎯 CLASSIFIED: TEMPORAL query: '%s...'", query[:50])
+            return QueryCategory.TEMPORAL
         
         # Priority 5: General queries (default fallback)
         # These use single content vector (same as factual, but lower confidence)
