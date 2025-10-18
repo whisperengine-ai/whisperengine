@@ -2711,21 +2711,28 @@ class MessageProcessor:
         user_id: str, 
         relevant_memories: List[Dict[str, Any]]
     ) -> str:
-        """Build memory narrative for structured context (extracted from original method)."""
+        """
+        Build memory narrative for structured context with temporal windows.
+        
+        Organizes conversation memories into time-based buckets to help LLMs
+        distinguish between fresh topics, recent themes, and long-term context.
+        This improves conversation continuity and natural temporal awareness.
+        """
         if not relevant_memories:
             return ""
         
         memory_parts = []
         user_facts = []
-        conversation_memories = []
+        conversation_memories_with_time = []  # List of (memory, age_hours) tuples
         
         # Get character name for personalized conversation turn labels
         character_display_name = self.character_name.capitalize() if self.character_name else "Bot"
         
-        # Separate facts from conversation memories
+        # Separate facts from conversation memories and extract timestamps
         for memory in relevant_memories[:15]:  # Increased from 10 to 15 for richer semantic context
             content = memory.get("content", "")
             metadata = memory.get("metadata", {})
+            timestamp_str = memory.get("timestamp", "")
             
             if metadata.get("type") == "user_fact":
                 fact = metadata.get("fact", content)[:300]
@@ -2733,31 +2740,93 @@ class MessageProcessor:
                     user_facts.append(fact)
             elif content:
                 # 🔑 HYBRID APPROACH FIX: Extract bot response from metadata for full conversation context
-                # This provides complete conversation turns (User + CharacterName) instead of just user messages
                 bot_response = metadata.get('bot_response', '') if isinstance(metadata, dict) else ''
                 
                 if bot_response:
-                    # Format as full conversation turn with character's name (e.g., "User: / Elena:")
-                    # This reinforces character identity and makes conversation history feel more personal
+                    # Format as full conversation turn with character's name
                     conversation_turn = f"User: {content[:300]}\n   {character_display_name}: {bot_response[:300]}"
-                    conversation_memories.append(conversation_turn)
                 else:
                     # Fallback: Check if already formatted with labels, or just use content
                     if "User:" in content and ("Bot:" in content or character_display_name in content):
-                        conversation_memories.append(f"{content[:500]}")
+                        conversation_turn = f"{content[:500]}"
                     else:
-                        conversation_memories.append(f"{content[:500]}")
+                        conversation_turn = f"{content[:500]}"
+                
+                # Calculate age in hours for temporal bucketing
+                age_hours = self._calculate_memory_age_hours(timestamp_str)
+                conversation_memories_with_time.append((conversation_turn, age_hours))
         
-        # Build narrative with structure
+        # Build USER FACTS section (not time-bucketed - facts are persistent)
         if user_facts:
             memory_parts.append(f"USER FACTS: {'; '.join(user_facts)}")
         
-        if conversation_memories:
-            # 🔑 HYBRID APPROACH: Show 10 conversation memories (increased from 5) with pipe delimiter
-            # Rationale: More extractive semantic context while reducing recent chronological messages
-            memory_parts.append(f"PAST CONVERSATIONS: {' | '.join(conversation_memories[:10])}")
+        # Build PAST CONVERSATIONS with temporal windows
+        if conversation_memories_with_time:
+            temporal_narrative = self._build_temporal_conversation_narrative(conversation_memories_with_time)
+            if temporal_narrative:
+                memory_parts.append(f"PAST CONVERSATIONS:\n{temporal_narrative}")
         
         return " || ".join(memory_parts) if memory_parts else ""
+    
+    def _calculate_memory_age_hours(self, timestamp_str: str) -> float:
+        """Calculate how many hours ago a memory occurred."""
+        try:
+            if not timestamp_str:
+                return 999999.0  # Very old if no timestamp
+            
+            from datetime import datetime
+            # Parse ISO format timestamp
+            memory_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            age_seconds = (datetime.utcnow().replace(tzinfo=memory_time.tzinfo) - memory_time).total_seconds()
+            return age_seconds / 3600  # Convert to hours
+        except Exception as e:
+            logger.warning(f"Failed to parse timestamp '{timestamp_str}': {e}")
+            return 999999.0  # Treat as very old on error
+    
+    def _build_temporal_conversation_narrative(self, memories_with_time: List[tuple]) -> str:
+        """
+        Organize conversations into temporal windows for natural time awareness.
+        
+        Time buckets:
+        - RECENT (< 24 hours): Fresh context, ongoing conversations
+        - THIS WEEK (24h - 7 days): Recent themes and patterns
+        - LONGER-TERM (> 7 days): Established relationship context
+        
+        Args:
+            memories_with_time: List of (conversation_turn, age_hours) tuples
+            
+        Returns:
+            Formatted temporal narrative string
+        """
+        # Organize memories into time buckets
+        recent = []      # < 24 hours
+        this_week = []   # 24 hours - 7 days (168 hours)
+        longer_term = [] # > 7 days
+        
+        for conversation_turn, age_hours in memories_with_time:
+            if age_hours < 24:
+                recent.append(conversation_turn)
+            elif age_hours < 168:  # 7 days = 168 hours
+                this_week.append(conversation_turn)
+            else:
+                longer_term.append(conversation_turn)
+        
+        # Build temporal narrative with natural language headers
+        narrative_parts = []
+        
+        if recent:
+            recent_text = " | ".join(recent[:5])  # Max 5 recent memories
+            narrative_parts.append(f"🕐 RECENT (Last 24 hours):\n{recent_text}")
+        
+        if this_week:
+            week_text = " | ".join(this_week[:4])  # Max 4 weekly memories
+            narrative_parts.append(f"📅 THIS WEEK:\n{week_text}")
+        
+        if longer_term:
+            long_text = " | ".join(longer_term[:3])  # Max 3 long-term memories
+            narrative_parts.append(f"📆 LONGER-TERM CONTEXT:\n{long_text}")
+        
+        return "\n\n".join(narrative_parts) if narrative_parts else ""
     
     async def _get_conversation_summary_structured(self, user_id: str) -> str:
         """

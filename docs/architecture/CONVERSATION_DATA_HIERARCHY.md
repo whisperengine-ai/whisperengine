@@ -598,6 +598,48 @@ From `ai_components` dictionary:
 
 ## ✅ Recent Improvements (October 18, 2025)
 
+### **Temporal Context Windows Implementation**
+
+**Issue Resolved**:
+5. ✅ **Temporal Context Windows** - Memory narrative now organized by time-based buckets
+
+**Problem**: All memories presented as flat lists without temporal organization
+- Characters couldn't distinguish fresh topics from ongoing threads
+- No temporal anchoring for LLMs to understand conversation progression
+- Mixed recent and old context hurt natural conversation flow
+
+**Solution**: Time-based memory organization in structured prompt assembly
+- **Time Buckets**: 🕐 RECENT (< 24h), 📅 THIS WEEK (24h-7d), 📆 LONGER-TERM (>7d)
+- **Natural Headers**: Characters interpret time context organically (not rigidly)
+- **Preserved Structure**: USER FACTS remain persistent (not time-bucketed)
+- **Smart Distribution**: Max 5 recent, 4 weekly, 3 long-term memories per bucket
+
+**Before**:
+```
+PAST CONVERSATIONS: User: X | Elena: Y | User: Z | Elena: W
+```
+
+**After**:
+```
+PAST CONVERSATIONS:
+🕐 RECENT (Last 24 hours):
+User: How do I train Luna? | Elena: Start with positive reinforcement...
+
+📅 THIS WEEK:
+User: Tell me about marine biology | Elena: It's fascinating!...
+
+📆 LONGER-TERM CONTEXT:
+User: I'm thinking about career change | Elena: That's a big decision...
+```
+
+**Results**:
+- ✅ Characters naturally reference temporal context ("Most recently", "Before that")
+- ✅ No robotic compliance or mechanical time references
+- ✅ Better conversation continuity and relationship progression awareness
+- ✅ LLMs can distinguish between fresh topics and established patterns
+
+**Implementation**: `src/core/message_processor.py:2709` (`_build_memory_narrative_structured()`, `_build_temporal_conversation_narrative()`)
+
 ### **Memory Display & Conversation Context Enhancement**
 
 **Issues Resolved**:
@@ -618,7 +660,7 @@ From `ai_components` dictionary:
 ### **Knowledge Graph Entity Type Display**
 
 **Issue Resolved**:
-4. ✅ **Entity Type Context in Facts** - Knowledge graph facts now display entity types for clarity
+6. ✅ **Entity Type Context in Facts** - Knowledge graph facts now display entity types for clarity
 
 **Problem**: Facts showed relationships without entity context
 - Example: "owns Luna" without indicating Luna is a pet
@@ -783,31 +825,48 @@ After: "owns Luna (pet)" (clear entity type context)
 
 ---
 
-### **7. Missing: Temporal Context Windows** 🟡 MEDIUM
+### **7. ✅ COMPLETE: Temporal Context Windows** 
 
-**Issue**: All data mixed without time-based segmentation
+**Status**: ✅ **IMPLEMENTED** (October 18, 2025)
 
-**Currently**: Flat lists of memories, facts, and messages
+**Solution**: Added time-based memory organization in structured prompt assembly
 
-**Missing**: Time-aware organization
+**Implementation**:
+- Modified `_build_memory_narrative_structured()` to group conversations by age
+- Added temporal buckets: 🕐 RECENT (< 24h), 📅 THIS WEEK (24h-7d), 📆 LONGER-TERM (>7d)
+- Preserved USER FACTS as persistent (not time-bucketed)
+- Used natural language headers that characters interpret organically
+
+**Before**:
 ```
+PAST CONVERSATIONS: User: X | Elena: Y | User: Z | Elena: W
+```
+
+**After**:
+```
+PAST CONVERSATIONS:
 🕐 RECENT (Last 24 hours):
-- Discussed dream symbolism
-- User feeling contemplative
+User: How do I train Luna? | Elena: Start with positive reinforcement...
 
 📅 THIS WEEK:
-- 3 conversations about creative projects
-- Shared personal story about childhood
+User: Tell me about marine biology | Elena: It's fascinating! The ocean covers...
 
 📆 LONGER-TERM CONTEXT:
-- Established trust relationship (45 days)
-- Recurring theme: work-life balance
+User: I'm thinking about career change | Elena: That's a big decision...
 ```
 
-**Why It Matters**: 
-- LLMs benefit from temporal anchoring
-- Helps distinguish fresh topics from ongoing threads
-- Supports natural conversation continuity
+**Benefits**:
+- ✅ **LLM Temporal Anchoring**: Characters distinguish fresh topics from ongoing threads
+- ✅ **Natural Time Awareness**: Characters reference "recently", "before that", "we've talked about"
+- ✅ **Conversation Continuity**: Better understanding of relationship progression over time
+- ✅ **Personality-First Compliance**: Headers are prompts, not rigid instructions
+
+**Testing Results**:
+- Elena naturally said "Most recently, you were..." and "Before that, we talked about..."
+- No robotic time references or mechanical compliance
+- Characters maintain authentic personality while gaining temporal awareness
+
+**Location**: `src/core/message_processor.py:2709` (`_build_memory_narrative_structured()`)
 
 ---
 
@@ -873,41 +932,36 @@ USER FACTS (confidence-aware):
 
 ### **High Priority**:
 
-1. **Temporal Context Windows** 🟡
-   - Time-aware memory organization
-   - Temporal anchoring for LLM
-   - "Recent vs. Established" distinction
-
-2. **Character Episodic Themes** 🟡
+1. **Character Episodic Themes** 🟡
    - Cluster memorable moments by theme
    - Show patterns in character learning
    - Cross-conversation insight tracking
 
 ### **Medium Priority**:
 
-4. **Conversation Flow Indicators**
+2. **Conversation Flow Indicators**
    - Topic transition detection
    - Engagement momentum signals
    - Conversation state awareness
 
-5. **Confidence-Aware Fact Presentation**
+3. **Confidence-Aware Fact Presentation**
    - Show uncertainty levels
    - Enable natural clarification requests
    - Support iterative fact refinement
 
 ### **Low Priority**:
 
-6. **Cross-Conversation Patterns**
+4. **Cross-Conversation Patterns**
    - Recurring theme detection
    - User behavioral patterns
    - Temporal interaction preferences
 
-7. **User Engagement Metrics in Prompt**
+5. **User Engagement Metrics in Prompt**
    - Flow state indicators
    - Thematic coherence scores
    - Adaptive response strategies
 
-8. **Knowledge Graph Relationships**
+6. **Knowledge Graph Relationships**
    - Visualize entity connections
    - Show relationship strength
    - Multi-hop fact inference

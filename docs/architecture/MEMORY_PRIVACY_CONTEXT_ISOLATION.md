@@ -24,6 +24,13 @@ WhisperEngine currently retrieves ALL user memories regardless of conversation c
 
 ### Current Architecture
 
+**Collection-Based Bot Isolation**:
+- Each character bot has its own dedicated Qdrant collection
+- Elena: `whisperengine_memory_elena`
+- Marcus: `whisperengine_memory_marcus`
+- Jake: `whisperengine_memory_jake`
+- Collections provide complete memory isolation between different AI characters
+
 **Memory Storage** (Working Correctly):
 ```python
 # src/memory/vector_memory_system.py - Lines 5785-5824
@@ -43,6 +50,50 @@ else:
 # - guild_id (if applicable)
 # - security_level (PRIVATE_DM, PRIVATE_CHANNEL, PUBLIC_CHANNEL)
 # - platform ("discord")
+# - user_id (unique per user)
+# 
+# NOTE: No character_name or bot_name in metadata
+# Facts are NOT scoped to which character learned them
+# Collection isolation = bot-level, not fact-level
+```
+
+**⚠️ IMPORTANT: Cross-Character Fact Sharing**:
+
+Within a single bot's collection, **facts are shared across all interactions**. This means:
+
+1. **No Character Attribution**: Facts don't track which "character persona" learned them
+2. **User-Scoped Only**: Facts are filtered by `user_id` only, not by context of discovery
+3. **Implication**: If Elena learns "user likes Python" in one conversation context, that fact is available in ALL contexts within Elena's memory
+
+This is by design for simplicity, but creates interesting scenarios:
+- ✅ **Good**: User doesn't need to re-teach the same facts to the same bot
+- ⚠️ **Consideration**: Facts learned in DM available in public (the problem we're solving)
+- 🤔 **Future**: Could track `learned_by_character` in metadata if multi-persona bots emerge
+
+**Current Fact Storage** (No Character Tracking):
+```python
+# src/memory/vector_memory_system.py - Lines 5428-5455
+async def store_fact(
+    self,
+    user_id: str,
+    fact: str,
+    context: str,
+    confidence: float = 1.0,
+    metadata: Optional[Dict[str, Any]] = None
+) -> bool:
+    fact_memory = VectorMemory(
+        id=str(uuid4()),
+        user_id=user_id,  # ONLY user scoping
+        memory_type=MemoryType.FACT,
+        content=fact,
+        metadata={
+            "context": context,
+            **(metadata or {})
+            # No character_name or bot_name field
+        }
+    )
+    # Stored in bot's collection (e.g., whisperengine_memory_elena)
+    # Facts accessible across all conversations within this bot
 ```
 
 **Memory Retrieval** (No Filtering):
@@ -63,6 +114,39 @@ async def retrieve_relevant_memories(
 ```
 
 **Key Finding**: Infrastructure exists to support filtering (security_level tracked), but filtering is intentionally not implemented in retrieval methods.
+
+### Cross-Character Fact Sharing Implications
+
+**Current Behavior**: Facts are scoped by `user_id` only, NOT by character or conversation context.
+
+**What This Means**:
+```
+User talks to Elena in DM → Learns "user has a cat named Whiskers"
+User talks to Elena in public channel → Elena knows about Whiskers
+
+User talks to Elena → Learns "user lives in Seattle"  
+User talks to Marcus → Marcus does NOT know about Seattle
+(Different Qdrant collections = complete bot isolation)
+```
+
+**Privacy Interaction with Hybrid Filtering**:
+
+The hybrid filtering solution addresses **channel context**, but facts are still shared within a bot's memory:
+
+| Scenario | Current Behavior | With Hybrid Filtering |
+|----------|------------------|----------------------|
+| DM fact → Public channel (same bot) | ✅ Fact accessible | ❌ Fact filtered (PRIVATE_DM) |
+| DM fact → DM (same bot) | ✅ Fact accessible | ✅ Fact accessible |
+| Public fact → Public channel (same bot) | ✅ Fact accessible | ✅ Fact accessible |
+| DM fact → Different bot | ❌ Not accessible (collection isolation) | ❌ Not accessible (collection isolation) |
+
+**Design Decision Rationale**:
+- ✅ **No character tracking needed**: Collection-based isolation is sufficient
+- ✅ **Simpler architecture**: User-scoped facts, no character attribution complexity
+- ✅ **Consistent UX**: User teaches facts once per bot, not per conversation context
+- ⚠️ **Privacy handled by channel filtering**: Hybrid filtering solves the actual privacy problem
+
+**Future Consideration**: If WhisperEngine adds multi-persona bots (e.g., Elena in "teacher mode" vs. "friend mode"), could add `learned_by_character` metadata field. This would be an **additive change** (Qdrant schema compatible).
 
 ### Qdrant Schema Status
 
@@ -323,6 +407,8 @@ if security_context == ContextSecurity.PUBLIC_CHANNEL:
 ## 🔧 Implementation Considerations
 
 ### Hybrid Filtering Implementation Details
+
+**Architecture Note**: Facts are **user-scoped only** (no character attribution within a bot's memory). Filtering is by `channel context`, not by `who learned the fact`. This keeps implementation simple while solving the privacy problem.
 
 **Phase 1: Fact Retrieval Methods** (Primary Target)
 
