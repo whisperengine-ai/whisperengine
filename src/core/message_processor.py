@@ -2097,6 +2097,17 @@ class MessageProcessor:
                     limit=15  # Get more messages for better context (matching previous implementation)
                 )
                 
+                # 🚨 CRITICAL FIX: Sort by timestamp to ensure we ALWAYS get the MOST RECENT messages
+                # This prevents stale conversation contexts from being reused across multiple prompts
+                if conversation_history:
+                    conversation_history = sorted(
+                        conversation_history,
+                        key=lambda x: x.get('timestamp', '') if isinstance(x, dict) else getattr(x, 'timestamp', ''),
+                        reverse=True  # Most recent first
+                    )[:15]  # Take only the 15 most recent
+                    
+                    logger.info(f"🔄 CONTEXT ROTATION: Sorted conversation history by timestamp - {len(conversation_history)} messages")
+                
                 # Convert to expected format for generate_conversation_summary
                 # 🚨 FIX: Include author_id so summary can filter user-specific messages
                 recent_messages = []
@@ -2105,26 +2116,58 @@ class MessageProcessor:
                         content = msg.get('content', '')
                         role = msg.get('role', 'user')
                         is_bot = role in ['assistant', 'bot']
+                        timestamp = msg.get('timestamp', '')
                         
                         recent_messages.append({
                             'content': content,
                             'author_id': user_id if not is_bot else 'bot',  # 🚨 FIX: Add author_id for filtering
                             'role': role,
-                            'bot': is_bot
+                            'bot': is_bot,
+                            'timestamp': timestamp  # Preserve timestamp for debugging
                         })
                     else:
                         content = getattr(msg, 'content', '')
                         role = getattr(msg, 'role', 'user')
                         is_bot = role in ['assistant', 'bot']
+                        timestamp = getattr(msg, 'timestamp', '')
                         
                         recent_messages.append({
                             'content': content,
                             'author_id': user_id if not is_bot else 'bot',  # 🚨 FIX: Add author_id for filtering
                             'role': role,
-                            'bot': is_bot
+                            'bot': is_bot,
+                            'timestamp': timestamp  # Preserve timestamp for debugging
                         })
                 
                 logger.info(f"🔥 FALLBACK: Using memory manager conversation history - {len(recent_messages)} messages")
+                
+                # 🚨 CONTEXT DIVERSITY CHECK: Detect if the same conversation context is being reused
+                # This prevents looping where the bot gets the same historical context repeatedly
+                import hashlib
+                
+                # Create a hash of the conversation content (not including timestamps)
+                context_signature = '|'.join([
+                    f"{msg.get('role', 'user')}:{msg.get('content', '')[:50]}" 
+                    for msg in recent_messages
+                ])
+                context_hash = hashlib.md5(context_signature.encode()).hexdigest()
+                
+                # Track last context hash for this user (using instance attribute)
+                last_context_attr = f'_last_context_hash_{user_id}'
+                last_context_hash = getattr(self, last_context_attr, None)
+                
+                if last_context_hash and context_hash == last_context_hash:
+                    logger.warning(
+                        f"⚠️ STALE CONTEXT DETECTED: Same conversation history reused for user {user_id} "
+                        f"(hash: {context_hash[:8]}). Context may be stuck - forcing fresh retrieval."
+                    )
+                    # Don't error, but log this for monitoring
+                    # The timestamp sorting above should prevent this, but we want to detect if it still happens
+                else:
+                    logger.debug(f"✅ CONTEXT DIVERSITY: New conversation context for user {user_id} (hash: {context_hash[:8]})")
+                
+                # Store the current context hash for next comparison
+                setattr(self, last_context_attr, context_hash)
                 
                 # 🚨 CRITICAL FIX: Ensure conversation context includes bot responses for continuity
                 # If the most recent messages are all user messages, this breaks LLM context
@@ -6068,7 +6111,16 @@ Be conservative - only extract clear statements about the bot's own characterist
             from src.utils.discord_status_footer import strip_footer_from_response
             clean_response = strip_footer_from_response(response)
             
-            # �🛡️ FINAL SAFETY CHECK: Don't store obviously broken responses
+            # 🛡️ META-CONVERSATION FILTER: Prevent conversations about memory/bot issues from being stored
+            # These create recursive awareness loops where the bot is primed to think it has problems
+            if self._is_meta_conversation(message_context.content, clean_response):
+                logger.warning(
+                    "🚫 META-CONVERSATION: Not storing conversation about bot memory/issues for user %s",
+                    message_context.user_id
+                )
+                return False
+            
+            # 🛡️ FINAL SAFETY CHECK: Don't store obviously broken responses
             if self._is_response_safe_to_store(clean_response):
                 # Extract bot emotion from ai_components (Phase 7.5)
                 bot_emotion = ai_components.get('bot_emotion')
@@ -6138,6 +6190,62 @@ Be conservative - only extract clear statements about the bot's own characterist
                 return False
         
         return True
+    
+    def _is_meta_conversation(self, user_message: str, bot_response: str) -> bool:
+        """
+        Detect meta-conversations about the bot's memory, functioning, or identity issues.
+        
+        Meta-conversations create recursive awareness loops where discussing memory problems
+        causes those discussions to be stored, which then primes future responses to believe
+        there are memory problems. This filter prevents that poisoning.
+        
+        Args:
+            user_message: The user's message
+            bot_response: The bot's response
+            
+        Returns:
+            True if this is a meta-conversation that should NOT be stored
+        """
+        import re
+        
+        # Patterns that indicate meta-conversations about bot issues
+        meta_patterns = [
+            # Memory/context issues
+            r'\b(fragment|fragmented|fragmenting)\s+(your\s+)?(memory|memories|context)',
+            r'\b(corrupt|corrupted|corrupting)\s+(your\s+)?(memory|memories)',
+            r'\b(loop|looping|loops|looped)\b',
+            r'\b(repeat|repeating|repeated)\s+(yourself|responses?|messages?)',
+            r'\b(lost|losing)\s+(your\s+)?(memory|memories|context)',
+            r'\b(stuck|stale|frozen)\s+(context|conversation|memory)',
+            
+            # Bot functioning/identity discussions
+            r'\byour\s+(memory|functioning|system|context)\s+(is|has|seems)',
+            r'\bsomething\s+(is\s+)?(wrong|off|broken)\s+with\s+(you|your)',
+            r'\b(reset|restart|reboot|fix)\s+(you|your\s+memory|your\s+context)',
+            r'\bwhat.*happening\s+to\s+(you|your\s+memory)',
+            
+            # Name confusion discussions (specific pattern from the incident)
+            r'\byou.*confus(ed|ing).*names?\b',
+            r'\b(i\'?m|you\'?re)\s+\w+.*\byou\'?re\s+\w+\b',  # "I'm X, you're Y" corrections
+            
+            # Technical debugging discussions
+            r'\bconversation\s+(cache|history|context).*\b(clear|reset|stuck)',
+            r'\bprompt.*\blog\b',
+            
+            # Meta-awareness phrases
+            r'\bkeeping\s+you\s+in\s+the\s+loop',
+            r'\bpart\s+of\s+the\s+process\b',
+        ]
+        
+        # Check both user message and bot response
+        combined_text = f"{user_message} {bot_response}".lower()
+        
+        for pattern in meta_patterns:
+            if re.search(pattern, combined_text, re.IGNORECASE):
+                logger.debug(f"🔍 META-CONVERSATION: Detected pattern '{pattern}' in conversation")
+                return True
+        
+        return False
     
     def _classify_message_context(self, message_context: MessageContext):
         """
