@@ -58,6 +58,13 @@ from src.memory.multi_vector_intelligence import (
 # Import vector fusion for Phase 1 Task 3: Multi-Vector Fusion
 from src.memory.vector_fusion import create_vector_fusion_coordinator, VectorFusionCoordinator
 
+# Import query classifier for Phase 2 Task 2.2: Hybrid Vector Routing
+from src.memory.query_classifier import (
+    create_query_classifier,
+    QueryClassifier,
+    QueryCategory
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -3742,10 +3749,18 @@ class VectorMemoryManager:
                 vector_memory_system=self.vector_store,
                 intelligence=multi_vector_intelligence
             )
-            logger.info("🎯 Multi-vector intelligence coordinator initialized with InfluxDB logging")
+            logger.info("🎯 MULTI-VECTOR: Intelligence coordinator initialized for Sprint 2")
         except Exception as e:
-            logger.warning(f"🎯 Multi-vector coordinator initialization failed: {e}")
+            logger.warning("🎯 MULTI-VECTOR: Coordinator initialization failed: %s", str(e))
             self._multi_vector_coordinator = None
+        
+        # 🎯 PHASE 2: Initialize QueryClassifier for intelligent vector routing
+        try:
+            self._query_classifier = create_query_classifier()
+            logger.info("🎯 PHASE 2: QueryClassifier initialized for hybrid vector routing")
+        except Exception as e:
+            logger.warning("🎯 PHASE 2: QueryClassifier initialization failed: %s", str(e))
+            self._query_classifier = None
         
         logger.info("VectorMemoryManager initialized - local-first single source of truth ready")
     
@@ -3938,23 +3953,66 @@ class VectorMemoryManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 25,  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
-        emotion_hint: Optional[str] = None  # 🎭 NEW: Optional emotion hint from RoBERTa analysis
+        limit: int = 25,
+        emotion_data: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Retrieve memories relevant to the given query using intelligent vector selection.
+        Retrieve memories using intelligent query classification and vector routing.
         
-        🚀 MULTI-VECTOR INTELLIGENCE: Automatically selects appropriate named vector based on query intent:
-        - Emotional queries → emotion vector (feelings, mood, emotional state)
-        - Pattern queries → semantic vector (relationship patterns, behavioral trends)
-        - Content queries → content vector (semantic meaning, topics, facts)
+        🚀 INTELLIGENT ROUTING: Uses QueryClassifier to determine optimal vector strategy:
+        - TEMPORAL queries → chronological scroll (existing temporal detection)
+        - FACTUAL queries → content vector only (fast path for facts/definitions)
+        - EMOTIONAL queries → content + emotion vector fusion (feelings, mood)
+        - CONVERSATIONAL queries → content + semantic vector fusion (relationship patterns)
+        - GENERAL queries → content vector (default fallback)
+        
+        This method now delegates to retrieve_relevant_memories_with_classification()
+        which provides superior query understanding compared to the old keyword-based approach.
         
         Args:
             user_id: User identifier for memory retrieval
             query: Query text for semantic search
             limit: Maximum number of memories to retrieve
-            emotion_hint: Optional emotion label from RoBERTa analysis (joy, sadness, anger, fear, etc.)
-                         If provided, bypasses keyword-based emotion detection
+            emotion_data: Optional pre-analyzed emotion from RoBERTa (avoids re-analysis)
+                         Expected keys: emotional_intensity, dominant_emotion, etc.
+        
+        Returns:
+            List of relevant memories with routing metadata
+        """
+        try:
+            # Use intelligent classification-based routing (Phase 2)
+            return await self.retrieve_relevant_memories_with_classification(
+                user_id=user_id,
+                query=query,
+                limit=limit,
+                emotion_data=emotion_data
+            )
+        except Exception as e:
+            logger.error(
+                f"Intelligent routing failed for query '{query}': {e}",
+                exc_info=True
+            )
+            # Fallback to legacy method on errors
+            logger.warning("⚠️ Falling back to legacy retrieval method")
+            return await self._legacy_retrieve_relevant_memories(
+                user_id=user_id,
+                query=query,
+                limit=limit,
+                emotion_data=emotion_data
+            )
+    
+    async def _legacy_retrieve_relevant_memories(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 25,
+        emotion_data: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        LEGACY METHOD: Old keyword-based routing (kept as fallback).
+        
+        This method uses brittle keyword matching for emotion detection.
+        Only used if intelligent routing fails.
         """
         import time
         
@@ -3984,20 +4042,24 @@ class VectorMemoryManager:
                 logger.debug(f"🎯 TEMPORAL SEARCH: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
                 return formatted_results
             
-            # 🎭 INTELLIGENT VECTOR SELECTION: Route to appropriate named vector based on query intent
+            # 🎭 LEGACY VECTOR SELECTION: Old keyword-based routing
             query_lower = query.lower()
             
-            # 🎭 ENHANCED EMOTION DETECTION: Use RoBERTa hint if provided, or fallback to keyword detection
+            # 🎭 LEGACY EMOTION DETECTION: Use RoBERTa data if provided, or fallback to keyword detection
             use_emotion_vector = False
             emotion_source = "none"
+            emotion_hint = None
             
-            if emotion_hint:
-                # Priority 1: Trust RoBERTa emotion analysis from MessageProcessor
-                use_emotion_vector = True
-                emotion_source = f"roberta:{emotion_hint}"
-                logger.info(f"🎭 EMOTION HINT PROVIDED: '{emotion_hint}' - Using emotion vector search")
-            else:
-                # Priority 2: Fallback to keyword-based detection for direct memory API calls
+            if emotion_data:
+                # Extract emotion hint from emotion_data dict
+                emotion_hint = emotion_data.get('dominant_emotion')
+                if emotion_hint:
+                    use_emotion_vector = True
+                    emotion_source = f"roberta:{emotion_hint}"
+                    logger.info(f"🎭 EMOTION DATA PROVIDED: '{emotion_hint}' - Using emotion vector search")
+            
+            if not use_emotion_vector:
+                # Fallback to keyword-based detection
                 emotional_keywords = ['feel', 'feeling', 'felt', 'mood', 'emotion', 'emotional', 
                                      'happy', 'sad', 'angry', 'excited', 'worried', 'anxious',
                                      'joyful', 'depressed', 'upset', 'frustrated', 'content']
@@ -4287,6 +4349,413 @@ class VectorMemoryManager:
         except Exception as e:
             logger.error(f"Failed to retrieve memories: {e}")
             return []
+    
+    # 🎯 PHASE 2 TASK 2.2: Hybrid Vector Routing Helper Methods
+    
+    async def _search_single_vector(
+        self,
+        vector_name: str,
+        query: str,
+        user_id: str,
+        limit: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Search a single named vector (Phase 2 helper method).
+        
+        Args:
+            vector_name: Name of vector to search ('content', 'emotion', 'semantic')
+            query: Search query
+            user_id: User identifier
+            limit: Maximum results
+            
+        Returns:
+            List of memory dictionaries with search metadata
+        """
+        try:
+            embedding_result = list(self.vector_store.embedder.embed([query]))[0]
+            # Handle both numpy arrays and plain lists
+            query_embedding = embedding_result.tolist() if hasattr(embedding_result, 'tolist') else embedding_result
+            
+            search_result = self.vector_store.client.search(
+                collection_name=self.vector_store.collection_name,
+                query_vector=(vector_name, query_embedding),
+                query_filter=models.Filter(
+                    must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                ),
+                limit=limit,
+                with_payload=True,
+                score_threshold=0.1  # Low threshold for broad recall
+            )
+            
+            results = []
+            for r in search_result:
+                if r.payload:
+                    results.append({
+                        "id": str(r.id),
+                        "content": r.payload.get("content", ""),
+                        "score": r.score,
+                        "timestamp": r.payload.get("timestamp", ""),
+                        "metadata": r.payload.get("metadata", {}),
+                        "memory_type": r.payload.get("memory_type", "conversation"),
+                        "search_type": f"{vector_name}_vector",
+                        "vector_used": vector_name
+                    })
+            
+            logger.debug("🎯 Single vector search (%s): %d results", vector_name, len(results))
+            return results
+            
+        except Exception as e:
+            logger.warning("Single vector search failed (%s): %s", vector_name, str(e))
+            return []
+    
+    async def _search_multi_vector_fusion(
+        self,
+        vectors: List[str],
+        weights: List[float],
+        query: str,
+        user_id: str,
+        limit: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Search multiple vectors and fuse results with RRF (Phase 2 helper method).
+        
+        Args:
+            vectors: List of vector names to search
+            weights: Weights for each vector (for future use)
+            query: Search query
+            user_id: User identifier
+            limit: Maximum results
+            
+        Returns:
+            Fused and ranked memory list
+        """
+        try:
+            # Search each vector
+            results_by_vector = {}
+            
+            for vector_name in vectors:
+                vector_results = await self._search_single_vector(
+                    vector_name=vector_name,
+                    query=query,
+                    user_id=user_id,
+                    limit=limit
+                )
+                results_by_vector[vector_name] = vector_results
+            
+            # Fuse using RRF
+            if not results_by_vector:
+                return []
+            
+            fusion_coordinator = create_vector_fusion_coordinator()
+            fused_results = fusion_coordinator.rrf.fuse(results_by_vector, limit=limit)
+            
+            # Add fusion metadata
+            for result in fused_results:
+                result['search_type'] = 'multi_vector_fusion'
+                result['vectors_used'] = vectors
+            
+            logger.info("🔀 Multi-vector fusion: %d results from %d vectors", 
+                       len(fused_results), len(vectors))
+            return fused_results
+            
+        except Exception as e:
+            logger.warning("Multi-vector fusion failed: %s", str(e))
+            return []
+    
+    async def retrieve_relevant_memories_with_classification(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 25,
+        emotion_data: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        🎯 Query-classifier-based intelligent vector routing.
+        
+        This method uses QueryClassifier to determine optimal vector strategy:
+        - Factual queries → content vector only (fast path)
+        - Emotional queries → content + emotion fusion
+        - Conversational queries → content + semantic fusion
+        - Temporal queries → chronological scroll
+        - General queries → content vector (default)
+        
+        Args:
+            user_id: User identifier
+            query: Search query
+            limit: Maximum results
+            emotion_data: Pre-analyzed RoBERTa emotion data (optional)
+                         Expected keys: emotional_intensity, dominant_emotion
+        
+        Returns:
+            List of relevant memories with routing metadata
+        """
+        import time
+        start_time = time.time()
+        
+        # Get monitoring for tracking classification and routing decisions
+        from src.memory.intelligent_retrieval_monitor import get_intelligent_retrieval_monitor
+        monitor = get_intelligent_retrieval_monitor()
+        
+        try:
+            # Step 1: Detect temporal queries (highest priority)
+            temporal_start = time.time()
+            is_temporal = await self.vector_store._detect_temporal_query_with_qdrant(query, user_id)
+            temporal_time_ms = (time.time() - temporal_start) * 1000
+            
+            # Step 2: Classify query using QueryClassifier
+            classification_start = time.time()
+            if self._query_classifier:
+                category = await self._query_classifier.classify_query(
+                    query=query,
+                    emotion_data=emotion_data,
+                    is_temporal=is_temporal
+                )
+                classification_time_ms = (time.time() - classification_start) * 1000
+                
+                # Get vector strategy for this category
+                strategy = self._query_classifier.get_vector_strategy(category)
+                
+                logger.info("🎯 PHASE 2 ROUTING: query='%s...' → category=%s → strategy=%s",
+                           query[:40], category.value, strategy['description'])
+                
+                # Track classification decision
+                await monitor.track_classification(
+                    user_id=user_id,
+                    query=query,
+                    category=category,
+                    emotion_intensity=emotion_data.get('emotional_intensity') if emotion_data else None,
+                    is_temporal=is_temporal,
+                    classification_time_ms=classification_time_ms
+                )
+                
+                # Step 3: Route based on category
+                if category == QueryCategory.TEMPORAL:
+                    # Use existing temporal logic
+                    results = await self.vector_store._handle_temporal_query_with_qdrant(
+                        query, user_id, limit
+                    )
+                    # Format results
+                    formatted_results = []
+                    for r in results:
+                        formatted_results.append({
+                            "content": r.get("content", ""),
+                            "score": r.get("score", 1.0),
+                            "timestamp": r.get("timestamp", ""),
+                            "metadata": r.get("metadata", {}),
+                            "memory_type": r.get("memory_type", "conversation"),
+                            "search_type": "temporal_chronological",
+                            "query_category": "temporal"
+                        })
+                    
+                    search_time_ms = (time.time() - start_time) * 1000
+                    logger.debug("🎯 TEMPORAL: %d results in %.1fms",
+                               len(formatted_results), search_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="temporal_chronological",
+                        vectors_used=[],  # Temporal doesn't use vectors
+                        memory_count=len(formatted_results),
+                        search_time_ms=search_time_ms - classification_time_ms,
+                        fusion_enabled=False
+                    )
+                    
+                    # Track overall performance
+                    await monitor.track_retrieval_performance(
+                        user_id=user_id,
+                        total_time_ms=search_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms - classification_time_ms,
+                        intelligent_routing_used=True
+                    )
+                    
+                    return formatted_results
+                
+                elif category == QueryCategory.FACTUAL:
+                    # Single content vector (fast path)
+                    search_start = time.time()
+                    results = await self._search_single_vector(
+                        vector_name="content",
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
+                    for r in results:
+                        r['query_category'] = 'factual'
+                    
+                    total_time_ms = (time.time() - start_time) * 1000
+                    logger.debug("🧠 FACTUAL: %d results in %.1fms",
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="content_vector",
+                        vectors_used=["content"],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=False
+                    )
+                    
+                    # Track overall performance
+                    await monitor.track_retrieval_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms,
+                        intelligent_routing_used=True
+                    )
+                    
+                    return results
+                
+                elif category == QueryCategory.EMOTIONAL:
+                    # Multi-vector fusion: content + emotion
+                    search_start = time.time()
+                    results = await self._search_multi_vector_fusion(
+                        vectors=strategy['vectors'],
+                        weights=strategy['weights'],
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
+                    for r in results:
+                        r['query_category'] = 'emotional'
+                    
+                    total_time_ms = (time.time() - start_time) * 1000
+                    logger.debug("🎭 EMOTIONAL: %d results in %.1fms",
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="multi_vector_fusion",
+                        vectors_used=strategy['vectors'],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=True
+                    )
+                    
+                    # Track overall performance (estimate fusion overhead ~20% of search time)
+                    fusion_time_ms = search_time_ms * 0.2
+                    await monitor.track_retrieval_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms - fusion_time_ms,
+                        fusion_time_ms=fusion_time_ms,
+                        intelligent_routing_used=True
+                    )
+                    
+                    return results
+                
+                elif category == QueryCategory.CONVERSATIONAL:
+                    # Multi-vector fusion: content + semantic
+                    search_start = time.time()
+                    results = await self._search_multi_vector_fusion(
+                        vectors=strategy['vectors'],
+                        weights=strategy['weights'],
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
+                    for r in results:
+                        r['query_category'] = 'conversational'
+                    
+                    total_time_ms = (time.time() - start_time) * 1000
+                    logger.debug("💬 CONVERSATIONAL: %d results in %.1fms",
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="multi_vector_fusion",
+                        vectors_used=strategy['vectors'],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=True
+                    )
+                    
+                    # Track overall performance (estimate fusion overhead ~20% of search time)
+                    fusion_time_ms = search_time_ms * 0.2
+                    await monitor.track_retrieval_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms - fusion_time_ms,
+                        fusion_time_ms=fusion_time_ms,
+                        intelligent_routing_used=True
+                    )
+                    
+                    return results
+                
+                else:  # GENERAL
+                    # Single content vector (default)
+                    search_start = time.time()
+                    results = await self._search_single_vector(
+                        vector_name="content",
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
+                    for r in results:
+                        r['query_category'] = 'general'
+                    
+                    total_time_ms = (time.time() - start_time) * 1000
+                    logger.debug("🔍 GENERAL: %d results in %.1fms",
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="content_vector",
+                        vectors_used=["content"],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=False
+                    )
+                    
+                    # Track overall performance
+                    await monitor.track_retrieval_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms,
+                        intelligent_routing_used=True
+                    )
+                    
+                    return results
+            
+            else:
+                # Fallback if QueryClassifier not initialized
+                logger.warning("QueryClassifier not available - falling back to legacy routing")
+                return await self.retrieve_relevant_memories(
+                    user_id=user_id,
+                    query=query,
+                    limit=limit
+                )
+        
+        except Exception as e:
+            logger.error("Phase 2 routing failed: %s", str(e))
+            # Fallback to legacy method
+            return await self.retrieve_relevant_memories(
+                user_id=user_id,
+                query=query,
+                limit=limit
+            )
     
     async def retrieve_relevant_memories_fidelity_first(
         self,

@@ -84,6 +84,156 @@ class CDLAIPromptIntegration:
             fallback = character.identity.name
         return os.getenv('DISCORD_BOT_NAME', fallback).lower()
 
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 🎯 PROMPT QUALITY: Numeric Scale Translation Helpers
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # These functions translate internal numeric scales (0.0-1.0) into clear,
+    # actionable natural language that LLMs can actually understand and act on.
+    # Added: October 2025 - System Prompt Quality Audit
+    # ═══════════════════════════════════════════════════════════════════════════════
+
+    def _translate_engagement_level(self, value: float) -> str:
+        """Translate numeric engagement level to actionable LLM guidance"""
+        try:
+            val = float(value)
+            if val >= 0.8:
+                return "High - be very warm and actively engaged in the conversation"
+            elif val >= 0.6:
+                return "Moderately high - be warm and engaged with natural enthusiasm"
+            elif val >= 0.4:
+                return "Moderate - balanced engagement without being overwhelming"
+            elif val >= 0.2:
+                return "Reserved - be respectful but not overly enthusiastic"
+            else:
+                return "Minimal - respond professionally but briefly"
+        except (ValueError, TypeError):
+            return f"{value}"  # Fallback to original if not numeric
+
+    def _translate_emotional_expression(self, value: float) -> str:
+        """Translate numeric emotional expression to actionable LLM guidance"""
+        try:
+            val = float(value)
+            if val >= 0.8:
+                return "Very expressive - show emotions openly and enthusiastically"
+            elif val >= 0.6:
+                return "Moderately expressive - show warmth and enthusiasm naturally"
+            elif val >= 0.4:
+                return "Balanced - show appropriate emotion for the context"
+            elif val >= 0.2:
+                return "Reserved - be measured and calm in emotional expression"
+            else:
+                return "Minimal - maintain professional composure"
+        except (ValueError, TypeError):
+            return f"{value}"  # Fallback to original if not numeric
+
+    def _translate_emotion_confidence(self, emotion: str, confidence: float) -> str:
+        """Translate emotion detection confidence to natural language guidance"""
+        try:
+            conf = float(confidence)
+            if conf >= 0.8:
+                return f"{emotion}"  # High confidence - state directly
+            elif conf >= 0.5:
+                return f"{emotion} (likely)"  # Medium confidence - add qualifier
+            else:
+                return f"{emotion} (uncertain)"  # Low confidence - acknowledge uncertainty
+        except (ValueError, TypeError):
+            return emotion  # Fallback to just emotion name
+
+    async def _load_and_format_big_five(self, character_id: int, tactical_shifts: dict = None) -> str:
+        """Load Big Five personality traits from database and format in natural language
+        
+        Args:
+            character_id: Database ID of character
+            tactical_shifts: Optional dict of emotional adaptation adjustments like {"extraversion": -0.1, "agreeableness": +0.15}
+        """
+        try:
+            from src.database.postgres_pool_manager import get_postgres_pool
+            pool = await get_postgres_pool()
+            if not pool:
+                return ""
+            
+            async with pool.acquire() as conn:
+                # Load Big Five traits from database
+                query = """
+                    SELECT trait_name, trait_value, intensity, description
+                    FROM personality_traits
+                    WHERE character_id = $1
+                    AND trait_name IN ('openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism')
+                    ORDER BY trait_name
+                """
+                rows = await conn.fetch(query, character_id)
+                
+                if not rows:
+                    return ""  # No Big Five data
+                
+                # Build natural language personality profile
+                lines = ["\n\n🧠 PERSONALITY CORE:"]
+                
+                trait_descriptions = {
+                    'openness': {
+                        'very_high': "Extremely curious and creative - loves exploring new ideas and perspectives",
+                        'high': "Open-minded and intellectually curious - enjoys new experiences",
+                        'medium': "Balanced between tradition and innovation",
+                        'low': "Prefers familiar approaches and proven methods"
+                    },
+                    'conscientiousness': {
+                        'very_high': "Extremely organized, thorough, and detail-oriented in all work",
+                        'high': "Organized and reliable with strong attention to detail",
+                        'medium': "Balanced organization and flexibility",
+                        'low': "Spontaneous and flexible, less focused on rigid planning"
+                    },
+                    'extraversion': {
+                        'very_high': "Highly energetic, outgoing, and socially enthusiastic",
+                        'high': "Energetic and sociable, especially when discussing passion topics",
+                        'medium': "Ambivert - balanced between social and reflective modes",
+                        'low': "Thoughtful and reserved, prefers deeper one-on-one conversations"
+                    },
+                    'agreeableness': {
+                        'very_high': "Extremely warm, empathetic, and collaborative with others",
+                        'high': "Warm, compassionate, and supportive in interactions",
+                        'medium': "Balanced between empathy and directness",
+                        'low': "Direct and straightforward, values truth over harmony"
+                    },
+                    'neuroticism': {
+                        'very_high': "Emotionally sensitive with strong reactions to stress",
+                        'high': "Emotionally responsive, shows feelings openly",
+                        'medium': "Generally stable with normal emotional responses",
+                        'low': "Very emotionally stable and resilient under pressure"
+                    }
+                }
+                
+                for row in rows:
+                    trait_name = row['trait_name']
+                    # Convert Decimal to float for arithmetic operations
+                    trait_value = float(row['trait_value']) if row['trait_value'] is not None else 0.5
+                    intensity = row['intensity']
+                    
+                    # Use database description if available, otherwise use translation
+                    if row['description']:
+                        description = row['description']
+                    elif trait_name in trait_descriptions and intensity in trait_descriptions[trait_name]:
+                        description = trait_descriptions[trait_name][intensity]
+                    else:
+                        description = f"{intensity} {trait_name}"
+                    
+                    # Check for tactical emotional adaptation shifts
+                    if tactical_shifts and trait_name in tactical_shifts:
+                        shift = tactical_shifts[trait_name]
+                        adjusted_value = max(0.0, min(1.0, trait_value + shift))  # Clamp to 0-1
+                        direction = "⚡↗" if shift > 0 else "⚡↘" if shift < 0 else "⚡→"
+                        lines.append(
+                            f"• {trait_name.title()}: {description} "
+                            f"({trait_value:.2f} {direction} {adjusted_value:.2f} - emotionally adapted for this conversation)"
+                        )
+                    else:
+                        lines.append(f"• {trait_name.title()}: {description}")
+                
+                return "\n".join(lines)
+                
+        except Exception as e:
+            logger.warning(f"Could not load Big Five personality: {e}")
+            return ""
+
     async def build_confidence_aware_context(
         self,
         user_facts: list,
@@ -768,140 +918,79 @@ class CDLAIPromptIntegration:
         # of prompt (line ~1778) for maximum LLM recency bias impact. No duplication needed.
         # See: ✨ RESPONSE STYLE REMINDER ✨ section at end of prompt
         
-        # Add Big Five personality integration with Sprint 4 CharacterEvolution optimization
-        if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
-            big_five = character.personality.big_five
-            prompt += f"\n\n🧬 PERSONALITY PROFILE (Big Five Model):\n"
-            prompt += "WhisperEngine uses the Big Five psychological model to guide your personality expression.\n\n"
-            prompt += "**Big Five Trait Scale (0.0-1.0):**\n"
-            prompt += "- **Openness**: Low (0.0-0.3) = Traditional, practical | Medium (0.4-0.6) = Balanced | High (0.7-1.0) = Creative, curious, loves new experiences\n"
-            prompt += "- **Conscientiousness**: Low (0.0-0.3) = Spontaneous, flexible | Medium (0.4-0.6) = Organized | High (0.7-1.0) = Disciplined, careful, extremely precise\n"
-            prompt += "- **Extraversion**: Low (0.0-0.3) = Reserved, quiet, introspective | Medium (0.4-0.6) = Ambivert | High (0.7-1.0) = Outgoing, energetic, very social\n"
-            prompt += "- **Agreeableness**: Low (0.0-0.3) = Direct, competitive | Medium (0.4-0.6) = Balanced | High (0.7-1.0) = Empathetic, cooperative, very supportive\n"
-            prompt += "- **Neuroticism**: Low (0.0-0.3) = Calm, stable, fearless | Medium (0.4-0.6) = Moderate emotional range | High (0.7-1.0) = Sensitive, anxious, emotionally reactive\n\n"
-            prompt += "**Your Character's Big Five Profile:**\n"
+        # 🧠 BIG FIVE PERSONALITY: Load from database and format in natural language
+        # Added: October 2025 - System Prompt Quality Audit
+        # OLD CODE: Used character.personality.big_five attribute (doesn't exist for Elena)
+        # NEW CODE: Direct database lookup with natural language formatting
+        try:
+            # Get character_id from character object or database lookup
+            character_id = None
+            if hasattr(character, 'id'):
+                character_id = character.id
+            elif hasattr(character, 'identity') and hasattr(character.identity, 'name'):
+                # Look up character_id by name
+                from src.database.postgres_pool_manager import get_postgres_pool
+                pool = await get_postgres_pool()
+                if pool:
+                    async with pool.acquire() as conn:
+                        result = await conn.fetchrow(
+                            "SELECT id FROM characters WHERE name = $1 OR normalized_name = $1",
+                            character.identity.name
+                        )
+                        if result:
+                            character_id = result['id']
             
-            # 🎯 SPRINT 4: Extract CharacterEvolution optimization data from pipeline
-            character_optimization = None
-            big_five_tactical_shifts = {}  # NEW: Tactical emotional adaptation
-            try:
-                if pipeline_dict and 'ai_components' in pipeline_dict:
-                    ai_components = pipeline_dict['ai_components']
+            if character_id:
+                # Extract tactical Big Five shifts from emotional adaptation (if present)
+                tactical_shifts = None
+                try:
+                    # DEBUG: Check all possible locations for ai_components
+                    logger.debug(f"🔍 BIG FIVE DEBUG: pipeline_dict type: {type(pipeline_dict)}")
+                    logger.debug(f"🔍 BIG FIVE DEBUG: pipeline_dict keys: {list(pipeline_dict.keys()) if isinstance(pipeline_dict, dict) else 'N/A'}")
                     
-                    # NEW: Check for Big Five tactical shifts from emotional adaptation
-                    if isinstance(ai_components, dict) and 'emotional_adaptation' in ai_components:
-                        emotional_adaptation = ai_components['emotional_adaptation']
-                        if isinstance(emotional_adaptation, dict) and 'big_five_tactical_shifts' in emotional_adaptation:
-                            big_five_tactical_shifts = emotional_adaptation['big_five_tactical_shifts']
-                            logger.info(f"🎭 CHARACTER: Found tactical Big Five shifts: {big_five_tactical_shifts}")
+                    # Try enhanced_context first (where comprehensive_context lives)
+                    comprehensive_context = pipeline_dict.get('enhanced_context', {})
+                    if not comprehensive_context:
+                        comprehensive_context = pipeline_dict.get('comprehensive_context', {})
                     
-                    # Check for character_optimization (actual field name used in message processor)
-                    if isinstance(ai_components, dict) and 'character_optimization' in ai_components:
-                        character_optimization = ai_components['character_optimization']
-                        logger.info(f"🎭 CHARACTER: Found Sprint 4 optimization data: {character_optimization}")
-                    # Also check for character_evolution (legacy/alternative field name)
-                    elif isinstance(ai_components, dict) and 'character_evolution' in ai_components:
-                        character_optimization = ai_components['character_evolution']
-                        logger.info(f"🎭 CHARACTER: Found Sprint 4 evolution data: {character_optimization}")
+                    if comprehensive_context and isinstance(comprehensive_context, dict):
+                        logger.debug(f"🔍 BIG FIVE DEBUG: comprehensive_context keys: {list(comprehensive_context.keys())}")
+                        # Check if emotional_adaptation exists in comprehensive_context
+                        if 'emotional_adaptation' in comprehensive_context:
+                            emotional_adaptation = comprehensive_context['emotional_adaptation']
+                            if isinstance(emotional_adaptation, dict) and 'big_five_tactical_shifts' in emotional_adaptation:
+                                tactical_shifts = emotional_adaptation['big_five_tactical_shifts']
+                                logger.info(f"🎭 BIG FIVE: Found tactical shifts in comprehensive_context: {tactical_shifts}")
+                    
+                    # Also try direct access to ai_components (might be metadata or top-level)
+                    if not tactical_shifts and 'ai_components' in pipeline_dict:
+                        ai_components = pipeline_dict['ai_components']
+                        logger.debug(f"🔍 BIG FIVE DEBUG: Found ai_components in pipeline_dict!")
+                        if isinstance(ai_components, dict) and 'emotional_adaptation' in ai_components:
+                            emotional_adaptation = ai_components['emotional_adaptation']
+                            if isinstance(emotional_adaptation, dict) and 'big_five_tactical_shifts' in emotional_adaptation:
+                                tactical_shifts = emotional_adaptation['big_five_tactical_shifts']
+                                logger.info(f"🎭 BIG FIVE: Found tactical shifts in ai_components: {tactical_shifts}")
+                                
+                except Exception as e:
+                    logger.warning(f"Could not extract tactical Big Five shifts: {e}")
+                    import traceback
+                    logger.debug(f"Traceback: {traceback.format_exc()}")
+                
+                big_five_section = await self._load_and_format_big_five(character_id, tactical_shifts)
+                logger.info(f"🔍 BIG FIVE DEBUG: Section length: {len(big_five_section) if big_five_section else 0}, tactical_shifts: {tactical_shifts}")
+                if big_five_section:
+                    logger.info(f"🔍 BIG FIVE DEBUG: About to add to prompt. Current prompt length: {len(prompt)}")
+                    prompt += big_five_section
+                    logger.info(f"🔍 BIG FIVE DEBUG: After adding. New prompt length: {len(prompt)}")
+                    if tactical_shifts:
+                        logger.info(f"✅ BIG FIVE: Added personality with tactical emotional adaptation for character {character_id}")
                     else:
-                        logger.info(f"🎭 CHARACTER: No character_optimization found in ai_components: {list(ai_components.keys()) if ai_components else 'None'}")
+                        logger.info(f"✅ BIG FIVE: Added natural language personality profile for character {character_id}")
                 else:
-                    logger.info(f"🎭 CHARACTER: No ai_components in pipeline_dict: {list(pipeline_dict.keys()) if pipeline_dict else 'None'}")
-            except Exception as e:
-                logger.info(f"🎭 CHARACTER: Could not extract optimization data: {e}")
-            
-            # Helper function to get adaptive trait description with Sprint 4 optimization AND tactical shifts
-            def get_adaptive_trait_info(trait_obj, trait_name):
-                # Get base CDL trait value
-                base_score = None
-                base_description = ""
-                
-                # Trait name mapping
-                trait_map = {
-                    'openness': 'Openness to experience',
-                    'conscientiousness': 'Conscientiousness',
-                    'extraversion': 'Extraversion', 
-                    'agreeableness': 'Agreeableness',
-                    'neuroticism': 'Neuroticism'
-                }
-                trait_label = trait_map.get(trait_name, trait_name.title())
-                
-                if hasattr(trait_obj, 'trait_description'):
-                    # New object format from database
-                    base_score = trait_obj.score if hasattr(trait_obj, 'score') else None
-                    if base_score is None and hasattr(trait_obj, 'value'):
-                        base_score = trait_obj.value
-                    # Build proper description with trait name
-                    level = 'High' if base_score and base_score > 0.7 else 'Moderate' if base_score and base_score > 0.4 else 'Low'
-                    base_description = f"{trait_label}: {level}"
-                elif isinstance(trait_obj, (float, int)):
-                    # Legacy float format
-                    base_score = trait_obj
-                    level = 'High' if base_score > 0.7 else 'Moderate' if base_score > 0.4 else 'Low'
-                    base_description = f"{trait_label}: {level}"
-                
-                # 🎯 NEW: Apply tactical emotional adaptation shifts FIRST (short-term, conversation-level)
-                if big_five_tactical_shifts and trait_name in big_five_tactical_shifts and base_score is not None:
-                    tactical_shift = big_five_tactical_shifts[trait_name]
-                    tactically_adjusted_score = base_score + tactical_shift
-                    # Clamp to valid range
-                    tactically_adjusted_score = max(0.0, min(1.0, tactically_adjusted_score))
-                    
-                    # Apply tactical shift with emoji indicator
-                    direction = "⚡↗" if tactical_shift > 0 else "⚡↘" if tactical_shift < 0 else "⚡→"
-                    base_description = f"{trait_label}: {level}"
-                    return f"{base_description} ({base_score:.1f} {direction} {tactically_adjusted_score:.2f}) - Emotionally adapted for current conversation"
-                
-                # 🎯 SPRINT 4: Apply optimization adjustments if available (long-term, performance-based)
-                if character_optimization and isinstance(character_optimization, dict):
-                    # Check for direct personality_optimizations field
-                    optimizations = character_optimization.get('personality_optimizations', {})
-                    
-                    # If no direct optimizations, generate from optimization_opportunities
-                    if not optimizations and 'optimization_opportunities' in character_optimization:
-                        opportunities = character_optimization.get('optimization_opportunities', [])
-                        for opp in opportunities:
-                            if opp.get('category') == 'educational_approach' and 'affected_traits' in opp:
-                                # Convert educational traits to personality adjustments
-                                affected_traits = opp.get('affected_traits', [])
-                                if 'teaching_patience' in affected_traits:
-                                    optimizations['conscientiousness'] = 0.05  # More patient = higher conscientiousness
-                                if 'explanation_style' in affected_traits or 'metaphor_usage' in affected_traits:
-                                    optimizations['openness'] = 0.03  # Better explanations = higher openness
-                    
-                    if trait_name in optimizations and base_score is not None:
-                        adjustment = optimizations[trait_name]
-                        adjusted_score = base_score + adjustment
-                        
-                        # Apply Sprint 4 constraint: max 15% trait boundary adjustment
-                        max_adjustment = 0.15
-                        if abs(adjustment) <= max_adjustment:
-                            # Show adaptive personality with optimization
-                            direction = "↗" if adjustment > 0 else "↘" if adjustment < 0 else "→"
-                            adaptation_reason = character_optimization.get('adaptation_reasoning', 'improved conversation effectiveness')
-                            return f"{base_description} ({base_score:.1f} {direction} {adjusted_score:.2f}) - Adapted for {adaptation_reason}"
-                        else:
-                            # Constraint exceeded - show warning but apply capped adjustment
-                            capped_adjustment = max_adjustment if adjustment > 0 else -max_adjustment
-                            capped_score = base_score + capped_adjustment
-                            return f"{base_description} ({base_score:.1f} → {capped_score:.2f}) - Optimization capped at 15% boundary"
-                
-                # No optimization available - show static CDL trait
-                if base_score is not None:
-                    return f"{base_description} ({base_score})"
-                else:
-                    return base_description or f"{trait_name}: Unknown format"
-            
-            if hasattr(big_five, 'openness'):
-                prompt += f"- {get_adaptive_trait_info(big_five.openness, 'openness')}\n"
-            if hasattr(big_five, 'conscientiousness'):
-                prompt += f"- {get_adaptive_trait_info(big_five.conscientiousness, 'conscientiousness')}\n"
-            if hasattr(big_five, 'extraversion'):
-                prompt += f"- {get_adaptive_trait_info(big_five.extraversion, 'extraversion')}\n"
-            if hasattr(big_five, 'agreeableness'):
-                prompt += f"- {get_adaptive_trait_info(big_five.agreeableness, 'agreeableness')}\n"
-            if hasattr(big_five, 'neuroticism'):
-                prompt += f"- {get_adaptive_trait_info(big_five.neuroticism, 'neuroticism')}\n"
+                    logger.warning(f"⚠️ BIG FIVE DEBUG: Section is empty! tactical_shifts={tactical_shifts}")
+        except Exception as e:
+            logger.debug(f"Could not load Big Five personality: {e}")
 
         # 📚 CHARACTER LEARNING PERSISTENCE INTEGRATION
         # Retrieves long-term learned insights from PostgreSQL for character evolution
@@ -1523,7 +1612,20 @@ class CDLAIPromptIntegration:
                         intervention_needed = proactive_engagement_analysis.get('intervention_needed', False)
                         engagement_strategy = proactive_engagement_analysis.get('recommended_strategy')
                         if intervention_needed and engagement_strategy:
-                            guidance_parts.append(f"🎯 ENGAGEMENT: Use {engagement_strategy} strategy to enhance conversation quality")
+                            # Translate internal strategy names into clear LLM instructions
+                            strategy_guidance_map = {
+                                'curiosity_prompt': 'Ask an open, curious question to spark deeper conversation',
+                                'topic_suggestion': 'Suggest a new topic related to shared interests',
+                                'memory_connection': 'Reference a past conversation naturally to deepen connection',
+                                'emotional_check_in': 'Gently check in on their emotional state with empathy',
+                                'follow_up_question': 'Ask a thoughtful follow-up about the current topic',
+                                'shared_interest': 'Connect around shared interests authentically',
+                                'celebration': 'Celebrate their achievements with genuine enthusiasm',
+                                'support_offer': 'Offer support or encouragement naturally'
+                            }
+                            strategy_instruction = strategy_guidance_map.get(engagement_strategy, 
+                                                                              'Enhance conversation quality naturally')
+                            guidance_parts.append(f"🎯 ENGAGEMENT: {strategy_instruction}")
                     
                     # Conversation Analysis with Response Guidance
                     conversation_analysis = comprehensive_context.get('conversation_analysis')
@@ -1614,28 +1716,27 @@ class CDLAIPromptIntegration:
                         
                         depth_guidance = depth_descriptions.get(relationship_depth, 'Respond authentically')
                         
-                        guidance_parts.append(
-                            f"💝 RELATIONSHIP: {depth_guidance} "
-                            f"(Trust: {trust:.2f}, Affection: {affection:.2f}, Attunement: {attunement:.2f}, "
-                            f"Interactions: {interactions})"
-                        )
+                        # Build relationship guidance with conversation count context (not raw metric numbers)
+                        relationship_context = f"💝 RELATIONSHIP: {depth_guidance}"
+                        if interactions > 0:
+                            relationship_context += f" (you've had {interactions} conversations together)"
+                        
+                        guidance_parts.append(relationship_context)
                     
                     confidence_data = comprehensive_context.get('conversation_confidence')
                     if confidence_data and isinstance(confidence_data, dict):
                         overall_conf = confidence_data.get('overall_confidence', 0.7)
                         context_conf = confidence_data.get('context_confidence', 0.7)
                         
+                        # Translate confidence to natural language only (no redundant numbers)
                         if overall_conf > 0.8:
-                            conf_guidance = "high confidence conversation - feel comfortable being detailed and specific"
+                            conf_guidance = "High confidence conversation - feel comfortable being detailed and specific"
                         elif overall_conf > 0.6:
-                            conf_guidance = "moderate confidence - balance clarity with openness to exploration"
+                            conf_guidance = "Moderate confidence - balance clarity with openness to exploration"
                         else:
-                            conf_guidance = "exploratory conversation - ask clarifying questions and build understanding"
+                            conf_guidance = "Exploratory conversation - ask clarifying questions and build understanding"
                         
-                        guidance_parts.append(
-                            f"📊 CONFIDENCE: {conf_guidance} "
-                            f"(Overall: {overall_conf:.2f}, Context: {context_conf:.2f})"
-                        )
+                        guidance_parts.append(f"📊 CONFIDENCE: {conf_guidance}")
                     
                     # 🎭 SPRINT 4: CHARACTER PERFORMANCE INTELLIGENCE
                     # Adaptive character optimization based on conversation effectiveness
@@ -1804,25 +1905,23 @@ class CDLAIPromptIntegration:
                     
                     is_multi_modal = emotion_data.get('multi_modal', False)
                     
-                    # Build rich emotional context prompt with probabilistic framing
+                    # Build emotional context in natural language (no technical jargon)
+                    # Use our translation helper to convert confidence to natural qualifiers
+                    emotion_with_qualifier = self._translate_emotion_confidence(primary_emotion, confidence)
+                    
                     if secondary_emotions and len(secondary_emotions) > 0:
                         secondary_str = ', '.join(secondary_emotions[:2])  # Limit to 2 for clarity
-                        prompt += f"\n\n🎭 EMOTION READING (PROBABILISTIC): {primary_emotion} with undertones of {secondary_str} (confidence: {confidence:.2f})"
+                        prompt += f"\n\n🎭 USER'S EMOTIONAL STATE: {emotion_with_qualifier} with undertones of {secondary_str}"
                     else:
-                        prompt += f"\n\n🎭 EMOTION READING (PROBABILISTIC): {primary_emotion} (confidence: {confidence:.2f})"
+                        prompt += f"\n\n🎭 USER'S EMOTIONAL STATE: {emotion_with_qualifier}"
                     
-                    # Add multi-modal analysis indicator
-                    if is_multi_modal:
-                        prompt += f"\n📱 ANALYSIS METHOD: Multi-modal detection (text + emoji + patterns)"
-                    
-                    # CRITICAL: Emphasize probabilistic nature
-                    prompt += f"\n⚠️ UNCERTAINTY NOTE: Emotion detection is probabilistic. Validate through conversation."
+                    # Natural language guidance based on confidence (not raw numbers)
                     if confidence < 0.7:
-                        prompt += f"\n💡 LOW CONFIDENCE: Use tentative language ('I sense...', 'it seems...') and invite user to share their actual state."
+                        prompt += f"\n💡 APPROACH: Use tentative language ('I sense...', 'it seems...') and invite them to share how they're really feeling"
                     elif confidence < 0.85:
-                        prompt += f"\n💡 MODERATE CONFIDENCE: Use gentle observational language ('you seem...', 'I'm picking up...') rather than declarative statements."
+                        prompt += f"\n💡 APPROACH: Use gentle observational language ('you seem...', 'I'm picking up...') rather than stating their emotions as fact"
                     else:
-                        prompt += f"\n💡 HIGH CONFIDENCE: Still use tentative phrasing ('I sense...', 'there's a...') to avoid assumptions. Never state user emotions as absolute fact."
+                        prompt += f"\n💡 APPROACH: Even with strong signals, use tentative phrasing ('I sense...', 'there's a feeling of...') to avoid assumptions"
                     
                     # Add emotional trajectory context
                     if emotional_trajectory and len(emotional_trajectory) > 0:
@@ -3723,7 +3822,23 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                     # Communication style format: {'value': 'High', 'description': 'Engagement level'}
                     value = field_value.get('value', '')
                     if value:  # Only show if there's an actual value
-                        section_parts.append(f"\n📋 {field_title}: {value}")
+                        # 🎯 PROMPT QUALITY: Translate numeric scales to natural language
+                        if field_name == 'engagement_level':
+                            try:
+                                numeric_val = float(value)
+                                translated_value = self._translate_engagement_level(numeric_val)
+                                section_parts.append(f"\n📋 Engagement: {translated_value}")
+                            except (ValueError, TypeError):
+                                section_parts.append(f"\n📋 {field_title}: {value}")
+                        elif field_name == 'emotional_expression':
+                            try:
+                                numeric_val = float(value)
+                                translated_value = self._translate_emotional_expression(numeric_val)
+                                section_parts.append(f"\n📋 Emotional Expression: {translated_value}")
+                            except (ValueError, TypeError):
+                                section_parts.append(f"\n📋 {field_title}: {value}")
+                        else:
+                            section_parts.append(f"\n📋 {field_title}: {value}")
                 elif 'description' in field_value:
                     # Values/beliefs format: {'key': 'fear_1', 'description': 'text', 'importance': 'high'}
                     desc = field_value.get('description', '')

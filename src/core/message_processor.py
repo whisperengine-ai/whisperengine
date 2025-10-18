@@ -3139,7 +3139,20 @@ class MessageProcessor:
             intervention_needed = proactive_engagement_analysis.get('intervention_needed', False)
             engagement_strategy = proactive_engagement_analysis.get('recommended_strategy')
             if intervention_needed and engagement_strategy:
-                guidance_parts.append(f"🎯 ENGAGEMENT: Use {engagement_strategy} strategy to enhance conversation quality")
+                # Translate internal strategy names into clear LLM instructions
+                strategy_guidance_map = {
+                    'curiosity_prompt': 'Ask an open, curious question to spark deeper conversation',
+                    'topic_suggestion': 'Suggest a new topic related to shared interests',
+                    'memory_connection': 'Reference a past conversation naturally to deepen connection',
+                    'emotional_check_in': 'Gently check in on their emotional state with empathy',
+                    'follow_up_question': 'Ask a thoughtful follow-up about the current topic',
+                    'shared_interest': 'Connect around shared interests authentically',
+                    'celebration': 'Celebrate their achievements with genuine enthusiasm',
+                    'support_offer': 'Offer support or encouragement naturally'
+                }
+                strategy_instruction = strategy_guidance_map.get(engagement_strategy, 
+                                                                  'Enhance conversation quality naturally')
+                guidance_parts.append(f"🎯 ENGAGEMENT: {strategy_instruction}")
         
         # Conversation Analysis with Response Guidance
         conversation_analysis = comprehensive_context.get('conversation_analysis')
@@ -3391,6 +3404,9 @@ class MessageProcessor:
             
             # 🎭 NEW: Tactical Big Five Emotional Adaptation
             # Create emotional adaptation strategy based on user's emotional state
+            logger.info(f"🎭 TACTICAL BIG FIVE DEBUG: emotional_context_engine exists: {self.emotional_context_engine is not None}")
+            logger.info(f"🎭 TACTICAL BIG FIVE DEBUG: emotion_analysis in ai_components: {'emotion_analysis' in ai_components}")
+            logger.info(f"🎭 TACTICAL BIG FIVE DEBUG: ai_components keys at this point: {list(ai_components.keys())}")
             if self.emotional_context_engine and ai_components.get('emotion_analysis'):
                 try:
                     emotion_analysis = ai_components['emotion_analysis']
@@ -5221,9 +5237,10 @@ class MessageProcessor:
             if 'comprehensive_context' not in ai_components:
                 ai_components['comprehensive_context'] = {}
             
-            # Add adaptive learning data (relationship state, confidence)
+            # Add adaptive learning data (relationship state, confidence, emotional adaptation)
             relationship_data = ai_components.get('relationship_state')
             confidence_data = ai_components.get('conversation_confidence')
+            emotional_adaptation = ai_components.get('emotional_adaptation')
             
             if relationship_data:
                 ai_components['comprehensive_context']['relationship_state'] = relationship_data
@@ -5232,6 +5249,10 @@ class MessageProcessor:
             if confidence_data:
                 ai_components['comprehensive_context']['conversation_confidence'] = confidence_data
                 logger.info("🎯 CONFIDENCE: Added confidence data to comprehensive_context for prompt injection")
+            
+            if emotional_adaptation:
+                ai_components['comprehensive_context']['emotional_adaptation'] = emotional_adaptation
+                logger.info("🎯 EMOTIONAL ADAPTATION: Added tactical Big Five shifts to comprehensive_context for prompt injection")
             
             # 🧠 UNIFIED CHARACTER INTELLIGENCE: Add coordinated intelligence from all systems
             unified_intelligence = ai_components.get('unified_character_intelligence')
