@@ -1,13 +1,14 @@
 """
-Phase 2 Multi-Vector Intelligence Monitoring.
+Intelligent Memory Retrieval Monitoring.
 
 Tracks query classification, vector routing decisions, and performance metrics
-to InfluxDB for analysis and optimization.
+to InfluxDB for analysis and optimization. Monitors the query-aware intelligent
+memory retrieval system that uses classification to select optimal vector strategies.
 
 Usage:
-    from src.memory.phase2_monitoring import Phase2Monitor
+    from src.memory.intelligent_retrieval_monitor import IntelligentRetrievalMonitor
     
-    monitor = Phase2Monitor()
+    monitor = IntelligentRetrievalMonitor()
     
     # Track classification decision
     await monitor.track_classification(
@@ -40,9 +41,11 @@ from src.memory.query_classifier import QueryCategory
 logger = logging.getLogger(__name__)
 
 
-class Phase2Monitor:
+class IntelligentRetrievalMonitor:
     """
-    Monitor Phase 2 query classification and routing decisions.
+    Monitor intelligent query-aware memory retrieval system.
+    
+    Tracks classification-driven routing decisions for semantic memory retrieval.
     
     Sends metrics to InfluxDB for tracking:
     - Query classification accuracy
@@ -135,7 +138,7 @@ class Phase2Monitor:
             
             # Write to InfluxDB
             await self.temporal_client.write_point(
-                measurement="phase2_query_classification",
+                measurement="query_classification",
                 tags=tags,
                 fields=fields
             )
@@ -233,17 +236,17 @@ class Phase2Monitor:
         except Exception as e:
             logger.warning("Failed to track routing: %s", str(e))
     
-    async def track_phase2_performance(
+    async def track_retrieval_performance(
         self,
         user_id: str,
         total_time_ms: float,
         classification_time_ms: float,
         search_time_ms: float,
         fusion_time_ms: Optional[float] = None,
-        phase2_method_used: bool = True
+        intelligent_routing_used: bool = True
     ):
         """
-        Track overall Phase 2 performance metrics.
+        Track overall intelligent retrieval performance metrics.
         
         Args:
             user_id: User identifier
@@ -251,16 +254,16 @@ class Phase2Monitor:
             classification_time_ms: Time spent in QueryClassifier
             search_time_ms: Time spent in vector search
             fusion_time_ms: Time spent in RRF fusion (if applicable)
-            phase2_method_used: Whether Phase 2 routing was used vs legacy
+            intelligent_routing_used: Whether intelligent routing was used vs legacy
             
         Example:
-            >>> await monitor.track_phase2_performance(
+            >>> await monitor.track_retrieval_performance(
             ...     user_id="user123",
             ...     total_time_ms=30.5,
             ...     classification_time_ms=2.0,
             ...     search_time_ms=23.5,
             ...     fusion_time_ms=5.0,
-            ...     phase2_method_used=True
+            ...     intelligent_routing_used=True
             ... )
         """
         if not self.enabled or not self.temporal_client:
@@ -274,7 +277,7 @@ class Phase2Monitor:
             # Build tags
             tags = {
                 "bot_name": bot_name,
-                "method": "phase2_routing" if phase2_method_used else "legacy_routing"
+                "method": "intelligent_routing" if intelligent_routing_used else "legacy_routing"
             }
             
             # Build fields
@@ -298,7 +301,7 @@ class Phase2Monitor:
             
             # Write to InfluxDB
             await self.temporal_client.write_point(
-                measurement="phase2_performance",
+                measurement="intelligent_retrieval_performance",
                 tags=tags,
                 fields=fields
             )
@@ -386,7 +389,7 @@ class Phase2Monitor:
             
             # Write to InfluxDB
             await self.temporal_client.write_point(
-                measurement="phase2_ab_test",
+                measurement="retrieval_method_comparison",
                 tags=tags,
                 fields=fields
             )
@@ -401,23 +404,23 @@ class Phase2Monitor:
 
 
 # Global singleton instance
-_phase2_monitor: Optional[Phase2Monitor] = None
+_retrieval_monitor: Optional[IntelligentRetrievalMonitor] = None
 
 
-def get_phase2_monitor() -> Phase2Monitor:
+def get_intelligent_retrieval_monitor() -> IntelligentRetrievalMonitor:
     """
-    Get or create global Phase2Monitor instance.
+    Get or create global IntelligentRetrievalMonitor instance.
     
     Returns:
-        Global Phase2Monitor singleton
+        Global IntelligentRetrievalMonitor singleton
         
     Example:
-        >>> monitor = get_phase2_monitor()
+        >>> monitor = get_intelligent_retrieval_monitor()
         >>> await monitor.track_classification(...)
     """
-    global _phase2_monitor
+    global _retrieval_monitor
     
-    if _phase2_monitor is None:
-        _phase2_monitor = Phase2Monitor()
+    if _retrieval_monitor is None:
+        _retrieval_monitor = IntelligentRetrievalMonitor()
     
-    return _phase2_monitor
+    return _retrieval_monitor

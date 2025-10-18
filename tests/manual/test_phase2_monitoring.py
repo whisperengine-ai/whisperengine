@@ -72,13 +72,13 @@ async def test_monitoring():
     print("\nTest 3: Track Phase 2 Performance")
     print("-" * 80)
     
-    await monitor.track_phase2_performance(
+    await monitor.track_retrieval_performance(
         user_id="test_user",
         total_time_ms=30.5,
         classification_time_ms=2.0,
         search_time_ms=23.5,
         fusion_time_ms=5.0,
-        phase2_method_used=True
+        intelligent_routing_used=True
     )
     print("✅ Performance tracked")
     

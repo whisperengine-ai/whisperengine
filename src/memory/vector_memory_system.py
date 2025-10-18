@@ -4415,7 +4415,7 @@ class VectorMemoryManager:
             logger.warning("Multi-vector fusion failed: %s", str(e))
             return []
     
-    async def retrieve_relevant_memories_phase2(
+    async def retrieve_relevant_memories_with_classification(
         self,
         user_id: str,
         query: str,
@@ -4423,7 +4423,7 @@ class VectorMemoryManager:
         emotion_data: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        🎯 PHASE 2: Query-classifier-based intelligent vector routing.
+        🎯 Query-classifier-based intelligent vector routing.
         
         This method uses QueryClassifier to determine optimal vector strategy:
         - Factual queries → content vector only (fast path)
@@ -4445,9 +4445,9 @@ class VectorMemoryManager:
         import time
         start_time = time.time()
         
-        # Get Phase 2 monitor for tracking
-        from src.memory.phase2_monitoring import get_phase2_monitor
-        monitor = get_phase2_monitor()
+        # Get monitoring for tracking classification and routing decisions
+        from src.memory.intelligent_retrieval_monitor import get_intelligent_retrieval_monitor
+        monitor = get_intelligent_retrieval_monitor()
         
         try:
             # Step 1: Detect temporal queries (highest priority)
@@ -4516,12 +4516,12 @@ class VectorMemoryManager:
                     )
                     
                     # Track overall performance
-                    await monitor.track_phase2_performance(
+                    await monitor.track_retrieval_performance(
                         user_id=user_id,
                         total_time_ms=search_time_ms,
                         classification_time_ms=classification_time_ms,
                         search_time_ms=search_time_ms - classification_time_ms,
-                        phase2_method_used=True
+                        intelligent_routing_used=True
                     )
                     
                     return formatted_results
@@ -4556,12 +4556,12 @@ class VectorMemoryManager:
                     )
                     
                     # Track overall performance
-                    await monitor.track_phase2_performance(
+                    await monitor.track_retrieval_performance(
                         user_id=user_id,
                         total_time_ms=total_time_ms,
                         classification_time_ms=classification_time_ms,
                         search_time_ms=search_time_ms,
-                        phase2_method_used=True
+                        intelligent_routing_used=True
                     )
                     
                     return results
@@ -4598,13 +4598,13 @@ class VectorMemoryManager:
                     
                     # Track overall performance (estimate fusion overhead ~20% of search time)
                     fusion_time_ms = search_time_ms * 0.2
-                    await monitor.track_phase2_performance(
+                    await monitor.track_retrieval_performance(
                         user_id=user_id,
                         total_time_ms=total_time_ms,
                         classification_time_ms=classification_time_ms,
                         search_time_ms=search_time_ms - fusion_time_ms,
                         fusion_time_ms=fusion_time_ms,
-                        phase2_method_used=True
+                        intelligent_routing_used=True
                     )
                     
                     return results
@@ -4641,13 +4641,13 @@ class VectorMemoryManager:
                     
                     # Track overall performance (estimate fusion overhead ~20% of search time)
                     fusion_time_ms = search_time_ms * 0.2
-                    await monitor.track_phase2_performance(
+                    await monitor.track_retrieval_performance(
                         user_id=user_id,
                         total_time_ms=total_time_ms,
                         classification_time_ms=classification_time_ms,
                         search_time_ms=search_time_ms - fusion_time_ms,
                         fusion_time_ms=fusion_time_ms,
-                        phase2_method_used=True
+                        intelligent_routing_used=True
                     )
                     
                     return results
@@ -4682,12 +4682,12 @@ class VectorMemoryManager:
                     )
                     
                     # Track overall performance
-                    await monitor.track_phase2_performance(
+                    await monitor.track_retrieval_performance(
                         user_id=user_id,
                         total_time_ms=total_time_ms,
                         classification_time_ms=classification_time_ms,
                         search_time_ms=search_time_ms,
-                        phase2_method_used=True
+                        intelligent_routing_used=True
                     )
                     
                     return results
