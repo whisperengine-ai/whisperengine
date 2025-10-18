@@ -3139,7 +3139,20 @@ class MessageProcessor:
             intervention_needed = proactive_engagement_analysis.get('intervention_needed', False)
             engagement_strategy = proactive_engagement_analysis.get('recommended_strategy')
             if intervention_needed and engagement_strategy:
-                guidance_parts.append(f"🎯 ENGAGEMENT: Use {engagement_strategy} strategy to enhance conversation quality")
+                # Translate internal strategy names into clear LLM instructions
+                strategy_guidance_map = {
+                    'curiosity_prompt': 'Ask an open, curious question to spark deeper conversation',
+                    'topic_suggestion': 'Suggest a new topic related to shared interests',
+                    'memory_connection': 'Reference a past conversation naturally to deepen connection',
+                    'emotional_check_in': 'Gently check in on their emotional state with empathy',
+                    'follow_up_question': 'Ask a thoughtful follow-up about the current topic',
+                    'shared_interest': 'Connect around shared interests authentically',
+                    'celebration': 'Celebrate their achievements with genuine enthusiasm',
+                    'support_offer': 'Offer support or encouragement naturally'
+                }
+                strategy_instruction = strategy_guidance_map.get(engagement_strategy, 
+                                                                  'Enhance conversation quality naturally')
+                guidance_parts.append(f"🎯 ENGAGEMENT: {strategy_instruction}")
         
         # Conversation Analysis with Response Guidance
         conversation_analysis = comprehensive_context.get('conversation_analysis')
