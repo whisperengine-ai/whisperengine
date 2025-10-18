@@ -4445,23 +4445,41 @@ class VectorMemoryManager:
         import time
         start_time = time.time()
         
+        # Get Phase 2 monitor for tracking
+        from src.memory.phase2_monitoring import get_phase2_monitor
+        monitor = get_phase2_monitor()
+        
         try:
             # Step 1: Detect temporal queries (highest priority)
+            temporal_start = time.time()
             is_temporal = await self.vector_store._detect_temporal_query_with_qdrant(query, user_id)
+            temporal_time_ms = (time.time() - temporal_start) * 1000
             
             # Step 2: Classify query using QueryClassifier
+            classification_start = time.time()
             if self._query_classifier:
                 category = await self._query_classifier.classify_query(
                     query=query,
                     emotion_data=emotion_data,
                     is_temporal=is_temporal
                 )
+                classification_time_ms = (time.time() - classification_start) * 1000
                 
                 # Get vector strategy for this category
                 strategy = self._query_classifier.get_vector_strategy(category)
                 
                 logger.info("🎯 PHASE 2 ROUTING: query='%s...' → category=%s → strategy=%s",
                            query[:40], category.value, strategy['description'])
+                
+                # Track classification decision
+                await monitor.track_classification(
+                    user_id=user_id,
+                    query=query,
+                    category=category,
+                    emotion_intensity=emotion_data.get('emotional_intensity') if emotion_data else None,
+                    is_temporal=is_temporal,
+                    classification_time_ms=classification_time_ms
+                )
                 
                 # Step 3: Route based on category
                 if category == QueryCategory.TEMPORAL:
@@ -4482,27 +4500,75 @@ class VectorMemoryManager:
                             "query_category": "temporal"
                         })
                     
+                    search_time_ms = (time.time() - start_time) * 1000
                     logger.debug("🎯 TEMPORAL: %d results in %.1fms",
-                               len(formatted_results), (time.time() - start_time) * 1000)
+                               len(formatted_results), search_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="temporal_chronological",
+                        vectors_used=[],  # Temporal doesn't use vectors
+                        memory_count=len(formatted_results),
+                        search_time_ms=search_time_ms - classification_time_ms,
+                        fusion_enabled=False
+                    )
+                    
+                    # Track overall performance
+                    await monitor.track_phase2_performance(
+                        user_id=user_id,
+                        total_time_ms=search_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms - classification_time_ms,
+                        phase2_method_used=True
+                    )
+                    
                     return formatted_results
                 
                 elif category == QueryCategory.FACTUAL:
                     # Single content vector (fast path)
+                    search_start = time.time()
                     results = await self._search_single_vector(
                         vector_name="content",
                         query=query,
                         user_id=user_id,
                         limit=limit
                     )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
                     for r in results:
                         r['query_category'] = 'factual'
                     
+                    total_time_ms = (time.time() - start_time) * 1000
                     logger.debug("🧠 FACTUAL: %d results in %.1fms",
-                               len(results), (time.time() - start_time) * 1000)
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="content_vector",
+                        vectors_used=["content"],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=False
+                    )
+                    
+                    # Track overall performance
+                    await monitor.track_phase2_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms,
+                        phase2_method_used=True
+                    )
+                    
                     return results
                 
                 elif category == QueryCategory.EMOTIONAL:
                     # Multi-vector fusion: content + emotion
+                    search_start = time.time()
                     results = await self._search_multi_vector_fusion(
                         vectors=strategy['vectors'],
                         weights=strategy['weights'],
@@ -4510,15 +4576,42 @@ class VectorMemoryManager:
                         user_id=user_id,
                         limit=limit
                     )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
                     for r in results:
                         r['query_category'] = 'emotional'
                     
+                    total_time_ms = (time.time() - start_time) * 1000
                     logger.debug("🎭 EMOTIONAL: %d results in %.1fms",
-                               len(results), (time.time() - start_time) * 1000)
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="multi_vector_fusion",
+                        vectors_used=strategy['vectors'],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=True
+                    )
+                    
+                    # Track overall performance (estimate fusion overhead ~20% of search time)
+                    fusion_time_ms = search_time_ms * 0.2
+                    await monitor.track_phase2_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms - fusion_time_ms,
+                        fusion_time_ms=fusion_time_ms,
+                        phase2_method_used=True
+                    )
+                    
                     return results
                 
                 elif category == QueryCategory.CONVERSATIONAL:
                     # Multi-vector fusion: content + semantic
+                    search_start = time.time()
                     results = await self._search_multi_vector_fusion(
                         vectors=strategy['vectors'],
                         weights=strategy['weights'],
@@ -4526,26 +4619,77 @@ class VectorMemoryManager:
                         user_id=user_id,
                         limit=limit
                     )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
                     for r in results:
                         r['query_category'] = 'conversational'
                     
+                    total_time_ms = (time.time() - start_time) * 1000
                     logger.debug("💬 CONVERSATIONAL: %d results in %.1fms",
-                               len(results), (time.time() - start_time) * 1000)
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="multi_vector_fusion",
+                        vectors_used=strategy['vectors'],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=True
+                    )
+                    
+                    # Track overall performance (estimate fusion overhead ~20% of search time)
+                    fusion_time_ms = search_time_ms * 0.2
+                    await monitor.track_phase2_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms - fusion_time_ms,
+                        fusion_time_ms=fusion_time_ms,
+                        phase2_method_used=True
+                    )
+                    
                     return results
                 
                 else:  # GENERAL
                     # Single content vector (default)
+                    search_start = time.time()
                     results = await self._search_single_vector(
                         vector_name="content",
                         query=query,
                         user_id=user_id,
                         limit=limit
                     )
+                    search_time_ms = (time.time() - search_start) * 1000
+                    
                     for r in results:
                         r['query_category'] = 'general'
                     
+                    total_time_ms = (time.time() - start_time) * 1000
                     logger.debug("🔍 GENERAL: %d results in %.1fms",
-                               len(results), (time.time() - start_time) * 1000)
+                               len(results), total_time_ms)
+                    
+                    # Track routing decision
+                    await monitor.track_routing(
+                        user_id=user_id,
+                        query_category=category,
+                        search_type="content_vector",
+                        vectors_used=["content"],
+                        memory_count=len(results),
+                        search_time_ms=search_time_ms,
+                        fusion_enabled=False
+                    )
+                    
+                    # Track overall performance
+                    await monitor.track_phase2_performance(
+                        user_id=user_id,
+                        total_time_ms=total_time_ms,
+                        classification_time_ms=classification_time_ms,
+                        search_time_ms=search_time_ms,
+                        phase2_method_used=True
+                    )
+                    
                     return results
             
             else:
