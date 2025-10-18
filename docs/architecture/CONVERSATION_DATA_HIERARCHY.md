@@ -614,6 +614,22 @@ From `ai_components` dictionary:
 
 **Result**: Richer conversation context with full conversation turns visible to character, eliminating redundant vague summaries.
 
+### **Knowledge Graph Entity Type Display**
+
+**Issue Resolved**:
+4. ✅ **Entity Type Context in Facts** - Knowledge graph facts now display entity types for clarity
+
+**Problem**: Facts showed relationships without entity context
+- Example: "owns Luna" without indicating Luna is a pet
+- Characters couldn't understand WHAT entities were when multiple entities shared names
+
+**Solution**: Display entity_type in parentheses for non-person entities
+- Format: `entity_display = f"{entity_name} ({entity_type})"` when entity_type not in ['person', 'unknown', 'general']
+- Maintains concise format while adding critical context
+- Implementation: `message_processor.py` lines 2882-2897
+
+**Result**: Facts now display as "owns Luna (pet)", "owns Minerva (pet)", "works at Google (organization)" providing essential entity context.
+
 ---
 
 ## ⚠️ What's Missing / Issues
@@ -737,29 +753,29 @@ point = {
 
 ---
 
-### **6. Missing: Knowledge Graph Relationship Visualization** 🟢 LOW
+### **6. ✅ Knowledge Graph Relationship Visualization** (COMPLETE)
 
-**Available**:
-- User facts from PostgreSQL knowledge graph
-- Relationship types (likes, dislikes, lives_in, works_at, etc.)
-- Temporal relevance scoring
+**Completed**: October 18, 2025 - Entity type display implemented
 
-**What's Included**: Raw facts list
+**What Was Missing**: Entity context in relationship facts
 ```
-USER CONTEXT:
-- Mark (preferred_name)
-- California (lives_in)
-- Pizza (likes)
+Before: "owns Luna" (no indication Luna is a pet)
+After: "owns Luna (pet)" (clear entity type context)
 ```
 
-**Missing**: Relationship context
-```
-USER CONTEXT & RELATIONSHIPS:
-• Identity: Mark
-• Location: Lives in California (mentioned 5 times over 30 days)
-• Food Preferences: Likes pizza (high confidence), dislikes olives
-• Interests: Machine learning ← works on [Projects] → side projects
-```
+**Solution Implemented**:
+- Display format: `entity_display = f"{entity_name} ({entity_type})"`
+- Applies to non-person entities (excludes 'person', 'unknown', 'general')
+- Implementation: `message_processor.py` lines 2882-2897
+- Commit: 072b2f3
+
+**Result**: Characters now see entity types in facts, providing essential context for understanding relationships.
+
+**Further Enhancement Potential** (DEFERRED):
+- Rich visualization: "Location: Lives in California (mentioned 5 times over 30 days)"
+- Relationship graphs: "Machine learning ← works on [Projects] → side projects"
+- Confidence indicators and temporal patterns
+- Priority: LOW - current implementation sufficient for character understanding
 
 ---
 
