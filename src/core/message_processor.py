@@ -2880,15 +2880,22 @@ class MessageProcessor:
                 if confidence < 0.6 or potentially_outdated:
                     continue
                 
+                # 🔑 FORMAT FIX: Include entity type for context (e.g., "Luna (cat)" instead of just "Luna")
+                # This helps characters understand WHAT the entity is, not just the relationship
+                entity_display = entity_name
+                if entity_type and entity_type.lower() not in ['person', 'unknown', 'general']:
+                    # Show type in parentheses for non-person entities (pets, places, things)
+                    entity_display = f"{entity_name} ({entity_type})"
+                
                 # Categorize facts by type
                 if relationship_type in ['likes', 'loves', 'enjoys', 'prefers']:
-                    preferences.append(f"{relationship_type} {entity_name}")
+                    preferences.append(f"{relationship_type} {entity_display}")
                 elif relationship_type in ['works_at', 'studies_at', 'lives_in']:
-                    background.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                    background.append(f"{relationship_type.replace('_', ' ')} {entity_display}")
                 elif relationship_type in ['owns', 'has', 'knows']:
-                    current_facts.append(f"{relationship_type} {entity_name}")
+                    current_facts.append(f"{relationship_type} {entity_display}")
                 else:
-                    current_facts.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                    current_facts.append(f"{relationship_type.replace('_', ' ')} {entity_display}")
             
             # Dynamic limits based on content length to stay within context limits
             max_total_chars = 300  # Target max characters for facts
