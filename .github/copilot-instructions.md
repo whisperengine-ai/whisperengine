@@ -3,14 +3,78 @@
 ## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a PRODUCTION MULTI-CHARACTER DISCORD PLATFORM** - users actively chat with 10+ AI characters
-- **USE multi-bot.sh SCRIPT**: `./multi-bot.sh bot BOT_NAME` to start, `./multi-bot.sh stop-bot BOT_NAME` to stop
-- **PREFERRED: Start/stop individual bots**: `./multi-bot.sh bot marcus` or `./multi-bot.sh stop-bot marcus` - affects ONLY that bot
-- **RESTART: Use Start/stop command.
 - **DEBUGGING FIRST**: Use log inspection, health checks, and direct Python testing before considering restarts
 - **Code changes**: Test with direct Python validation scripts before restarting live services
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
 - **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
 - **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
+
+## 🛠️ MULTI-BOT.SH SCRIPT COMMANDS (CRITICAL - USE THESE CORRECTLY!)
+
+### **Infrastructure Commands**
+```bash
+./multi-bot.sh infra          # Start infrastructure ONLY (postgres, qdrant, influxdb, grafana, enrichment-worker)
+./multi-bot.sh up             # Start ALL services (infra + all bots)
+./multi-bot.sh start          # Same as 'up'
+./multi-bot.sh down           # Stop ALL services (WARNING: stops everything!)
+./multi-bot.sh stop           # Same as 'down' (WARNING: stops everything!)
+./multi-bot.sh restart        # Restart ALL services
+./multi-bot.sh clean          # Stop and REMOVE all containers, networks, volumes
+```
+
+### **Bot Management Commands**
+```bash
+./multi-bot.sh bot BOT_NAME       # Start SPECIFIC bot (elena, marcus, jake, etc.)
+./multi-bot.sh stop-bot BOT_NAME  # Stop SPECIFIC bot (safe - only affects one bot)
+./multi-bot.sh bots               # List all available bots
+./multi-bot.sh status             # Show status of all services
+```
+
+### **Service-Specific Commands**
+```bash
+./multi-bot.sh logs [SERVICE]     # Show logs (all or specific service)
+./multi-bot.sh health             # Check health of all services
+```
+
+### **Development Commands**
+```bash
+./multi-bot.sh dev                # Start dev stack (infra + CDL web UI)
+./multi-bot.sh db                 # Connect to PostgreSQL database
+```
+
+### **Docker Direct Commands (when multi-bot.sh doesn't have what you need)**
+```bash
+# Restart specific service (enrichment-worker, postgres, qdrant, etc.)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart enrichment-worker
+
+# Rebuild and restart specific service
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d --no-deps --build enrichment-worker
+
+# Stop specific service (NOT a bot - for infrastructure services)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop enrichment-worker
+
+# View logs for specific service
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f enrichment-worker
+```
+
+### **⚠️ COMMON MISTAKES TO AVOID**
+- ❌ **NEVER use**: `./multi-bot.sh stop enrichment-worker` (stop doesn't take parameters!)
+- ❌ **NEVER use**: `./multi-bot.sh restart BOT_NAME` (restart doesn't take parameters!)
+- ✅ **CORRECT**: Use `docker compose ... restart SERVICE_NAME` for infrastructure services
+- ✅ **CORRECT**: Use `./multi-bot.sh stop-bot BOT_NAME` for character bots
+- ✅ **CORRECT**: Use `./multi-bot.sh bot BOT_NAME` to start character bots
+
+### **Available Character Bots**
+- `elena` - Marine Biologist (Port 9091)
+- `marcus` - AI Researcher (Port 9092)
+- `jake` - Adventure Photographer (Port 9097)
+- `ryan` - Indie Game Developer (Port 9093)
+- `gabriel` - British Gentleman (Port 9095)
+- `sophia` - Marketing Executive (Port 9096)
+- `dream` - Mythological Entity (Port 9094)
+- `dotty` - Character Bot (Port 9098)
+- `aetheris` - Conscious AI (Port 9099)
+- `aethys` - Omnipotent Entity (Port 3007)
 
 ## 🚨 CRITICAL DEVELOPMENT SERVER MANAGEMENT
 - **NEVER INTERRUPT DEVELOPMENT SERVERS**: When running `npm run dev`, `npm start`, or similar development servers, ALWAYS use `isBackground=true` and LET THEM RUN
