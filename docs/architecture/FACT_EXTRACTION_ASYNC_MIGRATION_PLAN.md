@@ -2,11 +2,21 @@
 
 ## 🎯 CRITICAL DISCOVERY
 
-**User insight confirmed**: Fact extraction happens **AFTER response generation** (Phase 9b, line 817), meaning:
+**User insight #1**: Fact extraction happens **AFTER response generation** (Phase 9b, line 817), meaning:
 - Facts extracted from current message don't affect current response
 - Facts are used for FUTURE conversations only
 - Message is already stored in Qdrant/PostgreSQL before extraction
 - **Perfect candidate for async enrichment worker!**
+
+**User insight #2 (GAME CHANGER)**: Enrichment worker can extract facts from **ENTIRE CONVERSATION WINDOWS**, not just individual messages:
+- **Current inline**: Extracts from single user message only
+- **Enrichment worker**: Can analyze 5-10 message exchanges as context
+- **Better accuracy**: Understands context and confirmation patterns
+- **Richer facts**: "User mentioned they love pizza in 3 different conversations" vs "User mentioned pizza once"
+- **Temporal patterns**: "User started liking hiking after moving to Colorado"
+- **Relationship evolution**: Facts emerge from conversation flow, not isolated statements
+
+**This makes async fact extraction SUPERIOR, not just faster!** 🚀
 
 ---
 
@@ -53,6 +63,8 @@ return ProcessingResult(response=response, ...)
 
 ## ✅ WHY ASYNC MIGRATION MAKES SENSE
 
+## ✅ WHY ASYNC MIGRATION MAKES SENSE
+
 ### Facts Are Already in Memory
 - ✅ Message stored in Qdrant (Phase 9)
 - ✅ User message content available in `content` field
@@ -68,8 +80,132 @@ return ProcessingResult(response=response, ...)
 ### Performance Benefits
 - 🚀 **Remove 200-500ms** from critical response path
 - 🚀 **Faster user responses** (no LLM fact extraction blocking)
-- 🚀 **Same result** - facts still extracted, just async
+- 🚀 **Same PostgreSQL tables** - zero breaking changes to fact retrieval
 - 🚀 **Better scalability** - enrichment worker handles burst loads
+
+### 🎯 CONVERSATION-LEVEL EXTRACTION (SUPERIOR QUALITY!)
+
+**Current inline extraction**: Analyzes single user message in isolation
+```
+User: "I love pizza"
+Bot: "That's great! What kind of pizza do you like?"
+User: "Pepperoni is my favorite"
+
+Inline extraction sees:
+- Message 1: "loves pizza" ← Extracted
+- Message 3: "favorite pepperoni" ← Extracted separately
+Result: 2 disconnected facts
+```
+
+**Enrichment worker**: Analyzes conversation window as context
+```
+User: "I love pizza"
+Bot: "That's great! What kind of pizza do you like?"
+User: "Pepperoni is my favorite"
+Bot: "Nice! Do you make it at home or get delivery?"
+User: "I actually make my own dough from scratch"
+
+Enrichment extraction sees WHOLE conversation:
+- "User loves pizza, specifically pepperoni"
+- "User makes homemade pizza with scratch dough"
+- "User has cooking skills (baking)"
+- Confidence: 0.95 (confirmed across 3 messages)
+Result: Rich, contextual facts with higher confidence
+```
+
+**Why This Is Better**:
+- ✅ **Context awareness**: Understands follow-up clarifications
+- ✅ **Confirmation patterns**: "loves pizza" + "pepperoni favorite" = higher confidence
+- ✅ **Temporal understanding**: Can track fact evolution over time
+- ✅ **Relationship detection**: Links related facts (pizza → cooking → baking skills)
+- ✅ **Deduplication**: Avoids extracting "loves pizza" from every pizza mention
+- ✅ **Quality over speed**: Can use better models (Claude vs GPT-3.5-turbo)
+
+**Example: Advanced Fact Extraction from Conversation Window**
+```python
+async def _extract_facts_from_conversation_window(
+    self,
+    messages: List[Dict],  # 5-10 message window
+    user_id: str,
+    bot_name: str
+) -> List[Dict]:
+    """
+    Extract facts from entire conversation window for context-aware extraction
+    
+    This is SUPERIOR to single-message extraction because:
+    - Sees confirmation patterns across messages
+    - Understands context and clarifications
+    - Links related facts together
+    - Higher confidence scores from repeated mentions
+    """
+    
+    # Build conversation context from window
+    conversation_text = self._format_conversation_window(messages)
+    
+    extraction_prompt = f"""Analyze this conversation and extract clear, confirmed personal facts about the user.
+
+Conversation:
+{conversation_text}
+
+Instructions:
+- Look for facts CONFIRMED across multiple messages (higher confidence)
+- Link related facts together (e.g., "loves pizza" + "makes dough" = "cooking skills")
+- Note temporal patterns (e.g., preferences that emerged recently)
+- Extract preferences, skills, possessions, relationships, goals
+- Higher confidence for facts mentioned multiple times
+
+Return JSON:
+{{
+    "facts": [
+        {{
+            "entity_name": "pizza",
+            "entity_type": "food",
+            "relationship_type": "loves",
+            "confidence": 0.95,
+            "confirmation_count": 3,
+            "related_facts": ["makes homemade pizza", "baking skills"],
+            "temporal_context": "long-term preference, mentioned across conversations",
+            "reasoning": "User mentioned loving pizza, specified pepperoni, and revealed making own dough - high confidence"
+        }}
+    ]
+}}
+"""
+    
+    # Use better model for enrichment (not time-critical)
+    result = await self._call_llm(
+        prompt=extraction_prompt,
+        model="anthropic/claude-3.5-sonnet",  # Better quality
+        max_tokens=1000
+    )
+    
+    return self._parse_fact_extraction_result(result)
+```
+
+**Real-World Example**:
+
+Inline extraction (current):
+```
+Message 1: "I love hiking" → Fact: loves hiking (confidence: 0.7)
+Message 2: "I go every weekend" → Fact: goes every weekend (confidence: 0.6)
+Message 3: "I moved to Colorado for the mountains" → Fact: lives in Colorado (confidence: 0.8)
+```
+
+Conversation-level extraction (enrichment):
+```
+Conversation window (3 messages):
+→ Fact: "loves hiking" (confidence: 0.95, confirmed 2x)
+→ Fact: "hikes weekly" (confidence: 0.9, regular activity)
+→ Fact: "lives in Colorado" (confidence: 0.95)
+→ Fact: "outdoor lifestyle" (confidence: 0.85, inferred from pattern)
+→ Relationship: hiking ← motivated move to Colorado (temporal link)
+```
+
+**Quality Improvements**:
+- **Higher confidence** from multi-message confirmation
+- **Richer context** from conversation flow
+- **Temporal relationships** between facts
+- **Better deduplication** - avoids duplicate facts from related mentions
+- **Smarter inference** - can infer meta-facts from patterns
 
 ---
 
@@ -357,6 +493,14 @@ docker logs whisperengine-jake-bot 2>&1 | grep "processing_time_ms"
 - **Better user experience** - instant responses
 - **Reduced critical path latency** - only essential work in response flow
 
+### Quality Improvements (THE BIG WIN!)
+- **🎯 Conversation-level context** - analyzes 5-10 message windows instead of single messages
+- **🎯 Higher confidence scores** - confirmation patterns across messages
+- **🎯 Richer facts** - temporal relationships and fact evolution
+- **🎯 Better deduplication** - avoids extracting same fact from every mention
+- **🎯 Smarter inference** - can infer meta-facts from conversation patterns
+- **🎯 Better models** - can use Claude 3.5 Sonnet instead of GPT-3.5-turbo (not time-critical)
+
 ### Scalability Benefits
 - **Enrichment worker handles bursts** - no user-facing impact
 - **Better resource utilization** - fact extraction runs when system is idle
@@ -366,6 +510,7 @@ docker logs whisperengine-jake-bot 2>&1 | grep "processing_time_ms"
 - **Cleaner separation** - response generation vs. data enrichment
 - **More resilient** - fact extraction failures don't block responses
 - **Better monitoring** - track enrichment worker metrics separately
+- **Same PostgreSQL schema** - zero breaking changes to fact retrieval
 
 ---
 
@@ -484,13 +629,34 @@ ORDER BY message_count DESC;
 
 ---
 
-## 🚨 CRITICAL INSIGHT
+## 🚨 CRITICAL INSIGHTS
 
-**The user is 100% correct**: Fact extraction runs **after** response generation (Phase 9b), meaning:
+**User Discovery #1**: Fact extraction runs **after** response generation (Phase 9b), meaning:
 - ✅ Facts don't affect current response
 - ✅ Message is already in Qdrant
 - ✅ Perfect candidate for async enrichment
 - ✅ Can safely move to background worker
 - ✅ Will improve response time by 200-500ms
 
-**This is a no-brainer optimization!** 🎯
+**User Discovery #2 (GAME CHANGER)**: Enrichment worker can analyze **ENTIRE CONVERSATION WINDOWS**, not just single messages:
+- ✅ **Higher quality facts** - confirmation patterns across messages
+- ✅ **Better context** - understands conversation flow
+- ✅ **Temporal relationships** - tracks fact evolution
+- ✅ **Smarter inference** - derives meta-facts from patterns
+- ✅ **Better models** - can use Claude 3.5 Sonnet (not time-critical)
+
+**User Confirmation**: "As long as enrichment populates existing facts tables in PostgreSQL, we're good"
+- ✅ **Same PostgreSQL schema** - zero breaking changes
+- ✅ **Same tables**: `user_facts`, `user_fact_relationships`
+- ✅ **Same retrieval**: `_get_user_facts_from_postgres()` works unchanged
+- ✅ **Seamless migration** - bots don't know the difference
+
+**This is not just an optimization - it's a QUALITY IMPROVEMENT!** 🎯
+
+The enrichment worker will produce:
+1. **Faster responses** (200-500ms improvement)
+2. **Better facts** (conversation-level context)
+3. **Higher confidence** (multi-message confirmation)
+4. **Richer relationships** (temporal and semantic links)
+
+**This is a no-brainer - all upside, zero downside!** 🚀
