@@ -188,6 +188,51 @@ services:
     # This service is only used for building the shared image
     # It doesn't run as a container - just builds the image
 
+  # ===== BACKGROUND ENRICHMENT WORKER =====
+  enrichment-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.enrichment-worker
+    container_name: whisperengine_enrichment_worker
+    restart: unless-stopped
+    environment:
+      # Qdrant connection
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      
+      # PostgreSQL connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=whisperengine
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      
+      # Enrichment configuration
+      - ENRICHMENT_INTERVAL_SECONDS=${ENRICHMENT_INTERVAL_SECONDS:-300}
+      - ENRICHMENT_BATCH_SIZE=${ENRICHMENT_BATCH_SIZE:-50}
+      - MIN_MESSAGES_FOR_SUMMARY=${MIN_MESSAGES_FOR_SUMMARY:-5}
+      - TIME_WINDOW_HOURS=${TIME_WINDOW_HOURS:-24}
+      - LOOKBACK_DAYS=${LOOKBACK_DAYS:-30}
+      
+      # LLM configuration
+      - LLM_MODEL=${ENRICHMENT_LLM_MODEL:-anthropic/claude-3.5-sonnet}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - bot_network
+    volumes:
+      - ./logs/enrichment:/app/logs/enrichment
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep 'src.enrichment.worker' | grep -v grep || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
   # ===== BOT SERVICES (populated dynamically) =====
   # BOT_SERVICES_PLACEHOLDER
 

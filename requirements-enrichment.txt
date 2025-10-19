@@ -1,0 +1,13 @@
+# WhisperEngine Enrichment Worker Requirements
+# Minimal dependencies for background enrichment processing
+
+# Core dependencies
+qdrant-client>=1.7.0
+asyncpg>=0.29.0
+
+# LLM client dependencies (OpenRouter)
+openai>=1.0.0
+httpx>=0.24.0
+
+# Logging and utilities
+python-dotenv>=1.0.0
