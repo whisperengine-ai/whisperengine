@@ -1150,6 +1150,11 @@ class EnrichmentWorker:
         
         Checks universal_users.preferences JSONB for extraction timestamps.
         Falls back to 30 days ago if no preferences exist.
+        
+        INCREMENTAL APPROACH (matches fact extraction pattern):
+        - Tracks last extraction via preference updated_at timestamps
+        - Only processes NEW messages since last extraction
+        - Avoids wasteful re-processing of old conversations
         """
         async with self.db_pool.acquire() as conn:
             # Check if user has any preferences with extraction timestamp
@@ -1167,9 +1172,17 @@ class EnrichmentWorker:
                 for pref_type, pref_data in prefs.items():
                     if isinstance(pref_data, dict) and 'updated_at' in pref_data:
                         try:
-                            ts = datetime.fromisoformat(pref_data['updated_at'].replace('Z', '+00:00'))
-                            timestamps.append(ts)
-                        except (ValueError, AttributeError):
+                            # Parse ISO timestamp (handles both with/without timezone)
+                            ts_str = pref_data['updated_at']
+                            if isinstance(ts_str, str):
+                                # Remove 'Z' and add UTC timezone if needed
+                                ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                                # Convert to naive UTC datetime for consistency with Qdrant queries
+                                if ts.tzinfo is not None:
+                                    ts = ts.replace(tzinfo=None)
+                                timestamps.append(ts)
+                        except (ValueError, AttributeError) as e:
+                            logger.warning("Failed to parse timestamp for preference %s: %s", pref_type, e)
                             continue
                 
                 if timestamps:
