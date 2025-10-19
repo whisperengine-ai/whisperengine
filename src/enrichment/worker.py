@@ -618,91 +618,238 @@ class EnrichmentWorker:
         bot_name: str
     ) -> int:
         """
-        Store extracted facts in PostgreSQL (SAME tables as inline extraction).
+        Store extracted facts in PostgreSQL using SAME schema as inline extraction.
         
-        This ensures zero breaking changes - bots use _get_user_facts_from_postgres()
-        unchanged and see facts from both inline AND enrichment extraction.
+        Uses fact_entities and user_fact_relationships tables (matches semantic_router.py).
+        This ensures bots see facts from BOTH inline AND enrichment extraction.
+        
+        Storage logic matches store_user_fact() in semantic_router.py:
+        1. Auto-create user in universal_users
+        2. Insert/update fact_entities
+        3. Check for opposing relationship conflicts
+        4. Insert/update user_fact_relationships
+        5. Auto-discover similar entities
         """
         stored_count = 0
         
         async with self.db_pool.acquire() as conn:
-            for fact in facts:
-                try:
-                    # Build metadata JSON
-                    metadata = {
-                        'confirmation_count': fact.confirmation_count,
-                        'related_facts': fact.related_facts,
-                        'temporal_context': fact.temporal_context,
-                        'reasoning': fact.reasoning,
-                        'source_messages': fact.source_messages,
-                        'extraction_method': 'enrichment_worker',  # Differentiate from inline
-                        'extracted_at': datetime.utcnow().isoformat()
-                    }
-                    
-                    # Insert or update fact
-                    await conn.execute(
-                        """
-                        INSERT INTO user_facts (
-                            user_id, bot_name, entity_name, entity_type,
-                            relationship_type, confidence, metadata, created_at, updated_at
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-                        ON CONFLICT (user_id, bot_name, entity_name, relationship_type)
-                        DO UPDATE SET
-                            confidence = GREATEST(user_facts.confidence, EXCLUDED.confidence),
-                            metadata = EXCLUDED.metadata,
-                            updated_at = NOW()
-                        """,
-                        user_id,
-                        bot_name,
-                        fact.entity_name,
-                        fact.entity_type,
-                        fact.relationship_type,
-                        fact.confidence,
-                        json.dumps(metadata)
-                    )
-                    
-                    stored_count += 1
-                    
-                except Exception as e:
-                    logger.error("Failed to store fact %s: %s", fact.entity_name, e)
-                    continue
-            
-            # Store knowledge graph relationships
-            for relationship in relationships:
-                try:
-                    source_fact = relationship.get('source_fact')
-                    target_fact = relationship.get('target_fact')
-                    
-                    if not source_fact or not target_fact:
+            async with conn.transaction():
+                # Auto-create user in universal_users (FK requirement)
+                await conn.execute("""
+                    INSERT INTO universal_users 
+                    (universal_id, primary_username, display_name, created_at, last_active)
+                    VALUES ($1, $2, $3, NOW(), NOW())
+                    ON CONFLICT (universal_id) DO UPDATE SET last_active = NOW()
+                """, user_id, f"user_{user_id[-8:]}", f"User {user_id[-6:]}")
+                
+                for fact in facts:
+                    try:
+                        # Build attributes JSONB
+                        attributes = {
+                            'confirmation_count': fact.confirmation_count,
+                            'related_facts': fact.related_facts,
+                            'temporal_context': fact.temporal_context,
+                            'reasoning': fact.reasoning,
+                            'source_messages': fact.source_messages,
+                            'extraction_method': 'enrichment_worker',
+                            'extracted_at': datetime.utcnow().isoformat()
+                        }
+                        
+                        # Insert or update entity in fact_entities
+                        entity_id = await conn.fetchval("""
+                            INSERT INTO fact_entities (entity_type, entity_name, attributes)
+                            VALUES ($1, $2, $3)
+                            ON CONFLICT (entity_type, entity_name) 
+                            DO UPDATE SET 
+                                attributes = fact_entities.attributes || COALESCE($3, '{}'::jsonb),
+                                updated_at = NOW()
+                            RETURNING id
+                        """, fact.entity_type, fact.entity_name, json.dumps(attributes))
+                        
+                        # Check for opposing relationship conflicts (matches semantic_router.py)
+                        conflict_result = await self._detect_opposing_relationships_inline_style(
+                            conn, user_id, entity_id, fact.relationship_type, fact.confidence
+                        )
+                        
+                        if conflict_result == 'keep_existing':
+                            # Don't store - stronger opposing relationship exists
+                            logger.info(
+                                f"🚫 CONFLICT: Skipped storing '{fact.relationship_type}' for {fact.entity_name} - "
+                                f"stronger opposing relationship exists"
+                            )
+                            continue
+                        
+                        # Insert or update user-fact relationship
+                        await conn.execute("""
+                            INSERT INTO user_fact_relationships 
+                            (user_id, entity_id, relationship_type, confidence, emotional_context, 
+                             mentioned_by_character, source_conversation_id)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                            ON CONFLICT (user_id, entity_id, relationship_type)
+                            DO UPDATE SET
+                                confidence = GREATEST(user_fact_relationships.confidence, $4),
+                                mentioned_by_character = COALESCE($6, user_fact_relationships.mentioned_by_character),
+                                updated_at = NOW()
+                        """, user_id, entity_id, fact.relationship_type, fact.confidence,
+                             'neutral',  # Emotional context from conversation analysis
+                             bot_name, 
+                             None)  # No source_conversation_id for enrichment
+                        
+                        stored_count += 1
+                        logger.info(
+                            f"✅ ENRICHMENT FACT: Stored '{fact.entity_name}' "
+                            f"({fact.entity_type}, {fact.relationship_type}, confidence={fact.confidence:.2f})"
+                        )
+                        
+                        # Auto-discover similar entities (matches semantic_router.py)
+                        similar_entities = await conn.fetch("""
+                            SELECT id, entity_name, 
+                                   similarity(entity_name, $1) as sim_score
+                            FROM fact_entities
+                            WHERE entity_type = $2
+                              AND id != $3
+                              AND similarity(entity_name, $1) > 0.3
+                            ORDER BY sim_score DESC
+                            LIMIT 5
+                        """, fact.entity_name, fact.entity_type, entity_id)
+                        
+                        # Create entity relationships for similar entities
+                        for similar in similar_entities:
+                            await conn.execute("""
+                                INSERT INTO entity_relationships 
+                                (from_entity_id, to_entity_id, relationship_type, weight)
+                                VALUES ($1, $2, 'similar_to', $3)
+                                ON CONFLICT (from_entity_id, to_entity_id, relationship_type) 
+                                DO UPDATE SET weight = GREATEST(entity_relationships.weight, $3)
+                            """, entity_id, similar["id"], min(float(similar["sim_score"]), 0.9))
+                        
+                    except Exception as e:
+                        logger.error("Failed to store fact %s: %s", fact.entity_name, e)
                         continue
-                    
-                    # Store in user_fact_relationships table
-                    await conn.execute(
-                        """
-                        INSERT INTO user_fact_relationships (
-                            user_id, bot_name, source_entity, target_entity,
-                            relationship_type, confidence, metadata, created_at
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                        ON CONFLICT (user_id, bot_name, source_entity, target_entity, relationship_type)
-                        DO UPDATE SET
-                            confidence = GREATEST(user_fact_relationships.confidence, EXCLUDED.confidence),
-                            updated_at = NOW()
-                        """,
-                        user_id,
-                        bot_name,
-                        source_fact.entity_name,
-                        target_fact.entity_name,
-                        relationship['relationship_type'],
-                        relationship['confidence'],
-                        json.dumps({
-                            'reasoning': relationship.get('reasoning'),
-                            'extraction_method': 'enrichment_worker'
-                        })
-                    )
-                    
-                except Exception as e:
-                    logger.error("Failed to store relationship: %s", e)
-                    continue
+                
+                # Store knowledge graph relationships (from fact extraction intelligence)
+                for relationship in relationships:
+                    try:
+                        source_fact = relationship.get('source_fact')
+                        target_fact = relationship.get('target_fact')
+                        
+                        if not source_fact or not target_fact:
+                            continue
+                        
+                        # Get entity IDs for both facts
+                        source_entity_id = await conn.fetchval("""
+                            SELECT id FROM fact_entities 
+                            WHERE entity_type = $1 AND entity_name = $2
+                        """, source_fact.entity_type, source_fact.entity_name)
+                        
+                        target_entity_id = await conn.fetchval("""
+                            SELECT id FROM fact_entities 
+                            WHERE entity_type = $1 AND entity_name = $2
+                        """, target_fact.entity_type, target_fact.entity_name)
+                        
+                        if not source_entity_id or not target_entity_id:
+                            continue
+                        
+                        # Store in entity_relationships table
+                        await conn.execute("""
+                            INSERT INTO entity_relationships 
+                            (from_entity_id, to_entity_id, relationship_type, weight, context_metadata)
+                            VALUES ($1, $2, $3, $4, $5)
+                            ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
+                            DO UPDATE SET 
+                                weight = GREATEST(entity_relationships.weight, $4),
+                                updated_at = NOW()
+                        """, source_entity_id, target_entity_id, 
+                             relationship['relationship_type'], 
+                             relationship['confidence'],
+                             json.dumps({
+                                'reasoning': relationship.get('reasoning'),
+                                'extraction_method': 'enrichment_worker'
+                             }))
+                        
+                    except Exception as e:
+                        logger.error("Failed to store relationship: %s", e)
+                        continue
+        
+        return stored_count
+    
+    async def _detect_opposing_relationships_inline_style(
+        self,
+        conn,
+        user_id: str,
+        entity_id: int,
+        new_relationship: str,
+        new_confidence: float
+    ) -> Optional[str]:
+        """
+        Detect opposing relationships (matches semantic_router.py logic).
+        
+        Returns:
+            'keep_existing', 'resolved', or None if no conflicts
+        """
+        # Opposing relationships mapping (from fact_extraction_engine.py)
+        opposing_relationships = {
+            'likes': ['dislikes', 'hates', 'avoids'],
+            'loves': ['dislikes', 'hates', 'avoids'],
+            'enjoys': ['dislikes', 'hates', 'avoids'],
+            'prefers': ['dislikes', 'avoids', 'rejects'],
+            'wants': ['rejects', 'avoids', 'dislikes'],
+            'needs': ['rejects', 'avoids'],
+            'supports': ['opposes', 'rejects'],
+            'trusts': ['distrusts', 'suspects'],
+            'believes': ['doubts', 'rejects'],
+            # Reverse mappings
+            'dislikes': ['likes', 'loves', 'enjoys', 'prefers', 'wants'],
+            'hates': ['likes', 'loves', 'enjoys'],
+            'avoids': ['likes', 'loves', 'enjoys', 'prefers', 'wants', 'needs'],
+            'rejects': ['wants', 'needs', 'prefers', 'supports', 'believes'],
+            'opposes': ['supports'],
+            'distrusts': ['trusts'],
+            'doubts': ['believes'],
+            'suspects': ['trusts']
+        }
+        
+        if new_relationship not in opposing_relationships:
+            return None
+        
+        # Check for existing opposing relationships
+        opposing_types = opposing_relationships[new_relationship]
+        conflicts = await conn.fetch("""
+            SELECT relationship_type, confidence, updated_at, mentioned_by_character
+            FROM user_fact_relationships 
+            WHERE user_id = $1 AND entity_id = $2 
+            AND relationship_type = ANY($3)
+            ORDER BY confidence DESC, updated_at DESC
+        """, user_id, entity_id, opposing_types)
+        
+        if not conflicts:
+            return None
+        
+        for conflict in conflicts:
+            conflict_confidence = float(conflict['confidence'])
+            
+            if conflict_confidence > new_confidence:
+                # Keep stronger existing opposing relationship
+                logger.info(
+                    f"⚠️ CONFLICT DETECTED: Keeping stronger existing '{conflict['relationship_type']}' "
+                    f"(confidence: {conflict_confidence:.2f}) over new '{new_relationship}' "
+                    f"(confidence: {new_confidence:.2f})"
+                )
+                return 'keep_existing'
+            else:
+                # Replace weaker opposing relationship with stronger new one
+                await conn.execute("""
+                    DELETE FROM user_fact_relationships 
+                    WHERE user_id = $1 AND entity_id = $2 AND relationship_type = $3
+                """, user_id, entity_id, conflict['relationship_type'])
+                
+                logger.info(
+                    f"🔄 CONFLICT RESOLVED: Replaced weaker '{conflict['relationship_type']}' "
+                    f"(confidence: {conflict_confidence:.2f}) with stronger '{new_relationship}' "
+                    f"(confidence: {new_confidence:.2f})"
+                )
+        
+        return 'resolved'
         
         return stored_count
 

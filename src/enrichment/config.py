@@ -37,7 +37,8 @@ class EnrichmentConfig:
     ENRICHMENT_BATCH_SIZE: int = int(os.getenv("ENRICHMENT_BATCH_SIZE", "50"))
     
     # LLM configuration
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "anthropic/claude-3.5-sonnet")
+    # Claude Sonnet 4.5 for superior quality (now available!)
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "anthropic/claude-sonnet-4.5")
     # Support both OPENROUTER_API_KEY and LLM_CHAT_API_KEY (for compatibility)
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY") or os.getenv("LLM_CHAT_API_KEY", "")
     

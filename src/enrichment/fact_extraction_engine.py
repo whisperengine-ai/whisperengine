@@ -69,16 +69,38 @@ class FactExtractionEngine:
     - Tracks temporal fact evolution
     """
     
-    def __init__(self, llm_client, model: str = "anthropic/claude-3.5-sonnet"):
+    def __init__(self, llm_client, model: str = "anthropic/claude-sonnet-4.5"):
         """
         Initialize fact extraction engine
         
         Args:
             llm_client: LLM client for fact extraction
-            model: Model to use (default: Claude 3.5 Sonnet for quality)
+            model: Model to use (default: Claude Sonnet 4.5 for superior quality)
         """
         self.llm_client = llm_client
         self.model = model
+        
+        # Opposing relationships mapping (from semantic_router.py)
+        self.opposing_relationships = {
+            'likes': ['dislikes', 'hates', 'avoids'],
+            'loves': ['dislikes', 'hates', 'avoids'],
+            'enjoys': ['dislikes', 'hates', 'avoids'],
+            'prefers': ['dislikes', 'avoids', 'rejects'],
+            'wants': ['rejects', 'avoids', 'dislikes'],
+            'needs': ['rejects', 'avoids'],
+            'supports': ['opposes', 'rejects'],
+            'trusts': ['distrusts', 'suspects'],
+            'believes': ['doubts', 'rejects'],
+            # Reverse mappings
+            'dislikes': ['likes', 'loves', 'enjoys', 'prefers', 'wants'],
+            'hates': ['likes', 'loves', 'enjoys'],
+            'avoids': ['likes', 'loves', 'enjoys', 'prefers', 'wants', 'needs'],
+            'rejects': ['wants', 'needs', 'prefers', 'supports', 'believes'],
+            'opposes': ['supports'],
+            'distrusts': ['trusts'],
+            'doubts': ['believes'],
+            'suspects': ['trusts']
+        }
         
     async def extract_facts_from_conversation_window(
         self,
@@ -449,37 +471,62 @@ Valid relationship_types:
         new_fact: ExtractedFact,
         existing_fact: Dict
     ) -> Optional[FactConflict]:
-        """Analyze if two facts conflict"""
-        # Direct contradiction: opposite relationships
-        opposite_relationships = {
-            'likes': 'dislikes',
-            'loves': 'hates',
-            'owns': 'sold',
-            'has': 'lost'
-        }
+        """
+        Analyze if two facts conflict (matches semantic_router.py logic)
         
+        Follows same conflict detection rules as inline extraction:
+        - Direct contradictions: opposing relationships (likes vs dislikes)
+        - Confidence-based resolution: Keep stronger confidence
+        - Temporal awareness: Recent facts can override older ones
+        """
+        # Get relationship types
         new_rel = new_fact.relationship_type
         existing_rel = existing_fact.get('relationship_type', '')
         
-        if opposite_relationships.get(new_rel) == existing_rel or \
-           opposite_relationships.get(existing_rel) == new_rel:
-            return FactConflict(
-                fact1=new_fact,
-                fact2=existing_fact,
-                conflict_type="direct_contradiction",
-                resolution="keep_recent",
-                reasoning=f"Direct contradiction: {new_rel} vs {existing_rel} - keeping more recent"
-            )
+        # Check if these relationships oppose each other
+        if new_rel in self.opposing_relationships:
+            opposing_types = self.opposing_relationships[new_rel]
+            
+            if existing_rel in opposing_types:
+                # Direct opposition detected!
+                new_conf = new_fact.confidence
+                existing_conf = existing_fact.get('confidence', 0.5)
+                
+                if existing_conf > new_conf:
+                    # Keep stronger existing opposing relationship
+                    return FactConflict(
+                        fact1=new_fact,
+                        fact2=existing_fact,
+                        conflict_type="direct_contradiction",
+                        resolution="keep_existing",
+                        reasoning=f"Existing '{existing_rel}' (confidence: {existing_conf:.2f}) is stronger than new '{new_rel}' (confidence: {new_conf:.2f})"
+                    )
+                else:
+                    # Replace weaker opposing relationship
+                    return FactConflict(
+                        fact1=new_fact,
+                        fact2=existing_fact,
+                        conflict_type="direct_contradiction",
+                        resolution="keep_recent",
+                        reasoning=f"New '{new_rel}' (confidence: {new_conf:.2f}) is stronger than existing '{existing_rel}' (confidence: {existing_conf:.2f})"
+                    )
         
-        # Temporal conflict: Same relationship but might be outdated
-        if new_rel == existing_rel and new_fact.temporal_context == "recent":
-            return FactConflict(
-                fact1=new_fact,
-                fact2=existing_fact,
-                conflict_type="preference_change",
-                resolution="keep_recent",
-                reasoning="Preference may have evolved - keeping recent fact"
-            )
+        # Check for temporal conflicts (same relationship but might be outdated)
+        if new_rel == existing_rel:
+            # For temporal facts (location, ownership, etc.), prefer recent
+            temporal_relationship_types = [
+                'works_at', 'lives_in', 'studies_at', 'owns', 'has',
+                'dating', 'in_relationship_with', 'feels', 'currently_feeling'
+            ]
+            
+            if new_rel in temporal_relationship_types and new_fact.temporal_context == "recent":
+                return FactConflict(
+                    fact1=new_fact,
+                    fact2=existing_fact,
+                    conflict_type="temporal_conflict",
+                    resolution="keep_recent",
+                    reasoning=f"Temporal fact '{new_rel}' updated - keeping recent version"
+                )
         
         return None
     
