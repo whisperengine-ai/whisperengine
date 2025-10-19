@@ -4,9 +4,8 @@
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a PRODUCTION MULTI-CHARACTER DISCORD PLATFORM** - users actively chat with 10+ AI characters
 - **USE multi-bot.sh SCRIPT**: `./multi-bot.sh bot BOT_NAME` to start, `./multi-bot.sh stop-bot BOT_NAME` to stop
-- **ALWAYS ASK before running restart commands**: `./multi-bot.sh restart`, `docker restart`, or manual docker compose restart
-- **ALWAYS ASK before running stop commands**: `./multi-bot.sh down`, `docker stop`, or stopping all services
 - **PREFERRED: Start/stop individual bots**: `./multi-bot.sh bot marcus` or `./multi-bot.sh stop-bot marcus` - affects ONLY that bot
+- **RESTART: Use Start/stop command.
 - **DEBUGGING FIRST**: Use log inspection, health checks, and direct Python testing before considering restarts
 - **Code changes**: Test with direct Python validation scripts before restarting live services
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"

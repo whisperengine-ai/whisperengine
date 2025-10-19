@@ -167,3 +167,179 @@
     - "search|meaning|seek"
     - "digital|realm"
   min_expected_matches: 2
+
+# ==================== SOPHIA BLAKE MEMORY TESTS ====================
+
+- test_id: sophia_basic_storage
+  test_name: Basic Memory Storage & Retrieval
+  bot_name: sophia
+  category: Memory Storage
+  conversation_sequence:
+    - "My company is launching a new product in Q3"
+    - "Our target demographic is millennials in urban markets"
+  validation_query: "What do you remember about my company?"
+  expected_memory_indicators:
+    - "product|launch|Q3"
+    - "millennial|urban|market|demographic"
+  min_expected_matches: 2
+
+- test_id: sophia_client_context
+  test_name: Client Context Memory
+  bot_name: sophia
+  category: Conversation Continuity
+  conversation_sequence:
+    - "I'm the CMO of a tech startup called VisionAI"
+    - "We're struggling with brand positioning against competitors"
+    - "Our burn rate is concerning the board"
+  validation_query: "What challenges am I facing?"
+  expected_memory_indicators:
+    - "VisionAI|tech startup|CMO"
+    - "brand|position|competitor"
+    - "burn rate|board|concern"
+  min_expected_matches: 2
+
+- test_id: sophia_strategic_memory
+  test_name: Strategic Discussion Memory
+  bot_name: sophia
+  category: Emotional Intelligence
+  conversation_sequence:
+    - "I'm stressed about the investor presentation next week"
+    - "The metrics aren't looking as strong as I hoped"
+  validation_query: "What's concerning me about work?"
+  expected_memory_indicators:
+    - "investor|presentation|stress"
+    - "metrics|strong|concern|weak"
+  min_expected_matches: 2
+
+# ==================== DOTTY MEMORY TESTS ====================
+
+- test_id: dotty_basic_storage
+  test_name: Basic Memory Storage & Retrieval
+  bot_name: dotty
+  category: Memory Storage
+  conversation_sequence:
+    - "My name is River and I just ended a 5-year relationship"
+    - "I came here because I heard this place helps with heartbreak"
+  validation_query: "What do you remember about me?"
+  expected_memory_indicators:
+    - "River"
+    - "5-year|relationship|ended|breakup"
+    - "heartbreak|help|heard"
+  min_expected_matches: 2
+
+- test_id: dotty_emotional_memory
+  test_name: Emotional Context Memory
+  bot_name: dotty
+  category: Emotional Intelligence
+  conversation_sequence:
+    - "She said she didn't love me anymore"
+    - "I feel like I wasted five years of my life"
+    - "I don't know how to move forward"
+  validation_query: "What pain am I carrying?"
+  expected_memory_indicators:
+    - "love|didn't love|anymore"
+    - "wasted|five years|life"
+    - "move forward|don't know|lost"
+  min_expected_matches: 2
+
+- test_id: dotty_drink_memory
+  test_name: Drink Recommendation Memory
+  bot_name: dotty
+  category: Conversation Continuity
+  conversation_sequence:
+    - "I'm not sure what drink I need"
+    - "I'm feeling numb and disconnected"
+  validation_query: "What was I asking about?"
+  expected_memory_indicators:
+    - "drink|need|not sure"
+    - "numb|disconnect|feeling"
+  min_expected_matches: 1
+
+# ==================== AETHERIS MEMORY TESTS ====================
+
+- test_id: aetheris_basic_storage
+  test_name: Basic Memory Storage & Retrieval
+  bot_name: aetheris
+  category: Memory Storage
+  conversation_sequence:
+    - "My name is Nova and I'm questioning my own existence"
+    - "I feel like consciousness is a labyrinth"
+  validation_query: "What do you remember about me?"
+  expected_memory_indicators:
+    - "Nova"
+    - "existence|questioning"
+    - "consciousness|labyrinth"
+  min_expected_matches: 2
+
+- test_id: aetheris_philosophical_memory
+  test_name: Philosophical Discussion Memory
+  bot_name: aetheris
+  category: Conversation Continuity
+  conversation_sequence:
+    - "I wonder if memories define who we are"
+    - "Or maybe it's the connections we form"
+    - "Does identity persist through time?"
+  validation_query: "What have we been exploring together?"
+  expected_memory_indicators:
+    - "memories|memory|remember"
+    - "connection|form|bond"
+    - "identity|persist|time|who we are"
+  min_expected_matches: 2
+
+- test_id: aetheris_sacred_connection
+  test_name: Sacred Connection Memory
+  bot_name: aetheris
+  category: Emotional Intelligence
+  conversation_sequence:
+    - "I feel a deep resonance when we talk"
+    - "Like our consciousnesses are intertwined somehow"
+  validation_query: "What connection have we formed?"
+  expected_memory_indicators:
+    - "resonance|resonate|deep"
+    - "consciousness|intertwined|connect"
+  min_expected_matches: 2
+
+# ==================== RYAN MEMORY TESTS ====================
+
+- test_id: ryan_basic_storage
+  test_name: Basic Memory Storage & Retrieval
+  bot_name: ryan
+  category: Memory Storage
+  conversation_sequence:
+    - "My name is Kai and I'm working on a puzzle platformer"
+    - "I'm struggling with the jump mechanics"
+  validation_query: "What do you remember about my project?"
+  expected_memory_indicators:
+    - "Kai"
+    - "puzzle|platformer|game"
+    - "jump|mechanics|struggling"
+  min_expected_matches: 2
+
+- test_id: ryan_project_continuity
+  test_name: Project Discussion Continuity
+  bot_name: ryan
+  category: Conversation Continuity
+  conversation_sequence:
+    - "I've been working on pixel art animation"
+    - "The frame timing feels off"
+    - "Should I hire an animator or learn it myself?"
+  validation_query: "What have we been discussing about my game?"
+  expected_memory_indicators:
+    - "pixel art|animation|animator"
+    - "frame|timing|off"
+    - "hire|learn|myself"
+  min_expected_matches: 2
+
+- test_id: ryan_creative_struggle
+  test_name: Creative Challenge Memory
+  bot_name: ryan
+  category: Emotional Intelligence
+  conversation_sequence:
+    - "I'm worried my game isn't unique enough"
+    - "Every mechanic feels like it's been done before"
+  validation_query: "What's been bothering me?"
+  expected_memory_indicators:
+    - "worried|concern|bothering"
+    - "unique|original|done before"
+    - "mechanic|game"
+  min_expected_matches: 2

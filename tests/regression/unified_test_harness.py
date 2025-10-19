@@ -64,12 +64,12 @@ class UnifiedTestHarness:
     
     BOT_CONFIGS = {
         "elena": {"port": 9091, "archetype": "Real-World"},
-        "gabriel": {"port": 9095, "archetype": "Real-World"},
+        "gabriel": {"port": 9095, "archetype": "Narrative AI"},
         "marcus": {"port": 9092, "archetype": "Real-World"},
         "jake": {"port": 9097, "archetype": "Real-World"},
         "ryan": {"port": 9093, "archetype": "Real-World"},
         "sophia": {"port": 9096, "archetype": "Real-World"},
-        "dotty": {"port": 9098, "archetype": "Real-World"},
+        "dotty": {"port": 9098, "archetype": "Narrative AI"},
         "dream": {"port": 9094, "archetype": "Fantasy"},
         "aethys": {"port": 3007, "archetype": "Fantasy"},
         "aetheris": {"port": 9099, "archetype": "Narrative AI"},

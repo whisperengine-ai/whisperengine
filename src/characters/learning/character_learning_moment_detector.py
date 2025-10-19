@@ -343,8 +343,24 @@ class CharacterLearningMomentDetector:
         """Extract main topics from conversation history."""
         topics = []
         
+        # 🚨 FIX: Handle None or non-list conversation_history safely
+        if not conversation_history or not isinstance(conversation_history, list):
+            logger.debug("No valid conversation history provided for topic extraction")
+            return topics
+        
         for message in conversation_history[-5:]:  # Last 5 messages
-            content = message.get('content', '').lower()
+            # 🚨 FIX: Handle None messages or messages without content
+            if not message or not isinstance(message, dict):
+                continue
+                
+            content = message.get('content', '')
+            # 🚨 FIX: Handle None content safely
+            if not content or not isinstance(content, str):
+                continue
+                
+            content = content.lower()
+            if not content.strip():
+                continue
             
             # Simple topic extraction (can be enhanced)
             for topic_keyword in ['science', 'art', 'technology', 'nature', 'music', 'travel', 'food']:

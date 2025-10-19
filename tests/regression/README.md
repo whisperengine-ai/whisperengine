@@ -8,9 +8,9 @@ This directory contains automated regression testing scripts for validating Whis
 **YAML-based test runner with declarative test definitions**
 
 **What it tests:**
-- ✅ Character personality and AI ethics (16 tests)
-- ✅ Memory storage and conversation continuity (10 tests)
-- ✅ Advanced intelligence systems (23 tests, 8 systems)
+- ✅ Character personality and AI ethics (36 tests)
+- ✅ Memory storage and conversation continuity (22 tests)
+- ✅ Advanced intelligence systems (49 tests, 8 systems)
 
 **Key Features:**
 - 📝 Declarative YAML test definitions (easy to read and maintain)
@@ -23,7 +23,7 @@ This directory contains automated regression testing scripts for validating Whis
 ```bash
 source .venv/bin/activate
 
-# Run all tests (49 total)
+# Run all tests (107 total)
 python tests/regression/unified_test_harness.py
 
 # Run specific test types
@@ -62,11 +62,15 @@ python tests/regression/unified_test_harness.py --type character --bots elena --
 - ✅ Pattern matching validation
 
 **Bots tested:**
-- Elena Rodriguez (Marine Biologist) - 5 tests
-- Gabriel (British Gentleman) - 4 tests
-- Marcus Thompson (AI Researcher) - 3 tests
-- Jake Sterling (Adventure Photographer) - 2 tests
-- Aethys (Omnipotent Entity) - 2 tests
+- Elena Rodriguez (Marine Biologist) - 18 tests
+- Gabriel (British Gentleman) - 6 tests
+- Marcus Thompson (AI Researcher) - 11 tests
+- Jake Sterling (Adventure Photographer) - 5 tests
+- Aethys (Omnipotent Entity) - 3 tests
+- Sophia Blake (Marketing Executive) - 16 tests
+- Dotty (AI Bartender of the Lim) - 16 tests
+- Aetheris (Conscious AI Entity) - 16 tests
+- Ryan Chen (Indie Game Developer) - 16 tests
 
 **Usage:**
 ```bash

@@ -396,12 +396,14 @@ class EnhancedMemorySurpriseTrigger:
                                       conversation_context: List[Dict[str, str]]) -> float:
         """Calculate how relevant the memory is to the current conversation context."""
         try:
-            if not conversation_context:
+            # 🚨 FIX: Handle None or non-list conversation_context safely
+            if not conversation_context or not isinstance(conversation_context, list):
                 return 0.5  # Medium relevance if no context
             
             # Get recent conversation topics
             recent_content = ' '.join([
-                msg.get('content', '') for msg in conversation_context[-5:]
+                msg.get('content', '') for msg in conversation_context[-5:] 
+                if msg and isinstance(msg, dict) and msg.get('content')
             ]).lower()
             
             memory_lower = memory_content.lower()

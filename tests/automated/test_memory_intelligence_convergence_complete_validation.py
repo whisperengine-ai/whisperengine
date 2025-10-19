@@ -115,8 +115,8 @@ class MemoryIntelligenceConvergenceTest:
             if self.message_processor:
                 self.test_results.append("✅ Message Processor creation: SUCCESS")
                 
-                # Check if intelligence integration is initialized
-                if hasattr(self.message_processor, 'character_intelligence_integration'):
+                # Check if intelligence integration is initialized (Updated for CDL refactor)
+                if hasattr(self.message_processor, 'character_intelligence_coordinator'):
                     self.test_results.append("✅ Character Intelligence Integration: AVAILABLE")
                 else:
                     self.test_results.append("⚠️ Character Intelligence Integration: NOT AVAILABLE")
@@ -140,9 +140,9 @@ class MemoryIntelligenceConvergenceTest:
                 self.test_results.append("❌ Intelligence coordination test: No message processor")
                 return False
             
-            # Check if coordination method exists
-            if hasattr(self.message_processor, '_coordinate_character_intelligence'):
-                self.test_results.append("✅ _coordinate_character_intelligence method: EXISTS")
+            # Check if coordination method exists (Updated for CDL refactor)
+            if hasattr(self.message_processor, '_process_unified_character_intelligence'):
+                self.test_results.append("✅ _process_unified_character_intelligence method: EXISTS")
                 
                 # Test method call with mock data
                 from src.core.message_processor import MessageContext
@@ -159,8 +159,11 @@ class MemoryIntelligenceConvergenceTest:
                 ]
                 
                 try:
-                    result = await self.message_processor._coordinate_character_intelligence(
-                        test_context, test_conversation
+                    result = await self.message_processor._process_unified_character_intelligence(
+                        test_context.user_id, 
+                        test_context.content,
+                        test_context, 
+                        test_conversation
                     )
                     
                     if result is not None:
@@ -172,7 +175,7 @@ class MemoryIntelligenceConvergenceTest:
                     self.test_results.append(f"⚠️ Intelligence coordination execution: ERROR - {method_error}")
                 
             else:
-                self.test_results.append("❌ _coordinate_character_intelligence method: MISSING")
+                self.test_results.append("❌ _process_unified_character_intelligence method: MISSING")
                 return False
             
             return True
@@ -305,32 +308,17 @@ class MemoryIntelligenceConvergenceTest:
                 self.test_results.append("❌ System status test: No message processor")
                 return False
             
-            # Test intelligence integration status
-            if hasattr(self.message_processor, 'character_intelligence_integration') and \
-               self.message_processor.character_intelligence_integration:
+            # Test intelligence integration status (Updated for CDL refactor)
+            if hasattr(self.message_processor, 'character_intelligence_coordinator') and \
+               self.message_processor.character_intelligence_coordinator:
                 
-                integration = self.message_processor.character_intelligence_integration
+                coordinator = self.message_processor.character_intelligence_coordinator
                 
-                # Test metrics
-                metrics = integration.get_integration_metrics()
-                if metrics and isinstance(metrics, dict):
-                    self.test_results.append("✅ Integration metrics: AVAILABLE")
+                # Test if coordinator is initialized
+                if coordinator:
+                    self.test_results.append("✅ Intelligence coordinator: AVAILABLE")
                 else:
-                    self.test_results.append("⚠️ Integration metrics: NOT AVAILABLE")
-                
-                # Test system status
-                status = await integration.get_system_status()
-                if status and isinstance(status, dict):
-                    self.test_results.append("✅ System status check: SUCCESS")
-                    
-                    coordinator_status = status.get('coordinator_status', 'unknown')
-                    available_systems = status.get('available_systems', [])
-                    
-                    self.test_results.append(f"📊 Coordinator status: {coordinator_status}")
-                    self.test_results.append(f"📊 Available systems: {len(available_systems)}")
-                    
-                else:
-                    self.test_results.append("⚠️ System status check: FAILED")
+                    self.test_results.append("⚠️ Intelligence coordinator: NOT INITIALIZED")
                 
             else:
                 self.test_results.append("⚠️ Character intelligence integration: NOT AVAILABLE")

@@ -362,14 +362,14 @@ class SimplifiedEmotionManager:
         
         try:
             # Import Phase 4 integration
-            logger.info("🚀 PHASE 4 DEBUG: Importing Phase4HumanLikeIntegration...")
-            from .human_like_conversation_integration import Phase4HumanLikeIntegration
-            logger.info("✅ PHASE 4 DEBUG: Phase4HumanLikeIntegration imported successfully")
+            logger.info("🚀 PHASE 4 DEBUG: Importing ConversationIntelligenceIntegration...")
+            from .human_like_conversation_integration import ConversationIntelligenceIntegration
+            logger.info("✅ PHASE 4 DEBUG: ConversationIntelligenceIntegration imported successfully")
             
             # Create Phase 4 integration instance if not already created
             if not hasattr(self, '_phase4_integration') or self._phase4_integration is None:
-                logger.info("🚀 PHASE 4 DEBUG: Creating new Phase4HumanLikeIntegration instance...")
-                self._phase4_integration = Phase4HumanLikeIntegration(
+                logger.info("🚀 PHASE 4 DEBUG: Creating new ConversationIntelligenceIntegration instance...")
+                self._phase4_integration = ConversationIntelligenceIntegration(
                     simplified_emotion_manager=self,
                     memory_manager=self.vector_memory_manager,
                     enable_adaptive_mode=True,

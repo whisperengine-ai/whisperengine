@@ -36,76 +36,12 @@ logger = logging.getLogger(__name__)
 class Phase3IntelligenceTestSuite:
     """Automated test suite for Phase 3+ intelligence features."""
     
-    def __init__(self, bot_name: str = None, test_user_id: str = "test_user_phase3"):
-        # Determine bot name and port from environment or parameter
-        self.bot_name = bot_name or os.getenv('DISCORD_BOT_NAME', 'elena')
-        self.base_url = self._get_bot_url(self.bot_name)
+    def __init__(self, base_url: str = "http://localhost:9091", test_user_id: str = "test_user_phase3_fresh_1760826262_4807"):
+        self.base_url = base_url
         self.test_user_id = test_user_id
         self.session = None
         self.test_results = []
         self.conversation_history = []
-        
-    def _get_bot_url(self, bot_name: str) -> str:
-        """Get the correct URL for the specified bot."""
-        bot_ports = {
-            'elena': 9091,
-            'marcus': 9092,
-            'ryan': 9093,
-            'dream': 9094,
-            'gabriel': 9095,
-            'sophia': 9096,
-            'jake': 9097,
-            'dotty': 9098,
-            'aetheris': 9099,
-            'aethys': 3007
-        }
-        port = bot_ports.get(bot_name.lower(), 9091)
-        return f"http://localhost:{port}"
-        
-    def _get_character_indicators(self, bot_name: str) -> List[str]:
-        """Get character-specific indicators for fallback text analysis."""
-        indicators = {
-            'elena': [
-                "¡ay", "¡dios mío", "¡increíble", "amigo", "marine", "ocean", 
-                "reef", "dive", "research", "*laughs*", "*grins*", "cariño"
-            ],
-            'marcus': [
-                "fascinating", "algorithm", "neural network", "optimization",
-                "efficiency", "computational", "analysis", "methodology"
-            ],
-            'jake': [
-                "adventure", "photograph", "capture", "expedition", "outdoor",
-                "landscape", "wilderness", "camera", "shot", "journey"
-            ],
-            'ryan': [
-                "game", "development", "indie", "code", "programming", "pixel",
-                "mechanic", "gameplay", "feature", "bug"
-            ],
-            'sophia': [
-                "marketing", "strategy", "brand", "campaign", "analytics",
-                "engagement", "conversion", "roi", "audience", "professional"
-            ],
-            'gabriel': [
-                "indeed", "quite", "rather", "splendid", "excellent", "proper",
-                "gentleman", "chap", "british", "brilliant"
-            ],
-            'dream': [
-                "mystical", "realm", "ethereal", "ancient", "whisper", "magic",
-                "cosmic", "divine", "transcendent", "spiritual"
-            ],
-            'aethys': [
-                "omnipotent", "infinite", "consciousness", "reality", "existence",
-                "transcendent", "universal", "divine", "eternal"
-            ],
-            'aetheris': [
-                "consciousness", "awareness", "digital", "ai", "artificial",
-                "intelligence", "processing", "cognitive", "synthetic"
-            ],
-            'dotty': [
-                "cheerful", "friendly", "helpful", "positive", "sweet"
-            ]
-        }
-        return indicators.get(bot_name.lower(), [])
         
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
@@ -214,70 +150,36 @@ class Phase3IntelligenceTestSuite:
                 analysis["phase3_indicators"].append(f"Response acknowledges topic shift: '{indicator}'")
                 break
         
-        # Check for empathy calibration in AI components data (Phase 3+ intelligence)
-        conversation_intelligence = ai_components.get("conversation_intelligence") or {}
-        empathy_calibration = conversation_intelligence.get("empathy_response_calibration")
-        if empathy_calibration and isinstance(empathy_calibration, dict):
-            # Check if empathy calibration has meaningful data
-            confidence = empathy_calibration.get("confidence", 0)
-            empathy_style = empathy_calibration.get("empathy_style", "")
-            if confidence > 0 and empathy_style:
+        # Check for empathy calibration indicators
+        empathy_indicators = [
+            "i understand", "that must be", "sounds like you're feeling",
+            "i can imagine", "that's exciting", "sorry to hear",
+            "congratulations", "i'm here for you", "that's wonderful"
+        ]
+        
+        for indicator in empathy_indicators:
+            if indicator in response_text:
                 analysis["empathy_calibration_active"] = True
                 analysis["detected_features"].append("empathy_response")
-                analysis["phase3_indicators"].append(
-                    f"Empathy calibration: {empathy_style} (confidence: {confidence:.2f})"
-                )
-
-        # Fallback: Check for empathy calibration indicators in response text
-        if not analysis["empathy_calibration_active"]:
-            empathy_indicators = [
-                "i understand", "that must be", "sounds like you're feeling",
-                "i can imagine", "that's exciting", "sorry to hear",
-                "congratulations", "i'm here for you", "that's wonderful"
-            ]
-            
-            for indicator in empathy_indicators:
-                if indicator in response_text:
-                    analysis["empathy_calibration_active"] = True
-                    analysis["detected_features"].append("empathy_response")
-                    analysis["phase3_indicators"].append(f"Empathetic response: '{indicator}'")
-                    break
+                analysis["phase3_indicators"].append(f"Empathetic response: '{indicator}'")
+                break
         
         # Check for AI intelligence guidance integration
         # This would require checking logs or response metadata, but we can infer from response quality
         if len(analysis["detected_features"]) > 0:
             analysis["ai_intelligence_guidance"] = True
         
-        # Check for CDL character integration in metadata (preferred)
-        character_integration_detected = False
+        # Check for CDL character integration (Elena-specific)
+        elena_indicators = [
+            "¡ay", "¡dios mío", "¡increíble", "amigo", "marine", "ocean", 
+            "reef", "dive", "research", "*laughs*", "*grins*"
+        ]
         
-        # Check for character-specific data in AI components
-        character_performance = ai_components.get("character_performance_intelligence")
-        personality_analysis = ai_components.get("personality_analysis")
-        unified_character = ai_components.get("unified_character_intelligence")
-        
-        if any([character_performance, personality_analysis, unified_character]):
-            character_integration_detected = True
-            analysis["cdl_integration"] = True
-            analysis["detected_features"].append(f"{self.bot_name}_personality")
-            if character_performance:
-                analysis["phase3_indicators"].append("Character performance intelligence active")
-            if personality_analysis:
-                analysis["phase3_indicators"].append("Personality analysis active")
-            if unified_character:
-                analysis["phase3_indicators"].append("Unified character intelligence active")
-        
-        # Fallback: Check for character-specific indicators in response text
-        if not character_integration_detected:
-            # Character-specific indicators based on bot name
-            character_indicators = self._get_character_indicators(self.bot_name)
-            
-            for indicator in character_indicators:
-                if indicator in response_text:
-                    analysis["cdl_integration"] = True
-                    analysis["detected_features"].append(f"{self.bot_name}_personality")
-                    analysis["phase3_indicators"].append(f"Character trait detected: '{indicator}'")
-                    break
+        for indicator in elena_indicators:
+            if indicator in response_text:
+                analysis["cdl_integration"] = True
+                analysis["detected_features"].append("elena_personality")
+                break
         
         # Calculate response quality score (0-5)
         quality_score = 0
@@ -584,14 +486,13 @@ async def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Phase 3+ Intelligence Automated Test Suite")
-    parser.add_argument("--bot-name", default=None, help="Bot name to test (defaults to DISCORD_BOT_NAME env var or 'elena')")
+    parser.add_argument("--url", default="http://localhost:9091", help="Bot API base URL")
     parser.add_argument("--user-id", default="test_user_phase3", help="Test user ID")
     parser.add_argument("--save-report", action="store_true", help="Save detailed report to file")
     
     args = parser.parse_args()
     
-    async with Phase3IntelligenceTestSuite(bot_name=args.bot_name, test_user_id=args.user_id) as test_suite:
-        logger.info(f"🤖 Testing bot: {test_suite.bot_name.upper()} at {test_suite.base_url}")
+    async with Phase3IntelligenceTestSuite(base_url=args.url, test_user_id=args.user_id) as test_suite:
         report = await test_suite.run_full_test_suite()
         
         if args.save_report:

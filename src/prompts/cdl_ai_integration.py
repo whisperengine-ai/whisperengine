@@ -2251,9 +2251,11 @@ Remember to stay true to your authentic voice and character.
                     keep_end = int(self.optimized_builder.max_words * 0.1)
                     truncated_words = words[:keep_start] + ["...\n\n"] + words[-keep_end:]
                     truncated_prompt = ' '.join(truncated_words)
-                    # Ensure character instruction remains
+                    # Ensure character instruction remains with full user name
                     if not truncated_prompt.endswith(':'):
-                        truncated_prompt += f"\n\nRespond as {character.identity.name}:"
+                        # Extract display_name from the original prompt context (should be preserved)
+                        display_name = "User"  # Fallback if not available
+                        truncated_prompt += f"\n\nRespond as {character.identity.name} to {display_name}:"
                     
                     # Record fidelity metrics for emergency truncation
                     truncated_word_count = len(truncated_prompt.split())

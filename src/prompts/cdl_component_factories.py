@@ -22,7 +22,7 @@ Date: 2025
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 from src.prompts.prompt_components import (
     PromptComponent,
     PromptComponentType,
@@ -86,7 +86,7 @@ async def create_character_identity_component(
         if not identity_parts:
             return None
         
-        content = "# Character Identity\n" + "\n".join(identity_parts)
+        content = "\n".join(identity_parts)
         
         return PromptComponent(
             type=PromptComponentType.CHARACTER_IDENTITY,
@@ -917,3 +917,62 @@ async def create_knowledge_context_component(
 # ⏳ UNIFIED_INTELLIGENCE (Priority 15) - TODO
 # ✅ KNOWLEDGE_CONTEXT (Priority 16)
 # ⏳ RESPONSE_STYLE (Priority 17) - TODO
+
+
+async def create_final_response_guidance_component(
+    enhanced_manager,
+    character_name: str,
+    user_display_name: str = "User",
+    priority: int = 20,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[PromptComponent]:
+    """Create a final response guidance component with character-specific instruction.
+    
+    Args:
+        enhanced_manager: Enhanced CDL manager instance
+        character_name: Name of the character
+        user_display_name: Display name for the user (default: "User")
+        priority: Priority (default: 20 - highest priority, added last)
+        metadata: Optional metadata dict
+        
+    Returns:
+        PromptComponent configured for final response guidance, or None if character not found
+    """
+    try:
+        # Get character data from CDL manager
+        character_data = await enhanced_manager.get_character_by_name(character_name)
+        if not character_data:
+            logger.warning("🎭 FINAL GUIDANCE: Character data not found for %s", character_name)
+            return None
+        
+        # Extract identity data to get character display name
+        identity = character_data.get("identity", {})
+        character_display_name = identity.get("name", character_name)
+        
+        # Create final response instruction
+        content = f"\nRespond as {character_display_name} to {user_display_name}:"
+        
+        component_metadata = {
+            "cdl_type": "FINAL_GUIDANCE",
+            "character_name": character_name,
+            "character_display_name": character_display_name,
+            "user_display_name": user_display_name,
+            "priority": priority,
+            "estimated_tokens": 10
+        }
+        
+        if metadata:
+            component_metadata.update(metadata)
+        
+        return PromptComponent(
+            type=PromptComponentType.GUIDANCE,
+            content=content,
+            priority=priority,
+            token_cost=10,  # Very small final instruction
+            required=True,  # Final guidance is required
+            metadata=component_metadata
+        )
+        
+    except Exception as e:
+        logger.error("❌ FINAL GUIDANCE: Error creating component for %s: %s", character_name, e)
+        return None

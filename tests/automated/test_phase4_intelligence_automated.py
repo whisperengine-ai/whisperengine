@@ -29,11 +29,30 @@ logger = logging.getLogger(__name__)
 class Phase4IntelligenceTestSuite:
     """Comprehensive automated test suite for Phase 4 Intelligence features."""
     
-    def __init__(self, base_url: str = "http://localhost:9091", test_user_id: str = "test_user_phase4"):
-        self.base_url = base_url
+    def __init__(self, bot_name: str = None, test_user_id: str = "test_user_phase4"):
+        self.bot_name = bot_name or "elena"
+        self.base_url = self._get_bot_url()
         self.test_user_id = test_user_id
         self.test_results = []
         self.relationship_progression_state = "new_acquaintance"
+    
+    def _get_bot_url(self) -> str:
+        """Get the correct bot URL based on bot name."""
+        bot_ports = {
+            "elena": 9091,
+            "marcus": 9092, 
+            "ryan": 9093,
+            "dream": 9094,
+            "gabriel": 9095,
+            "sophia": 9096,
+            "jake": 9097,
+            "dotty": 9098,
+            "aetheris": 9099,
+            "aethys": 3007
+        }
+        
+        port = bot_ports.get(self.bot_name.lower(), 9091)
+        return f"http://localhost:{port}"
     
     async def send_message(self, message: str, expected_features: List[str] = None, 
                           test_name: str = None, delay_before: float = 0.0) -> Dict[str, Any]:
@@ -106,25 +125,39 @@ class Phase4IntelligenceTestSuite:
         metadata = result.get("metadata", {})
         ai_components = metadata.get("ai_components", {})
         
-        # Check for Phase 4 intelligence in metadata
-        phase4_context = ai_components.get("phase4_intelligence") or ai_components.get("phase4_context")
-        if phase4_context:
+        # Check for Phase 4 intelligence in metadata using current field names
+        conversation_intelligence = ai_components.get("conversation_intelligence", {})
+        unified_intelligence = ai_components.get("unified_character_intelligence", {})
+        character_performance = ai_components.get("character_performance_intelligence", {})
+        conversation_analysis = ai_components.get("conversation_analysis", {})
+        
+        # Check for any intelligence system presence
+        if conversation_intelligence or unified_intelligence or character_performance:
             analysis["detected_features"].append("phase4_context_available")
-            analysis["phase4_indicators"].append("Phase 4 context detected in metadata")
+            analysis["phase4_indicators"].append("Intelligence systems detected in metadata")
             
-            # Check conversation mode
-            conversation_mode = phase4_context.get("conversation_mode")
-            if conversation_mode in ["human_like", "analytical", "balanced", "adaptive", "standard"]:
-                analysis["adaptive_conversation_modes"] = True
-                analysis["detected_features"].append("conversation_mode_detection")
-                analysis["phase4_indicators"].append(f"Conversation mode: {conversation_mode}")
+            # Check conversation mode from conversation_analysis
+            if conversation_analysis:
+                conversation_mode = conversation_analysis.get("mode")
+                if conversation_mode in ["human_like", "analytical", "balanced", "adaptive", "standard"]:
+                    analysis["adaptive_conversation_modes"] = True
+                    analysis["detected_features"].append("conversation_mode_detection")
+                    analysis["phase4_indicators"].append(f"Conversation mode: {conversation_mode}")
+                
+                # Check interaction type
+                interaction_type = conversation_analysis.get("interaction_type")
+                if interaction_type in ["general", "problem_solving", "emotional_support", "information_seeking", "creative_collaboration", "assistance_request"]:
+                    analysis["interaction_type_detection"] = True
+                    analysis["detected_features"].append("interaction_type_detection")
+                    analysis["phase4_indicators"].append(f"Interaction type: {interaction_type}")
             
-            # Check interaction type
-            interaction_type = phase4_context.get("interaction_type")
-            if interaction_type in ["general", "problem_solving", "emotional_support", "information_seeking", "creative_collaboration", "assistance_request"]:
-                analysis["interaction_type_detection"] = True
-                analysis["detected_features"].append("interaction_type_detection")
-                analysis["phase4_indicators"].append(f"Interaction type: {interaction_type}")
+            # Check for unified intelligence coordination
+            if unified_intelligence:
+                enhanced_response = unified_intelligence.get("enhanced_response")
+                if enhanced_response:
+                    analysis["human_like_integration"] = True
+                    analysis["detected_features"].append("unified_intelligence_active")
+                    analysis["phase4_indicators"].append("Unified character intelligence coordination active")
         
         # Check for adaptive conversation mode indicators in response
         analytical_indicators = [
@@ -159,16 +192,16 @@ class Phase4IntelligenceTestSuite:
             "last time we", "you mentioned before", "from our previous", "following up on"
         ]
         
-        # Check Phase 4 data for memory processing
-        if phase4_context:
-            phase2_results = phase4_context.get("phase2_results")
-            if phase2_results:
+        # Check current intelligence systems for memory processing
+        if conversation_intelligence or unified_intelligence:
+            # Check for enhanced emotion analysis
+            if conversation_intelligence.get("empathy_response_calibration"):
                 analysis["enhanced_memory_processing"] = True
                 analysis["detected_features"].append("enhanced_memory_processing")
                 analysis["phase4_indicators"].append("Enhanced emotion analysis detected")
             
             # Check for context switches which indicate memory processing
-            context_switches = phase4_context.get("context_switches", [])
+            context_switches = ai_components.get("context_switches", [])
             if context_switches:
                 analysis["enhanced_memory_processing"] = True
                 analysis["detected_features"].append("memory_continuity")
@@ -201,16 +234,17 @@ class Phase4IntelligenceTestSuite:
             "complex situation", "nuanced", "multifaceted", "various factors"
         ]
         
-        # Check Phase 4 data for context-aware features
-        if phase4_context:
-            context_analysis = phase4_context.get("context_analysis")
-            if context_analysis:
+        # Check current intelligence systems for context-aware features
+        if conversation_analysis or unified_intelligence:
+            # Check for comprehensive context analysis
+            comprehensive_context = ai_components.get("comprehensive_context")
+            if comprehensive_context:
                 analysis["context_aware_response"] = True
                 analysis["detected_features"].append("context_aware_response")
-                analysis["phase4_indicators"].append("Context analysis detected")
+                analysis["phase4_indicators"].append("Comprehensive context analysis detected")
             
             # Check for context switches
-            context_switches = phase4_context.get("context_switches", [])
+            context_switches = ai_components.get("context_switches", [])
             if context_switches:
                 analysis["context_aware_response"] = True
                 analysis["detected_features"].append("multi_context_integration")
@@ -225,18 +259,19 @@ class Phase4IntelligenceTestSuite:
                 break
         
         # Check for human-like integration patterns
-        if phase4_context:
-            processing_metadata = phase4_context.get("processing_metadata", {})
-            phases_executed = processing_metadata.get("phases_executed", [])
-            if len(phases_executed) >= 1:  # Any phase execution indicates integration
+        if unified_intelligence:
+            performance_metrics = unified_intelligence.get("performance_metrics", {})
+            systems_utilized = performance_metrics.get("systems_utilized", 0)
+            if systems_utilized >= 1:  # Any system utilization indicates integration
                 analysis["human_like_integration"] = True
                 analysis["detected_features"].append("human_like_integration")
-                analysis["phase4_indicators"].append(f"Phases executed: {phases_executed}")
+                analysis["phase4_indicators"].append(f"Systems utilized: {systems_utilized}")
         
         # Also consider multiple features as human-like integration
         if len(analysis["detected_features"]) >= 3:
             analysis["human_like_integration"] = True
-            analysis["detected_features"].append("human_like_integration")
+            if "human_like_integration" not in analysis["detected_features"]:
+                analysis["detected_features"].append("human_like_integration")
         
         # Calculate response quality score
         feature_count = len(analysis["detected_features"])
@@ -558,15 +593,20 @@ class Phase4IntelligenceTestSuite:
 
 async def main():
     """Run Phase 4 Intelligence automated tests."""
+    import os
     
-    # Test Elena bot (Marine Biologist) - Port 9091
+    # Get bot name from environment variable or default to elena
+    bot_name = os.environ.get('DISCORD_BOT_NAME', 'elena').lower()
+    
     test_suite = Phase4IntelligenceTestSuite(
-        base_url="http://localhost:9091",
-        test_user_id="test_user_phase4_elena"
+        bot_name=bot_name,
+        test_user_id=f"test_user_phase4_{bot_name}"
     )
     
-    success = await test_suite.run_all_tests()
-    return success
+    logger.info("🤖 Testing bot: %s at %s", bot_name.upper(), test_suite.base_url)
+    
+    result = await test_suite.run_all_tests()
+    return result
 
 
 if __name__ == "__main__":

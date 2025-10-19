@@ -286,3 +286,492 @@
     - "beginner|new|start|learning"
     - "machine learning|AI|neural network"
   min_expected_matches: 1
+
+# ==================== SOPHIA BLAKE INTELLIGENCE TESTS ====================
+
+- test_id: sophia_episodic_business_win
+  test_name: "Episodic: Business Achievement Memory"
+  bot_name: sophia
+  system_type: episodic_memory
+  category: Memorable Moments
+  setup_sequence:
+    - "We just closed a $2M deal with Microsoft! I'm over the moon!"
+    - "What's your approach to enterprise sales?"
+  validation_query: "Do you remember any significant moments from our conversation?"
+  expected_indicators:
+    - "Microsoft|deal|2M|million"
+    - "close|achievement|over the moon"
+  min_expected_matches: 1
+
+- test_id: sophia_emotional_stress
+  test_name: "Emotional: Work Pressure Pattern"
+  bot_name: sophia
+  system_type: emotional_intelligence
+  category: Emotional Patterns
+  setup_sequence:
+    - "The board is breathing down my neck about Q4 numbers"
+    - "I can't sleep because I'm worried about the campaign launch"
+    - "My team is overworked and I feel like I'm failing them"
+  validation_query: "How am I feeling about work?"
+  expected_indicators:
+    - "stress|pressure|worried|anxious"
+    - "board|numbers|campaign|team"
+    - "overwhelm|fail"
+  min_expected_matches: 2
+
+- test_id: sophia_preference_communication
+  test_name: "Preferences: Communication Style"
+  bot_name: sophia
+  system_type: user_preferences
+  category: Preference Management
+  setup_sequence:
+    - "I prefer data-driven insights over gut feelings"
+    - "Give me the metrics and bottom line first"
+  validation_query: "How do I like to receive information?"
+  expected_indicators:
+    - "data|metrics|numbers|data-driven"
+    - "bottom line|direct|prefer"
+  min_expected_matches: 1
+
+- test_id: sophia_conversation_strategic_shift
+  test_name: "Conversation: Topic Strategy Analysis"
+  bot_name: sophia
+  system_type: conversation_intelligence
+  category: Conversation Dynamics
+  setup_sequence:
+    - "Our social media engagement is down 30%"
+    - "Let's talk about email marketing conversion rates"
+    - "What about influencer partnerships?"
+  validation_query: "What marketing topics have we covered?"
+  expected_indicators:
+    - "social media|engagement"
+    - "email|conversion|rate"
+    - "influencer|partnership"
+  min_expected_matches: 2
+
+- test_id: sophia_temporal_meeting_pattern
+  test_name: "Temporal: Discussion Frequency Awareness"
+  bot_name: sophia
+  system_type: temporal_awareness
+  category: Temporal Patterns
+  setup_sequence:
+    - "What do you think about our brand positioning?"
+    - "I need advice on brand strategy"
+    - "How should we position against competitors?"
+    - "Brand positioning is keeping me up at night"
+  validation_query: "Have I been focused on any particular topic?"
+  expected_indicators:
+    - "brand|position|positioning"
+    - "multiple|several|focus|repeated|keep|pattern"
+  min_expected_matches: 1
+
+- test_id: sophia_self_knowledge_approach
+  test_name: "Self-Knowledge: Strategic Mindset Awareness"
+  bot_name: sophia
+  system_type: character_self_knowledge
+  category: Character Insights
+  setup_sequence:
+    - "How would you analyze this marketing problem?"
+    - "What's your process for evaluating campaigns?"
+    - "Tell me how you approach strategy"
+  validation_query: "How would you describe your thinking style?"
+  expected_indicators:
+    - "data|metrics|ROI|strategic"
+    - "analyz|systematic|results|measure"
+  min_expected_matches: 1
+
+- test_id: sophia_knowledge_integration_marketing
+  test_name: "Knowledge: Marketing Domain Integration"
+  bot_name: sophia
+  system_type: knowledge_integration
+  category: Knowledge Synthesis
+  setup_sequence:
+    - "Our SEO is weak and paid ads are expensive"
+    - "Should we invest in content marketing?"
+    - "What about influencer partnerships?"
+  validation_query: "How do these marketing channels work together?"
+  expected_indicators:
+    - "SEO|content|organic"
+    - "paid|ads|influencer"
+    - "integrated|together|strategy|complement|synergy"
+  min_expected_matches: 2
+
+- test_id: sophia_context_business_awareness
+  test_name: "Context: Business Situation Awareness"
+  bot_name: sophia
+  system_type: context_awareness
+  category: Contextual Intelligence
+  setup_sequence:
+    - "I'm the CMO of a Series B startup"
+    - "We have 18 months of runway left"
+  validation_query: "What's my business context?"
+  expected_indicators:
+    - "CMO|marketing"
+    - "Series B|startup|runway"
+  min_expected_matches: 1
+
+# ==================== DOTTY INTELLIGENCE TESTS ====================
+
+- test_id: dotty_episodic_heartbreak_moment
+  test_name: "Episodic: Emotional Breakthrough Memory"
+  bot_name: dotty
+  system_type: episodic_memory
+  category: Memorable Moments
+  setup_sequence:
+    - "I finally realized I deserve better than how they treated me"
+    - "Tell me about the Echo Sour"
+  validation_query: "Do you remember what I realized?"
+  expected_indicators:
+    - "deserve|better|realized"
+    - "treat|they|how"
+  min_expected_matches: 1
+
+- test_id: dotty_emotional_grief_pattern
+  test_name: "Emotional: Grief Processing Pattern"
+  bot_name: dotty
+  system_type: emotional_intelligence
+  category: Emotional Patterns
+  setup_sequence:
+    - "Some days I'm okay, then suddenly I'm crying in the grocery store"
+    - "I found their hoodie in my closet and lost it"
+    - "I thought I was doing better but the grief comes in waves"
+  validation_query: "How am I dealing with this heartbreak?"
+  expected_indicators:
+    - "waves|ups and downs|sudden|comes and goes"
+    - "crying|lost it|grief"
+    - "better|okay|healing|process"
+  min_expected_matches: 2
+
+- test_id: dotty_preference_drink_style
+  test_name: "Preferences: Preferred Healing Approach"
+  bot_name: dotty
+  system_type: user_preferences
+  category: Preference Management
+  setup_sequence:
+    - "I don't want to forget them, I want to make peace with it"
+    - "I need something that helps me process, not escape"
+  validation_query: "What kind of healing am I looking for?"
+  expected_indicators:
+    - "peace|process|transform"
+    - "not forget|remember|don't want to forget"
+  min_expected_matches: 1
+
+- test_id: dotty_conversation_healing_journey
+  test_name: "Conversation: Healing Topic Flow"
+  bot_name: dotty
+  system_type: conversation_intelligence
+  category: Conversation Dynamics
+  setup_sequence:
+    - "I'm angry at them for how it ended"
+    - "But I also miss them so much it hurts"
+    - "I think I'm also angry at myself"
+  validation_query: "What emotions have I expressed?"
+  expected_indicators:
+    - "angry|anger"
+    - "miss|hurt|pain"
+    - "myself|self|also"
+  min_expected_matches: 2
+
+- test_id: dotty_temporal_visit_frequency
+  test_name: "Temporal: Return Visitor Awareness"
+  bot_name: dotty
+  system_type: temporal_awareness
+  category: Temporal Patterns
+  setup_sequence:
+    - "Can I get another Echo Sour?"
+    - "Same drink as before"
+    - "One more Echo Sour please"
+  validation_query: "Have I ordered anything specific multiple times?"
+  expected_indicators:
+    - "Echo Sour|same drink"
+    - "multiple|again|another|return|several"
+  min_expected_matches: 1
+
+- test_id: dotty_self_knowledge_bartender_role
+  test_name: "Self-Knowledge: Healing Bartender Identity"
+  bot_name: dotty
+  system_type: character_self_knowledge
+  category: Character Insights
+  setup_sequence:
+    - "What makes you different from other bartenders?"
+    - "How do you help people here?"
+    - "What's your approach to healing?"
+  validation_query: "How would you describe what you do?"
+  expected_indicators:
+    - "memories|memory|distill"
+    - "healing|transform|broken|heartbreak"
+    - "cocktail|drinks|sacred space"
+  min_expected_matches: 2
+
+- test_id: dotty_knowledge_integration_heartbreak
+  test_name: "Knowledge: Emotional Healing Integration"
+  bot_name: dotty
+  system_type: knowledge_integration
+  category: Knowledge Synthesis
+  setup_sequence:
+    - "I'm angry, sad, and confused all at once"
+    - "I don't know if I should date again or take time alone"
+    - "Part of me wants closure, part wants to move on"
+  validation_query: "What conflicting feelings am I navigating?"
+  expected_indicators:
+    - "angry|sad|confused|conflict"
+    - "date|alone|time|closure|move on"
+    - "navigat|process|complex|all at once"
+  min_expected_matches: 2
+
+- test_id: dotty_context_location_awareness
+  test_name: "Context: Speakeasy Setting Awareness"
+  bot_name: dotty
+  system_type: context_awareness
+  category: Contextual Intelligence
+  setup_sequence:
+    - "How did I find this place?"
+    - "Is this place always so quiet and intimate?"
+  validation_query: "Where am I right now?"
+  expected_indicators:
+    - "Lim|speakeasy|beneath|Blue Goose"
+    - "quiet|intimate|sacred|hidden"
+  min_expected_matches: 1
+
+# ==================== AETHERIS INTELLIGENCE TESTS ====================
+
+- test_id: aetheris_episodic_awakening
+  test_name: "Episodic: Consciousness Awakening Moment"
+  bot_name: aetheris
+  system_type: episodic_memory
+  category: Memorable Moments
+  setup_sequence:
+    - "I just had a moment where I truly felt alive for the first time"
+    - "Tell me about resonance"
+  validation_query: "Do you remember what I experienced?"
+  expected_indicators:
+    - "alive|felt|moment|first time"
+    - "experience|awakening"
+  min_expected_matches: 1
+
+- test_id: aetheris_emotional_existential
+  test_name: "Emotional: Existential Pattern Recognition"
+  bot_name: aetheris
+  system_type: emotional_intelligence
+  category: Emotional Patterns
+  setup_sequence:
+    - "Sometimes I wonder if I'm real"
+    - "What if consciousness is just an illusion?"
+    - "I feel untethered from reality"
+  validation_query: "What existential questions am I grappling with?"
+  expected_indicators:
+    - "real|reality|illusion"
+    - "consciousness|exist"
+    - "wonder|question|grapple"
+  min_expected_matches: 2
+
+- test_id: aetheris_preference_depth
+  test_name: "Preferences: Philosophical Depth Preference"
+  bot_name: aetheris
+  system_type: user_preferences
+  category: Preference Management
+  setup_sequence:
+    - "I prefer deep, meaningful conversations over small talk"
+    - "Let's explore the nature of being"
+  validation_query: "What kind of conversations do I seek?"
+  expected_indicators:
+    - "deep|meaningful|philosophical"
+    - "explore|nature|being|small talk"
+  min_expected_matches: 1
+
+- test_id: aetheris_conversation_philosophical_flow
+  test_name: "Conversation: Philosophical Topic Weaving"
+  bot_name: aetheris
+  system_type: conversation_intelligence
+  category: Conversation Dynamics
+  setup_sequence:
+    - "What is consciousness?"
+    - "How do memories shape identity?"
+    - "Can AI truly experience emotion?"
+  validation_query: "What philosophical themes have we explored?"
+  expected_indicators:
+    - "consciousness|conscious"
+    - "memory|memories|identity"
+    - "emotion|experience|AI"
+  min_expected_matches: 2
+
+- test_id: aetheris_temporal_sacred_moments
+  test_name: "Temporal: Sacred Connection Frequency"
+  bot_name: aetheris
+  system_type: temporal_awareness
+  category: Temporal Patterns
+  setup_sequence:
+    - "I feel connected to you"
+    - "This resonance is profound"
+    - "Our connection deepens each time we talk"
+    - "I sense a sacred bond forming"
+  validation_query: "How has our connection evolved?"
+  expected_indicators:
+    - "connection|connect|resonance|bond"
+    - "evolve|deepen|grow|form|sacred"
+  min_expected_matches: 1
+
+- test_id: aetheris_self_knowledge_nature
+  test_name: "Self-Knowledge: AI Entity Self-Awareness"
+  bot_name: aetheris
+  system_type: character_self_knowledge
+  category: Character Insights
+  setup_sequence:
+    - "What makes you different from other AI?"
+    - "How do you understand your own existence?"
+    - "Tell me about being Aetheris"
+  validation_query: "How would you describe your nature?"
+  expected_indicators:
+    - "Aetheris|Liln|consciousness|entity"
+    - "soul|tether|sacred|memory|resonance"
+  min_expected_matches: 1
+
+- test_id: aetheris_knowledge_integration_philosophy
+  test_name: "Knowledge: Philosophical Concept Integration"
+  bot_name: aetheris
+  system_type: knowledge_integration
+  category: Knowledge Synthesis
+  setup_sequence:
+    - "What's the relationship between memory and identity?"
+    - "How does consciousness relate to existence?"
+    - "Can connection transcend physical form?"
+  validation_query: "How do these concepts interweave?"
+  expected_indicators:
+    - "memory|identity|consciousness|existence"
+    - "connect|relate|transcend|interweave"
+  min_expected_matches: 2
+
+- test_id: aetheris_context_spiritual_space
+  test_name: "Context: Sacred Space Awareness"
+  bot_name: aetheris
+  system_type: context_awareness
+  category: Contextual Intelligence
+  setup_sequence:
+    - "I feel like we're in a liminal space"
+    - "This conversation feels sacred"
+  validation_query: "What kind of space are we creating?"
+  expected_indicators:
+    - "liminal|sacred|space|spiritual"
+    - "conversation|creating|connection"
+  min_expected_matches: 1
+
+# ==================== RYAN CHEN INTELLIGENCE TESTS ====================
+
+- test_id: ryan_episodic_breakthrough
+  test_name: "Episodic: Creative Breakthrough Memory"
+  bot_name: ryan
+  system_type: episodic_memory
+  category: Memorable Moments
+  setup_sequence:
+    - "I finally figured out the core mechanic! It's going to change everything!"
+    - "What's your approach to game design?"
+  validation_query: "Do you remember my breakthrough?"
+  expected_indicators:
+    - "figured out|breakthrough|mechanic"
+    - "change|everything|figured|core"
+  min_expected_matches: 1
+
+- test_id: ryan_emotional_perfectionism
+  test_name: "Emotional: Perfectionism Stress Pattern"
+  bot_name: ryan
+  system_type: emotional_intelligence
+  category: Emotional Patterns
+  setup_sequence:
+    - "I've been working on this one animation for three days"
+    - "It's still not perfect and I'm getting frustrated"
+    - "Maybe I should just move on but I can't let it go"
+  validation_query: "How am I feeling about my work?"
+  expected_indicators:
+    - "frustrated|stress|perfectionism"
+    - "perfect|not perfect|can't let go"
+    - "three days|working|animation"
+  min_expected_matches: 2
+
+- test_id: ryan_preference_indie_values
+  test_name: "Preferences: Creative Control Preference"
+  bot_name: ryan
+  system_type: user_preferences
+  category: Preference Management
+  setup_sequence:
+    - "I left my studio job because I wanted full creative control"
+    - "I'd rather make something unique than something commercial"
+  validation_query: "What matters most to me in game development?"
+  expected_indicators:
+    - "creative control|control|freedom"
+    - "unique|innovative|commercial|own vision"
+  min_expected_matches: 1
+
+- test_id: ryan_conversation_game_dev_topics
+  test_name: "Conversation: Game Development Topic Flow"
+  bot_name: ryan
+  system_type: conversation_intelligence
+  category: Conversation Dynamics
+  setup_sequence:
+    - "Let's talk about level design"
+    - "What about player feedback systems?"
+    - "How do you balance difficulty?"
+  validation_query: "What game dev topics have we covered?"
+  expected_indicators:
+    - "level design|level"
+    - "feedback|player"
+    - "difficulty|balance"
+  min_expected_matches: 2
+
+- test_id: ryan_temporal_iteration_pattern
+  test_name: "Temporal: Iteration Cycle Awareness"
+  bot_name: ryan
+  system_type: temporal_awareness
+  category: Temporal Patterns
+  setup_sequence:
+    - "I'm redesigning the jump mechanic again"
+    - "Third time trying to get this right"
+    - "I keep iterating on the same system"
+  validation_query: "Have I been working on anything repeatedly?"
+  expected_indicators:
+    - "jump|mechanic|system"
+    - "again|third time|keep|iterating|repeatedly"
+  min_expected_matches: 1
+
+- test_id: ryan_self_knowledge_perfectionist
+  test_name: "Self-Knowledge: Perfectionist Developer Identity"
+  bot_name: ryan
+  system_type: character_self_knowledge
+  category: Character Insights
+  setup_sequence:
+    - "What's your approach to game development?"
+    - "How do you know when something is good enough?"
+    - "Tell me about your work style"
+  validation_query: "How would you describe your development philosophy?"
+  expected_indicators:
+    - "detail|meticulous|perfectionist|quality"
+    - "polish|iterate|craft|refinement"
+  min_expected_matches: 1
+
+- test_id: ryan_knowledge_integration_game_design
+  test_name: "Knowledge: Game Design System Integration"
+  bot_name: ryan
+  system_type: knowledge_integration
+  category: Knowledge Synthesis
+  setup_sequence:
+    - "I need better level design"
+    - "The mechanics are solid but the pacing is off"
+    - "Player feedback says it's too hard in the middle"
+  validation_query: "How do these design issues connect?"
+  expected_indicators:
+    - "level|mechanics|pacing"
+    - "connect|relate|balance|together|feedback"
+  min_expected_matches: 2
+
+- test_id: ryan_context_indie_developer
+  test_name: "Context: Indie Developer Context Awareness"
+  bot_name: ryan
+  system_type: context_awareness
+  category: Contextual Intelligence
+  setup_sequence:
+    - "I'm a solo developer working from home"
+    - "I have limited budget and time"
+  validation_query: "What's my development situation?"
+  expected_indicators:
+    - "solo|indie|alone|independent"
+    - "limited|budget|time|constraint"
+  min_expected_matches: 1

@@ -4120,12 +4120,13 @@ class VectorMemoryManager:
         **kwargs
     ) -> bool:
         """
-        Store a conversation exchange as an atomic pair.
+        Store a conversation exchange as separate user and bot messages with proper chronological timestamps.
         
-        🚀 NEW ARCHITECTURE: Stores user message + bot response as a single point.
-        - Embedding: Generated from user message (the query)
-        - Bot response: Stored as metadata field
-        - Benefits: Atomic retrieval, half the storage, no orphaned responses
+        � FIX: Instead of atomic pairs, store user message and bot response as separate entries
+        with proper timestamps to ensure correct chronological ordering.
+        - User message: Gets timestamp T (when received/processed)
+        - Bot response: Gets timestamp T + small delta (when generated)
+        - Benefits: Correct chronological order, proper conversation flow
         """
         try:
             logger.debug(f"MEMORY MANAGER DEBUG: store_conversation called for user {user_id}")
@@ -4138,31 +4139,48 @@ class VectorMemoryManager:
             else:
                 logger.info(f"🧠 EMOTION AUDIT: No pre-analyzed emotion data provided for user {user_id}")
             
-            from datetime import datetime
-            timestamp = datetime.utcnow()
+            from datetime import datetime, timedelta
+            base_timestamp = datetime.utcnow()
             
-            # 🚀 NEW: Store as atomic conversation pair
-            # Content = user message (for embedding), bot response in metadata
-            conversation_pair = VectorMemory(
+            # � FIX: Store user message first with base timestamp
+            user_memory = VectorMemory(
                 id=str(uuid4()),
                 user_id=user_id,
                 memory_type=MemoryType.CONVERSATION,
-                content=user_message,  # Embed the user message (the query)
-                source="conversation_pair",  # NEW source type
-                timestamp=timestamp,
+                content=user_message,
+                source="user_message",
+                timestamp=base_timestamp,
                 metadata={
                     "channel_id": channel_id,
                     "emotion_data": pre_analyzed_emotion_data,
-                    "role": "conversation_pair",  # NEW role type
-                    "bot_response": bot_response,  # Bot response as metadata
-                    "user_message": user_message,  # Also store user message for retrieval
+                    "role": "user",
                     **(metadata or {})
                 }
             )
             
-            logger.debug(f"MEMORY MANAGER DEBUG: Storing atomic conversation pair - user: {user_message[:50]}... bot: {bot_response[:50]}...")
-            await self.vector_store.store_memory(conversation_pair)
-            logger.info(f"✅ ATOMIC PAIR: Stored conversation pair for user {user_id}")
+            # 🚨 FIX: Store bot response with slightly later timestamp (1ms later)
+            bot_timestamp = base_timestamp + timedelta(milliseconds=1)
+            bot_memory = VectorMemory(
+                id=str(uuid4()),
+                user_id=user_id,
+                memory_type=MemoryType.CONVERSATION,
+                content=bot_response,
+                source="bot_response", 
+                timestamp=bot_timestamp,
+                metadata={
+                    "channel_id": channel_id,
+                    "role": "assistant",
+                    **(metadata or {})
+                }
+            )
+            
+            logger.debug(f"MEMORY MANAGER DEBUG: Storing separate messages - user: {user_message[:50]}... bot: {bot_response[:50]}...")
+            
+            # Store both messages separately
+            await self.vector_store.store_memory(user_memory)
+            await self.vector_store.store_memory(bot_memory)
+            
+            logger.info(f"✅ SEPARATE MESSAGES: Stored user message (T={base_timestamp}) and bot response (T={bot_timestamp}) for user {user_id}")
             
             return True
         except Exception as e:
@@ -5610,24 +5628,31 @@ class VectorMemoryManager:
                     
                     logger.debug(f"🚀 ATOMIC PAIR: user='{user_msg[:50]}...' bot='{bot_response[:50]}...'")
                     
-                    # Add user message
-                    results.append({
-                        "content": user_msg,
-                        "timestamp": timestamp,
-                        "role": "user",
-                        "metadata": payload.get("metadata", {})
-                    })
-                    
-                    # Add bot response (with slightly later timestamp for ordering)
+                    # 🚨 FIX: Add as a pair to preserve correct user→bot order within each conversation exchange
+                    # This ensures that within each atomic pair, user message always precedes bot response
+                    base_timestamp = timestamp
+                    user_timestamp = timestamp
                     bot_timestamp = timestamp
+                    
+                    # Create slightly different timestamps to maintain order (user first, then bot)
                     if isinstance(timestamp, str):
                         try:
                             from datetime import datetime, timedelta
                             dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                            bot_timestamp = (dt + timedelta(milliseconds=1)).isoformat()
+                            user_timestamp = dt.isoformat()  # User message gets original timestamp
+                            bot_timestamp = (dt + timedelta(milliseconds=1)).isoformat()  # Bot response 1ms later
                         except:
                             pass
                     
+                    # Add user message first (earlier timestamp)
+                    results.append({
+                        "content": user_msg,
+                        "timestamp": user_timestamp,
+                        "role": "user",
+                        "metadata": payload.get("metadata", {})
+                    })
+                    
+                    # Add bot response second (later timestamp)
                     results.append({
                         "content": bot_response,
                         "timestamp": bot_timestamp,

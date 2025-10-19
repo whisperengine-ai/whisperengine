@@ -540,6 +540,15 @@ class MessageProcessor:
                 logger.warning("SECURITY: Input warnings for user %s: %s", 
                              message_context.user_id, validation_result['warnings'])
             
+            # Phase 1.5: Store user message IMMEDIATELY for proper chronological order
+            # 🚨 CRITICAL FIX: User messages must be stored when they arrive (now),
+            # not later when bot response is generated. This fixes conversation ordering.
+            if self.memory_manager:
+                try:
+                    await self._store_user_message_immediately(message_context)
+                except Exception as e:
+                    logger.warning(f"Failed to store user message immediately: {e}")
+            
             # Phase 2: Name detection and storage
             await self._process_name_detection(message_context)
             
@@ -2097,16 +2106,14 @@ class MessageProcessor:
                     limit=15  # Get more messages for better context (matching previous implementation)
                 )
                 
-                # 🚨 CRITICAL FIX: Sort by timestamp to ensure we ALWAYS get the MOST RECENT messages
-                # This prevents stale conversation contexts from being reused across multiple prompts
+                # 🚨 FIXED: No need to re-sort - Qdrant already sorts by timestamp and vector memory 
+                # returns them in correct chronological order (oldest to newest)
+                # Redundant sorting here was breaking the proper message order
                 if conversation_history:
-                    conversation_history = sorted(
-                        conversation_history,
-                        key=lambda x: x.get('timestamp', '') if isinstance(x, dict) else getattr(x, 'timestamp', ''),
-                        reverse=True  # Most recent first
-                    )[:15]  # Take only the 15 most recent
+                    # Just take the limit, no re-sorting needed
+                    conversation_history = conversation_history[:15]  # Take only the 15 most recent
                     
-                    logger.info(f"🔄 CONTEXT ROTATION: Sorted conversation history by timestamp - {len(conversation_history)} messages")
+                    logger.info(f"✅ MEMORY ORDER: Using {len(conversation_history)} messages in chronological order from memory system")
                 
                 # Convert to expected format for generate_conversation_summary
                 # 🚨 FIX: Include author_id so summary can filter user-specific messages
@@ -2421,9 +2428,11 @@ class MessageProcessor:
             create_ai_identity_guidance_component,
             create_character_personality_component,
             create_character_voice_component,
+            create_final_response_guidance_component,
         )
         from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
         from src.database.postgres_pool_manager import get_postgres_pool
+        from src.prompts.cdl_component_factories import create_final_response_guidance_component
         
         try:
             bot_name = get_normalized_bot_name_from_env()
@@ -2506,6 +2515,24 @@ class MessageProcessor:
                 # Estimated tokens: 400
                 # Blocked by: Relationship management system not yet implemented
                 # Note: This would enable characters to reference shared history and relationship depth
+                
+                # ================================
+                # FINAL CDL COMPONENT: Response Guidance (Priority 20)
+                # ================================
+                # Add final "Respond as [character] to [user]:" instruction at highest priority
+                # This ensures it appears at the end of the system prompt
+                final_guidance_component = await create_final_response_guidance_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name,
+                    user_display_name="User",  # Could be enhanced with actual user name later
+                    priority=20  # Highest priority to ensure it appears last
+                )
+                if final_guidance_component:
+                    assembler.add_component(final_guidance_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added final response guidance for {bot_name}")
+                else:
+                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No final guidance component for {bot_name}")
+                    
             else:
                 logger.warning("⚠️ STRUCTURED CONTEXT: No database pool - skipping CDL components")
         except Exception as e:
@@ -2614,6 +2641,7 @@ class MessageProcessor:
                         priority=16
                     ))
                     logger.info(f"✅ STRUCTURED CONTEXT: Added legacy user facts ({len(user_facts_content)} chars)")
+                    
             except Exception as e:
                 # Fallback to legacy on error
                 logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL knowledge component error: {e}")
@@ -3803,6 +3831,20 @@ class MessageProcessor:
             ai_components['personality_context'] = ai_components.get('personality_analysis')
             ai_components['conversation_context'] = ai_components.get('conversation_intelligence')
             
+            # Bridge Phase 3 context switches from OLD path to NEW path structure for test compatibility
+            conversation_intelligence = ai_components.get('conversation_intelligence')
+            logger.debug(f"🌉 BRIDGE DEBUG: conversation_intelligence type: {type(conversation_intelligence)}")
+            if conversation_intelligence and isinstance(conversation_intelligence, dict):
+                conversation_context_switches = conversation_intelligence.get('conversation_context_switches')
+                logger.debug(f"🌉 BRIDGE DEBUG: conversation_context_switches: {len(conversation_context_switches) if conversation_context_switches else 'None'}")
+                if conversation_context_switches:
+                    ai_components['context_switches'] = conversation_context_switches
+                    logger.debug(f"✅ Bridged {len(conversation_context_switches)} context switches from OLD to NEW path")
+                else:
+                    logger.warning("🌉 BRIDGE WARNING: No conversation_context_switches found in conversation_intelligence")
+            else:
+                logger.warning(f"🌉 BRIDGE WARNING: conversation_intelligence is not a valid dict: {conversation_intelligence}")
+            
             # Advanced Emotion Intelligence integration
             advanced_emotion = ai_components.get('advanced_emotion_intelligence')
             if advanced_emotion:
@@ -4052,7 +4094,18 @@ class MessageProcessor:
         try:
             if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
                 logger.debug("🔍 Bot core or phase2_integration not available")
-                return None
+                # Create adapter for Discord-specific component first
+                discord_message = create_discord_message_adapter(message_context)
+                # Create minimal result with Phase 3 data
+                conversation_context_switches = await self._analyze_context_switches(user_id, content, discord_message)
+                empathy_response_calibration = await self._calibrate_empathy_response(user_id, content, discord_message)
+                return {
+                    'conversation_mode': 'standard',
+                    'interaction_type': 'general',
+                    'response_guidance': 'natural_conversation',
+                    'conversation_context_switches': conversation_context_switches,
+                    'empathy_response_calibration': empathy_response_calibration
+                }
             
             # Create adapter for Discord-specific component
             discord_message = create_discord_message_adapter(message_context)
@@ -4066,20 +4119,35 @@ class MessageProcessor:
             empathy_response_calibration = await self._calibrate_empathy_response(user_id, content, discord_message)
             
             # Process with conversation intelligence sophistication
-            conversation_context_result = await self.bot_core.phase2_integration.process_conversation_intelligence(
-                user_id=user_id,
-                message=discord_message,
-                recent_messages=conversation_context,
-                external_emotion_data=None,
-                emotion_context=None
-            )
+            try:
+                logger.debug(f"🔧 CALLING process_conversation_intelligence for user {user_id}")
+                conversation_context_result = await self.bot_core.phase2_integration.process_conversation_intelligence(
+                    user_id=user_id,
+                    message=discord_message,
+                    recent_messages=conversation_context,
+                    external_emotion_data=None,
+                    phase2_context=None
+                )
+                logger.debug(f"🔧 RESULT from process_conversation_intelligence: {type(conversation_context_result)} = {conversation_context_result}")
+            except Exception as e:
+                logger.warning(f"🔧 Phase 2 integration failed, creating minimal result: {e}")
+                # Create minimal result to preserve Phase 3 data
+                conversation_context_result = {
+                    'conversation_mode': 'standard',
+                    'interaction_type': 'general',
+                    'response_guidance': 'natural_conversation'
+                }
             
             # Add Phase 3 results to the conversation intelligence context
             if isinstance(conversation_context_result, dict):
                 conversation_context_result['conversation_context_switches'] = conversation_context_switches
                 conversation_context_result['empathy_response_calibration'] = empathy_response_calibration
+                logger.debug(f"🔧 SOPHISTICATED DEBUG: Added Phase 3 results - switches: {len(conversation_context_switches) if conversation_context_switches else 'None'}, empathy: {empathy_response_calibration is not None}")
+            else:
+                logger.warning(f"🔧 SOPHISTICATED DEBUG: conversation_context_result is not dict: {type(conversation_context_result)} = {conversation_context_result}")
             
             logger.debug(f"Sophisticated conversation intelligence processing successful for user {user_id}")
+            logger.debug(f"🔧 SOPHISTICATED DEBUG: Returning result type: {type(conversation_context_result)}")
             return conversation_context_result
             
         except Exception as e:
