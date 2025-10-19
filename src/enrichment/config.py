@@ -62,7 +62,7 @@ class EnrichmentConfig:
     # Processing thresholds
     MIN_MESSAGES_FOR_SUMMARY: int = int(os.getenv("MIN_MESSAGES_FOR_SUMMARY", "5"))
     TIME_WINDOW_HOURS: int = int(os.getenv("TIME_WINDOW_HOURS", "24"))
-    LOOKBACK_DAYS: int = int(os.getenv("LOOKBACK_DAYS", "30"))
+    LOOKBACK_DAYS: int = int(os.getenv("LOOKBACK_DAYS", "3"))  # Reduced from 30 to avoid massive backfill token burn
     
     @classmethod
     def get_postgres_dsn(cls) -> str:

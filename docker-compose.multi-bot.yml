@@ -212,13 +212,12 @@ services:
       - ENRICHMENT_BATCH_SIZE=${ENRICHMENT_BATCH_SIZE:-50}
       - MIN_MESSAGES_FOR_SUMMARY=${MIN_MESSAGES_FOR_SUMMARY:-5}
       - TIME_WINDOW_HOURS=${TIME_WINDOW_HOURS:-24}
-      - LOOKBACK_DAYS=${LOOKBACK_DAYS:-30}
+      - LOOKBACK_DAYS=${LOOKBACK_DAYS:-3}  # Reduced from 30 to avoid massive backfill token burn
       
       # LLM configuration
       - LLM_MODEL=${ENRICHMENT_LLM_MODEL:-anthropic/claude-3.5-sonnet}
       - LLM_CHAT_API_URL=${LLM_CHAT_API_URL}
       - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY}
-      - LLM_MAX_TOKENS_CHAT=${ENRICHMENT_LLM_MAX_TOKENS:-3000}
       
       # InfluxDB configuration (read-only access for temporal analysis)
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}

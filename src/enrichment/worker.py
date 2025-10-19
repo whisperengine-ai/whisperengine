@@ -621,8 +621,19 @@ class EnrichmentWorker:
                     # This ensures we don't reprocess messages, only get NEW ones
                     timestamps = []
                     for fact in existing_facts:
-                        if fact.get('context_metadata', {}).get('latest_message_timestamp'):
-                            ts = datetime.fromisoformat(fact['context_metadata']['latest_message_timestamp'])
+                        # Handle context_metadata being a string, dict, or None
+                        context_metadata = fact.get('context_metadata')
+                        if isinstance(context_metadata, str):
+                            import json
+                            try:
+                                context_metadata = json.loads(context_metadata)
+                            except (json.JSONDecodeError, TypeError):
+                                context_metadata = {}
+                        elif not isinstance(context_metadata, dict):
+                            context_metadata = {}
+                        
+                        if context_metadata.get('latest_message_timestamp'):
+                            ts = datetime.fromisoformat(context_metadata['latest_message_timestamp'])
                             # Make timezone-naive for comparison
                             if ts.tzinfo is not None:
                                 ts = ts.replace(tzinfo=None)
