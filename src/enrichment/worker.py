@@ -11,6 +11,7 @@ Runs independently from Discord bots - zero impact on real-time performance.
 import asyncio
 import logging
 import sys
+import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
@@ -19,6 +20,7 @@ import asyncpg
 
 from src.enrichment.config import config
 from src.enrichment.summarization_engine import SummarizationEngine
+from src.enrichment.fact_extraction_engine import FactExtractionEngine
 from src.llm.llm_protocol import create_llm_client
 
 # Configure logging
@@ -63,6 +65,12 @@ class EnrichmentWorker:
             llm_model=config.LLM_MODEL
         )
         
+        # Initialize fact extraction engine (conversation-level analysis)
+        self.fact_extractor = FactExtractionEngine(
+            llm_client=self.llm_client,
+            model=config.LLM_MODEL
+        )
+        
         logger.info("EnrichmentWorker initialized - Qdrant: %s:%s, Model: %s",
                    config.QDRANT_HOST, config.QDRANT_PORT, config.LLM_MODEL)
     
@@ -91,6 +99,7 @@ class EnrichmentWorker:
         logger.info("Found %s bot collections to process", len(collections))
         
         total_summaries_created = 0
+        total_facts_extracted = 0
         
         for collection_name in collections:
             bot_name = self._extract_bot_name(collection_name)
@@ -103,13 +112,22 @@ class EnrichmentWorker:
                 )
                 
                 total_summaries_created += summaries_created
+                
+                # Process fact extraction (conversation-level analysis)
+                facts_extracted = await self._process_fact_extraction(
+                    collection_name=collection_name,
+                    bot_name=bot_name
+                )
+                
+                total_facts_extracted += facts_extracted
+                
             except Exception as e:
                 logger.error("Error processing collection %s: %s", collection_name, e)
                 continue
         
         cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
-        logger.info("✅ Enrichment cycle complete - %s summaries created in %.2fs",
-                   total_summaries_created, cycle_duration)
+        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts extracted in %.2fs",
+                   total_summaries_created, total_facts_extracted, cycle_duration)
     
     async def _process_conversation_summaries(
         self,
@@ -431,6 +449,264 @@ class EnrichmentWorker:
             return collection_name
 
 
+        return bot_name
+
+
+    async def _process_fact_extraction(
+        self,
+        collection_name: str,
+        bot_name: str
+    ) -> int:
+        """
+        Process conversation-level fact extraction for a bot collection.
+        
+        This is SUPERIOR to inline extraction because:
+        1. Analyzes 5-10 message windows for context
+        2. Detects confirmation patterns across messages
+        3. Identifies and resolves conflicting facts
+        4. Builds knowledge graph relationships
+        5. Uses better models (Claude 3.5 Sonnet)
+        """
+        logger.info("🧠 Processing fact extraction for %s...", bot_name)
+        
+        # Get users with conversations in this collection
+        users = await self._get_users_in_collection(collection_name)
+        logger.debug("Found %s users for fact extraction", len(users))
+        
+        facts_extracted = 0
+        
+        for user_id in users:
+            try:
+                # Get conversation windows for fact extraction
+                # Look for recent conversations (last 7 days) that haven't been processed
+                end_time = datetime.utcnow()
+                start_time = end_time - timedelta(days=7)
+                
+                # Get messages in window
+                messages = await self._get_messages_in_window(
+                    collection_name=collection_name,
+                    user_id=user_id,
+                    start_time=start_time,
+                    end_time=end_time
+                )
+                
+                if len(messages) < config.MIN_MESSAGES_FOR_SUMMARY:
+                    logger.debug("Skipping user %s - only %s messages", user_id, len(messages))
+                    continue
+                
+                # Extract facts from conversation window
+                extracted_facts = await self.fact_extractor.extract_facts_from_conversation_window(
+                    messages=messages,
+                    user_id=user_id,
+                    bot_name=bot_name
+                )
+                
+                if not extracted_facts:
+                    logger.debug("No facts extracted for user %s", user_id)
+                    continue
+                
+                # Get existing facts for conflict detection
+                existing_facts = await self._get_existing_facts(user_id, bot_name)
+                
+                # Detect conflicts
+                conflicts = await self.fact_extractor.detect_fact_conflicts(
+                    new_facts=extracted_facts,
+                    existing_facts=existing_facts
+                )
+                
+                # Resolve conflicts
+                if conflicts:
+                    logger.info("Detected %s fact conflicts for user %s", len(conflicts), user_id)
+                    resolutions = await self.fact_extractor.resolve_fact_conflicts(conflicts)
+                    await self._apply_conflict_resolutions(resolutions, user_id, bot_name)
+                
+                # Build knowledge graph relationships
+                relationships = await self.fact_extractor.build_knowledge_graph_relationships(
+                    facts=extracted_facts,
+                    user_id=user_id,
+                    bot_name=bot_name
+                )
+                
+                # Organize and classify facts
+                organized_facts = await self.fact_extractor.organize_and_classify_facts(
+                    facts=extracted_facts
+                )
+                
+                # Store facts in PostgreSQL (same tables as inline extraction)
+                stored_count = await self._store_facts_in_postgres(
+                    facts=extracted_facts,
+                    relationships=relationships,
+                    user_id=user_id,
+                    bot_name=bot_name
+                )
+                
+                facts_extracted += stored_count
+                logger.info("✅ Extracted and stored %s facts for user %s", stored_count, user_id)
+                
+            except Exception as e:
+                logger.error("Error extracting facts for user %s: %s", user_id, e, exc_info=True)
+                continue
+        
+        logger.info("✅ Extracted %s total facts for %s", facts_extracted, bot_name)
+        return facts_extracted
+    
+    async def _get_existing_facts(self, user_id: str, bot_name: str) -> List[Dict]:
+        """Get existing facts for user from PostgreSQL"""
+        async with self.db_pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT entity_name, entity_type, relationship_type, confidence,
+                       created_at, metadata
+                FROM user_facts
+                WHERE user_id = $1 AND bot_name = $2
+                ORDER BY created_at DESC
+                """,
+                user_id,
+                bot_name
+            )
+            
+            return [dict(row) for row in rows]
+    
+    async def _apply_conflict_resolutions(
+        self,
+        resolutions: List[Dict],
+        user_id: str,
+        bot_name: str
+    ):
+        """Apply conflict resolution actions to database"""
+        async with self.db_pool.acquire() as conn:
+            for resolution in resolutions:
+                try:
+                    if resolution['action'] == 'update':
+                        # Archive old fact, keep new one
+                        fact_to_archive = resolution['fact_to_archive']
+                        await conn.execute(
+                            """
+                            UPDATE user_facts
+                            SET metadata = jsonb_set(
+                                COALESCE(metadata, '{}'::jsonb),
+                                '{archived}',
+                                'true'
+                            )
+                            WHERE user_id = $1 
+                            AND bot_name = $2
+                            AND entity_name = $3
+                            """,
+                            user_id,
+                            bot_name,
+                            fact_to_archive.entity_name
+                        )
+                        logger.debug("Archived conflicting fact: %s", fact_to_archive.entity_name)
+                    
+                    elif resolution['action'] == 'flag':
+                        # Flag for manual review
+                        logger.warning(
+                            "Fact conflict flagged for review - User: %s, Conflict: %s",
+                            user_id,
+                            resolution['reasoning']
+                        )
+                        
+                except Exception as e:
+                    logger.error("Failed to apply resolution: %s", e)
+                    continue
+    
+    async def _store_facts_in_postgres(
+        self,
+        facts: List,
+        relationships: List[Dict],
+        user_id: str,
+        bot_name: str
+    ) -> int:
+        """
+        Store extracted facts in PostgreSQL (SAME tables as inline extraction).
+        
+        This ensures zero breaking changes - bots use _get_user_facts_from_postgres()
+        unchanged and see facts from both inline AND enrichment extraction.
+        """
+        stored_count = 0
+        
+        async with self.db_pool.acquire() as conn:
+            for fact in facts:
+                try:
+                    # Build metadata JSON
+                    metadata = {
+                        'confirmation_count': fact.confirmation_count,
+                        'related_facts': fact.related_facts,
+                        'temporal_context': fact.temporal_context,
+                        'reasoning': fact.reasoning,
+                        'source_messages': fact.source_messages,
+                        'extraction_method': 'enrichment_worker',  # Differentiate from inline
+                        'extracted_at': datetime.utcnow().isoformat()
+                    }
+                    
+                    # Insert or update fact
+                    await conn.execute(
+                        """
+                        INSERT INTO user_facts (
+                            user_id, bot_name, entity_name, entity_type,
+                            relationship_type, confidence, metadata, created_at, updated_at
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+                        ON CONFLICT (user_id, bot_name, entity_name, relationship_type)
+                        DO UPDATE SET
+                            confidence = GREATEST(user_facts.confidence, EXCLUDED.confidence),
+                            metadata = EXCLUDED.metadata,
+                            updated_at = NOW()
+                        """,
+                        user_id,
+                        bot_name,
+                        fact.entity_name,
+                        fact.entity_type,
+                        fact.relationship_type,
+                        fact.confidence,
+                        json.dumps(metadata)
+                    )
+                    
+                    stored_count += 1
+                    
+                except Exception as e:
+                    logger.error("Failed to store fact %s: %s", fact.entity_name, e)
+                    continue
+            
+            # Store knowledge graph relationships
+            for relationship in relationships:
+                try:
+                    source_fact = relationship.get('source_fact')
+                    target_fact = relationship.get('target_fact')
+                    
+                    if not source_fact or not target_fact:
+                        continue
+                    
+                    # Store in user_fact_relationships table
+                    await conn.execute(
+                        """
+                        INSERT INTO user_fact_relationships (
+                            user_id, bot_name, source_entity, target_entity,
+                            relationship_type, confidence, metadata, created_at
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                        ON CONFLICT (user_id, bot_name, source_entity, target_entity, relationship_type)
+                        DO UPDATE SET
+                            confidence = GREATEST(user_fact_relationships.confidence, EXCLUDED.confidence),
+                            updated_at = NOW()
+                        """,
+                        user_id,
+                        bot_name,
+                        source_fact.entity_name,
+                        target_fact.entity_name,
+                        relationship['relationship_type'],
+                        relationship['confidence'],
+                        json.dumps({
+                            'reasoning': relationship.get('reasoning'),
+                            'extraction_method': 'enrichment_worker'
+                        })
+                    )
+                    
+                except Exception as e:
+                    logger.error("Failed to store relationship: %s", e)
+                    continue
+        
+        return stored_count
+
+
 async def main():
     """Main entry point for enrichment worker"""
     try:
@@ -458,11 +734,9 @@ async def main():
         worker = EnrichmentWorker(postgres_pool=pool)
         await worker.run()
         
-    except KeyboardInterrupt:
-        logger.info("🛑 Enrichment worker stopped by user")
     except Exception as e:
         logger.error("❌ Fatal error in enrichment worker: %s", e, exc_info=True)
-        sys.exit(1)
+        raise
 
 
 if __name__ == "__main__":
