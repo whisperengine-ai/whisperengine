@@ -57,22 +57,29 @@ class EnrichmentWorker:
         )
         
         # Initialize LLM client for high-quality summarization
-        self.llm_client = create_llm_client(llm_client_type="openrouter")
+        self.llm_client = create_llm_client(
+            llm_client_type="openrouter",
+            api_url=config.LLM_API_URL,
+            api_key=config.LLM_API_KEY
+        )
         
-        # Initialize summarization engine
+        # Initialize summarization engine (uses LLM_CHAT_MODEL)
         self.summarizer = SummarizationEngine(
             llm_client=self.llm_client,
-            llm_model=config.LLM_MODEL
+            llm_model=config.LLM_CHAT_MODEL
         )
         
-        # Initialize fact extraction engine (conversation-level analysis)
+        # Initialize fact extraction engine (uses LLM_FACT_EXTRACTION_MODEL)
+        # Defaults to Claude Sonnet 4.5 for superior conversation-level analysis
+        # Can be overridden to GPT-3.5 in .env for cost savings
         self.fact_extractor = FactExtractionEngine(
             llm_client=self.llm_client,
-            model=config.LLM_MODEL
+            model=config.LLM_FACT_EXTRACTION_MODEL
         )
         
-        logger.info("EnrichmentWorker initialized - Qdrant: %s:%s, Model: %s",
-                   config.QDRANT_HOST, config.QDRANT_PORT, config.LLM_MODEL)
+        logger.info("EnrichmentWorker initialized - Qdrant: %s:%s, Summary Model: %s, Fact Model: %s",
+                   config.QDRANT_HOST, config.QDRANT_PORT, 
+                   config.LLM_CHAT_MODEL, config.LLM_FACT_EXTRACTION_MODEL)
     
     async def run(self):
         """Main worker loop - runs forever in container"""
@@ -159,10 +166,10 @@ class EnrichmentWorker:
                 )
                 
                 if not time_windows:
-                    logger.debug("No new time windows to summarize for user %s", user_id)
+                    logger.debug("✅ No new messages for user %s", user_id)
                     continue
                 
-                logger.info("Found %s unsummarized windows for user %s", 
+                logger.info("🔍 Found %s windows for user %s (new message activity detected)", 
                            len(time_windows), user_id)
                 
                 # Process each time window
@@ -195,7 +202,7 @@ class EnrichmentWorker:
         start_time = window['start_time']
         end_time = window['end_time']
         
-        logger.debug("Creating summary for %s from %s to %s",
+        logger.info("📝 Creating summary for %s from %s to %s",
                     user_id, start_time, end_time)
         
         # Retrieve all messages in this time window
@@ -206,10 +213,14 @@ class EnrichmentWorker:
             end_time=end_time
         )
         
+        logger.info("📊 Retrieved %s messages for window", len(messages))
+        
         if len(messages) < config.MIN_MESSAGES_FOR_SUMMARY:
-            logger.debug("Skipping window - only %s messages (min: %s)",
+            logger.info("⏭️  Skipping window - only %s messages (min: %s)",
                         len(messages), config.MIN_MESSAGES_FOR_SUMMARY)
             return False
+        
+        logger.info("🤖 Generating LLM summary for %s messages...", len(messages))
         
         # Generate high-quality summary using LLM
         try:
@@ -218,8 +229,9 @@ class EnrichmentWorker:
                 user_id=user_id,
                 bot_name=bot_name
             )
+            logger.info("✅ LLM summary generated: %s chars", len(summary_result.get('summary_text', '')))
         except Exception as e:
-            logger.error("Failed to generate summary: %s", e)
+            logger.error("❌ Failed to generate summary: %s", e, exc_info=True)
             return False
         
         # Store summary in PostgreSQL
@@ -291,6 +303,68 @@ class EnrichmentWorker:
             return messages
             
         except Exception as e:
+            logger.error("Error retrieving messages: %s", e)
+            return []
+    
+    async def _get_new_messages_since(
+        self,
+        collection_name: str,
+        user_id: str,
+        since_timestamp: datetime
+    ) -> List[Dict]:
+        """
+        Get NEW messages for a user since a specific timestamp.
+        
+        This is the INCREMENTAL approach - only fetch messages we haven't processed yet.
+        Avoids wasteful re-querying of old conversations.
+        """
+        try:
+            # Convert datetime to Unix timestamp for Qdrant query
+            since_unix = since_timestamp.timestamp()
+            
+            # Scroll through Qdrant with filters
+            results, _ = self.qdrant_client.scroll(
+                collection_name=collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="user_id",
+                            match=MatchValue(value=user_id)
+                        ),
+                        FieldCondition(
+                            key="timestamp_unix",
+                            range=Range(
+                                gt=since_unix  # Greater than (not gte) to avoid re-processing
+                            )
+                        )
+                    ]
+                ),
+                limit=1000,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            messages = []
+            for point in results:
+                # Parse timestamp
+                timestamp_str = point.payload.get('timestamp', '')
+                try:
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                except:
+                    timestamp = datetime.utcnow()
+                
+                messages.append({
+                    'content': point.payload.get('content', ''),
+                    'timestamp': timestamp,
+                    'memory_type': point.payload.get('memory_type', ''),
+                    'emotion_label': point.payload.get('emotion_label', 'neutral')
+                })
+            
+            # Sort by timestamp
+            messages.sort(key=lambda m: m['timestamp'])
+            return messages
+            
+        except Exception as e:
             logger.error("Error retrieving messages from Qdrant: %s", e)
             return []
     
@@ -300,35 +374,61 @@ class EnrichmentWorker:
         user_id: str,
         existing_summaries: List[Dict]
     ) -> List[Dict]:
-        """Find time windows that need summarization"""
+        """
+        Find time windows that need summarization using INCREMENTAL approach.
+        
+        Strategy:
+        1. Find the LAST processed timestamp (most recent summary end_timestamp)
+        2. Query Qdrant for NEW messages since that timestamp
+        3. Create windows ONLY for new message activity
+        4. Avoids wasteful re-processing of same old conversations
+        """
         windows = []
         now = datetime.utcnow()
         
-        # Create windows for last N days (configurable)
-        for days_ago in range(config.LOOKBACK_DAYS):
-            window_end = now - timedelta(days=days_ago)
-            window_start = window_end - timedelta(hours=config.TIME_WINDOW_HOURS)
+        # Find the last processed timestamp
+        if existing_summaries:
+            # Get the most recent summary's end time
+            last_processed = max(s['end_timestamp'] for s in existing_summaries)
+            logger.debug("Last processed timestamp for user %s: %s", user_id, last_processed)
+        else:
+            # No summaries yet - look back N days for initial backfill
+            last_processed = now - timedelta(days=config.LOOKBACK_DAYS)
+            logger.debug("No existing summaries for user %s, backfilling from %s", user_id, last_processed)
+        
+        # Get NEW messages since last processing
+        new_messages = await self._get_new_messages_since(
+            collection_name=collection_name,
+            user_id=user_id,
+            since_timestamp=last_processed
+        )
+        
+        if not new_messages:
+            logger.debug("No new messages for user %s since %s", user_id, last_processed)
+            return []
+        
+        # Group new messages into time-based windows
+        # Use 24-hour windows for consistency
+        message_times = [msg['timestamp'] for msg in new_messages]
+        earliest_new = min(message_times)
+        latest_new = max(message_times)
+        
+        # Create windows covering the new message timespan
+        current_window_start = earliest_new
+        while current_window_start < latest_new:
+            window_end = min(current_window_start + timedelta(hours=config.TIME_WINDOW_HOURS), latest_new)
             
-            # Check if this window overlaps with existing summaries
-            overlaps = any(
-                self._windows_overlap(
-                    window_start, window_end,
-                    summary['start_timestamp'], summary['end_timestamp']
-                )
-                for summary in existing_summaries
-            )
+            windows.append({
+                'start_time': current_window_start,
+                'end_time': window_end
+            })
             
-            if not overlaps:
-                windows.append({
-                    'start_time': window_start,
-                    'end_time': window_end
-                })
+            current_window_start = window_end
+        
+        logger.debug("Created %s windows for %s new messages (user %s)", 
+                    len(windows), len(new_messages), user_id)
         
         return windows
-    
-    def _windows_overlap(self, start1, end1, start2, end2) -> bool:
-        """Check if two time windows overlap"""
-        return start1 <= end2 and end1 >= start2
     
     async def _get_existing_summary_ranges(
         self,
@@ -460,12 +560,13 @@ class EnrichmentWorker:
         """
         Process conversation-level fact extraction for a bot collection.
         
-        This is SUPERIOR to inline extraction because:
-        1. Analyzes 5-10 message windows for context
-        2. Detects confirmation patterns across messages
-        3. Identifies and resolves conflicting facts
-        4. Builds knowledge graph relationships
-        5. Uses better models (Claude 3.5 Sonnet)
+        Uses INCREMENTAL approach (same as summaries):
+        1. Tracks last processed timestamp via existing facts
+        2. Only processes NEW messages since last extraction
+        3. Avoids wasteful re-processing of old conversations
+        4. Analyzes conversation windows for context
+        5. Detects confirmation patterns and conflicts
+        6. Builds knowledge graph relationships
         """
         logger.info("🧠 Processing fact extraction for %s...", bot_name)
         
@@ -477,38 +578,50 @@ class EnrichmentWorker:
         
         for user_id in users:
             try:
-                # Get conversation windows for fact extraction
-                # Look for recent conversations (last 7 days) that haven't been processed
-                end_time = datetime.utcnow()
-                start_time = end_time - timedelta(days=7)
+                # Get last processed timestamp from existing facts
+                existing_facts = await self._get_existing_facts(user_id, bot_name)
                 
-                # Get messages in window
-                messages = await self._get_messages_in_window(
+                if existing_facts:
+                    # Find most recent fact extraction timestamp
+                    last_processed = max(
+                        fact.get('created_at', datetime.utcnow() - timedelta(days=30))
+                        for fact in existing_facts
+                    )
+                    logger.debug("Last fact extraction for user %s: %s", user_id, last_processed)
+                else:
+                    # No facts yet - backfill from 30 days ago
+                    last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                    logger.debug("No existing facts for user %s, backfilling from %s", user_id, last_processed)
+                
+                # Get NEW messages since last processing
+                new_messages = await self._get_new_messages_since(
                     collection_name=collection_name,
                     user_id=user_id,
-                    start_time=start_time,
-                    end_time=end_time
+                    since_timestamp=last_processed
                 )
                 
-                if len(messages) < config.MIN_MESSAGES_FOR_SUMMARY:
-                    logger.debug("Skipping user %s - only %s messages", user_id, len(messages))
+                if not new_messages:
+                    logger.debug("✅ No new messages for fact extraction (user %s)", user_id)
                     continue
                 
-                # Extract facts from conversation window
+                if len(new_messages) < config.MIN_MESSAGES_FOR_SUMMARY:
+                    logger.debug("Skipping user %s - only %s new messages", user_id, len(new_messages))
+                    continue
+                
+                logger.info("🔍 Extracting facts from %s new messages (user %s)", len(new_messages), user_id)
+                
+                # Extract facts from NEW conversation window
                 extracted_facts = await self.fact_extractor.extract_facts_from_conversation_window(
-                    messages=messages,
+                    messages=new_messages,
                     user_id=user_id,
                     bot_name=bot_name
                 )
                 
                 if not extracted_facts:
-                    logger.debug("No facts extracted for user %s", user_id)
+                    logger.debug("No facts extracted from new messages (user %s)", user_id)
                     continue
                 
-                # Get existing facts for conflict detection
-                existing_facts = await self._get_existing_facts(user_id, bot_name)
-                
-                # Detect conflicts
+                # Detect conflicts with existing facts
                 conflicts = await self.fact_extractor.detect_fact_conflicts(
                     new_facts=extracted_facts,
                     existing_facts=existing_facts
@@ -551,15 +664,27 @@ class EnrichmentWorker:
         return facts_extracted
     
     async def _get_existing_facts(self, user_id: str, bot_name: str) -> List[Dict]:
-        """Get existing facts for user from PostgreSQL"""
+        """
+        Get existing facts for user from PostgreSQL.
+        
+        Uses fact_entities + user_fact_relationships tables (matches inline extraction).
+        Returns facts with created_at timestamps for incremental processing.
+        """
         async with self.db_pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT entity_name, entity_type, relationship_type, confidence,
-                       created_at, metadata
-                FROM user_facts
-                WHERE user_id = $1 AND bot_name = $2
-                ORDER BY created_at DESC
+                SELECT 
+                    fe.entity_name,
+                    fe.entity_type,
+                    ufr.relationship_type,
+                    ufr.confidence,
+                    ufr.created_at,
+                    ufr.context_metadata
+                FROM user_fact_relationships ufr
+                JOIN fact_entities fe ON ufr.entity_id = fe.id
+                WHERE ufr.user_id = $1 
+                  AND (ufr.context_metadata->>'bot_name' = $2 OR ufr.context_metadata IS NULL)
+                ORDER BY ufr.created_at DESC
                 """,
                 user_id,
                 bot_name
@@ -573,28 +698,35 @@ class EnrichmentWorker:
         user_id: str,
         bot_name: str
     ):
-        """Apply conflict resolution actions to database"""
+        """
+        Apply conflict resolution actions to database.
+        
+        Uses fact_entities + user_fact_relationships tables (NOT user_facts).
+        """
         async with self.db_pool.acquire() as conn:
             for resolution in resolutions:
                 try:
                     if resolution['action'] == 'update':
-                        # Archive old fact, keep new one
+                        # Archive old fact by updating metadata in user_fact_relationships
                         fact_to_archive = resolution['fact_to_archive']
                         await conn.execute(
                             """
-                            UPDATE user_facts
+                            UPDATE user_fact_relationships
                             SET metadata = jsonb_set(
                                 COALESCE(metadata, '{}'::jsonb),
                                 '{archived}',
                                 'true'
                             )
-                            WHERE user_id = $1 
-                            AND bot_name = $2
-                            AND entity_name = $3
+                            WHERE user_id = $1
+                              AND entity_id = (
+                                  SELECT entity_id FROM fact_entities 
+                                  WHERE entity_name = $2 LIMIT 1
+                              )
+                              AND relationship_type = $3
                             """,
                             user_id,
-                            bot_name,
-                            fact_to_archive.entity_name
+                            fact_to_archive.entity_name,
+                            fact_to_archive.relationship_type
                         )
                         logger.debug("Archived conflicting fact: %s", fact_to_archive.entity_name)
                     
@@ -651,16 +783,18 @@ class EnrichmentWorker:
                             'tags': fact.related_facts  # Used for full-text search
                         }
                         
-                        # Insert or update entity in fact_entities
+                        # Insert or update entity in fact_entities (matches semantic_router.py)
+                        # Include category field to match inline extraction schema
                         entity_id = await conn.fetchval("""
-                            INSERT INTO fact_entities (entity_type, entity_name, attributes)
-                            VALUES ($1, $2, $3)
+                            INSERT INTO fact_entities (entity_type, entity_name, category, attributes)
+                            VALUES ($1, $2, $3, $4)
                             ON CONFLICT (entity_type, entity_name) 
                             DO UPDATE SET 
-                                attributes = fact_entities.attributes || COALESCE($3, '{}'::jsonb),
+                                category = COALESCE($3, fact_entities.category),
+                                attributes = fact_entities.attributes || COALESCE($4, '{}'::jsonb),
                                 updated_at = NOW()
                             RETURNING id
-                        """, fact.entity_type, fact.entity_name, json.dumps(attributes))
+                        """, fact.entity_type, fact.entity_name, fact.entity_type, json.dumps(attributes))
                         
                         # Build context_metadata JSONB for user_fact_relationships
                         # This leverages PostgreSQL graph features for rich metadata
