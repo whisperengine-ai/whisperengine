@@ -435,28 +435,70 @@ class DiscordEventHandler:
 
 ---
 
+## 🚀 STRATEGIC ENHANCEMENT: ASYNC ENRICHMENT ARCHITECTURE
+
+### Major Architectural Shift (Replaces Phase 2-3 priorities)
+
+**New Proposal**: Separate hot path (real-time) from cold path (async enrichment)
+
+Instead of optimizing inline fact extraction and conversation summarization, **move them to a background worker**:
+
+- **Current Hot Path**: User message → Memory storage → Fact extraction → Summarization → Response (SLOW)
+- **Proposed Hot Path**: User message → Memory storage → Response (FAST! -1,000ms)
+- **New Cold Path**: Background worker periodically processes Qdrant → Generates summaries → Stores in PostgreSQL
+
+**Benefits**:
+1. **~1,000ms saved per message** (25% performance improvement) - removes 2 LLM calls from hot path
+2. **Higher quality intelligence** - use Claude 3.5 Sonnet/GPT-4 for deep analysis without time pressure
+3. **Natural time-anchored queries** - "what did we talk about last week?" pre-computed
+4. **Independent scaling** - enrichment worker scales separately from Discord bots
+5. **Incremental deployment** - add-on enhancement with ZERO risk to existing bots
+
+**Documentation**: See `docs/architecture/INCREMENTAL_ASYNC_ENRICHMENT.md` for full design
+
+**Impact on Roadmap**:
+- ✅ **Phase 1 (Caching)** - Still valid and complementary
+- 🔄 **Phase 2-3 (Batching/Parallel)** - SUPERSEDED by async enrichment approach
+- 🔄 **Phase 4 (Discord investigation)** - Still needed for remaining 6.4s gap
+
+**New Priority Order**:
+1. **Async Enrichment Architecture** (Week 1-2) - **-1,000ms (25% improvement)**
+2. Emotion + Character caching (Phase 1) - **-350ms (8.8% improvement)**
+3. Discord timing investigation - Understand remaining 6.4s gap
+
+**Total Expected Improvement**: ~35% faster internal processing (3,988ms → 2,638ms)
+
+---
+
 ## 🎯 NEXT ACTIONS
 
 ### Immediate (This Week)
 1. ✅ **DONE**: Performance analysis and bottleneck identification
 2. ✅ **DONE**: Documentation of findings and optimization plan
-3. 🟡 **TODO**: User approval to proceed with Phase 1 implementation
-4. 🟡 **TODO**: Set up performance monitoring baseline before changes
+3. ✅ **DONE**: Async enrichment architecture design
+4. 🟡 **TODO**: User approval to proceed with async enrichment OR traditional caching approach
 
 ### Short-term (Next 2 Weeks)
+**Option A: Async Enrichment (RECOMMENDED)**
+1. Create PostgreSQL `conversation_summaries` table migration
+2. Implement enrichment worker MVP
+3. Deploy enrichment worker container (zero bot changes)
+4. Monitor background enrichment performance
+
+**Option B: Traditional Optimization**
 1. Implement emotion query caching (Priority 1.1)
 2. Implement character data caching (Priority 1.2)
 3. Validate 8.8% performance improvement
 4. Begin InfluxDB batching implementation (Priority 2.1)
 
 ### Medium-term (Next Month)
-1. Complete all Phase 1-3 optimizations
-2. Achieve 15% performance improvement target
+1. Complete async enrichment integration (minimal bot changes)
+2. Implement remaining caching optimizations (complementary)
 3. Conduct Discord timing investigation (Phase 4)
-4. Plan additional optimizations based on Phase 4 findings
+4. Target: 35%+ performance improvement + new time-based query features
 
 ---
 
-**Last Updated**: October 18, 2025  
+**Last Updated**: October 19, 2025  
 **Owner**: WhisperEngine Development Team  
-**Status**: 🟡 Awaiting approval to begin Phase 1 implementation
+**Status**: 🟡 Strategic decision needed: Async enrichment vs traditional optimization

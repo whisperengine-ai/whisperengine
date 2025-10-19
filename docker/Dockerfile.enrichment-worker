@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements-enrichment.txt .
+RUN pip install --no-cache-dir -r requirements-enrichment.txt
+
+# Copy only necessary source code for enrichment worker
+COPY src/enrichment/ ./src/enrichment/
+COPY src/llm/ ./src/llm/
+COPY src/database/ ./src/database/
+
+# Create logs directory
+RUN mkdir -p logs/enrichment
+
+# Set Python path
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Run enrichment worker
+CMD ["python", "-m", "src.enrichment.worker"]
