@@ -813,10 +813,17 @@ class MessageProcessor:
             )
             
             # Phase 9b: Knowledge extraction and storage (PostgreSQL)
-            # Extract facts from USER message about the user
-            knowledge_stored = await self._extract_and_store_knowledge(
-                message_context, ai_components, extract_from='user'
-            )
+            # FEATURE FLAG: Runtime fact extraction (disabled by default - enrichment worker handles this)
+            # Runtime extraction adds 200-500ms latency with LLM call per message
+            # Enrichment worker provides better quality with conversation context + no user-facing latency
+            knowledge_stored = False
+            if os.getenv('ENABLE_RUNTIME_FACT_EXTRACTION', 'false').lower() == 'true':
+                # Extract facts from USER message about the user
+                knowledge_stored = await self._extract_and_store_knowledge(
+                    message_context, ai_components, extract_from='user'
+                )
+            else:
+                logger.debug("⏭️ RUNTIME FACT EXTRACTION: Disabled (enrichment worker handles fact extraction)")
             
             # NOTE: Bot self-learning is handled by Character Episodic Intelligence (PHASE 1)
             # Character episodic memories are extracted from vector conversations with RoBERTa emotion scoring
