@@ -199,7 +199,7 @@ Topics (JSON array):"""
         
         for msg in messages:
             role = "User" if msg.get('memory_type') == 'user_message' else bot_name
-            content = msg.get('content', '')[:500]  # Truncate very long messages
+            content = msg.get('content', '')[:2000]  # Discord limit: 2000 chars - preserve full fidelity
             timestamp = msg.get('timestamp', '')
             
             # Format timestamp if it's a datetime object
