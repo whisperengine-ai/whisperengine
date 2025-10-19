@@ -5,6 +5,7 @@ Uses sophisticated LLM prompts and multi-step reasoning since we're NOT
 in the hot path and can take our time for better quality.
 """
 
+import asyncio
 import logging
 import json
 from typing import List, Dict, Any
@@ -105,15 +106,26 @@ Conversation ({message_count} messages):
 Provide a comprehensive 3-5 sentence summary that captures the essence of this conversation. Be specific and preserve important details."""
 
         try:
-            # Use LLM client to generate summary
-            response = await self.llm_client.generate_completion(
-                prompt=summary_prompt,
+            # Use get_chat_response for modern chat API (asyncio.to_thread for sync method)
+            response = await asyncio.to_thread(
+                self.llm_client.get_chat_response,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert conversation analyst. Provide clear, detailed summaries."
+                    },
+                    {
+                        "role": "user",
+                        "content": summary_prompt
+                    }
+                ],
                 model=self.llm_model,
                 temperature=0.5,
                 max_tokens=500
             )
             
-            summary_text = response.strip() if isinstance(response, str) else response.get('content', '').strip()
+            # get_chat_response returns a string directly
+            summary_text = response.strip() if response else ''
             
             if not summary_text:
                 logger.warning("LLM returned empty summary, using fallback")
@@ -135,14 +147,30 @@ Conversation:
 Topics (JSON array):"""
 
         try:
-            response = await self.llm_client.generate_completion(
-                prompt=topics_prompt,
+            # Use get_chat_response for modern chat API
+            response_text = await asyncio.to_thread(
+                self.llm_client.get_chat_response,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a topic extraction specialist. Return ONLY valid JSON arrays."
+                    },
+                    {
+                        "role": "user",
+                        "content": topics_prompt
+                    }
+                ],
                 model=self.llm_model,
                 temperature=0.3,
                 max_tokens=100
             )
             
-            response_text = response if isinstance(response, str) else response.get('content', '')
+            # get_chat_response returns string directly - parse JSON
+            # Handle markdown code blocks
+            if '```json' in response_text:
+                response_text = response_text.split('```json')[1].split('```')[0].strip()
+            elif '```' in response_text:
+                response_text = response_text.split('```')[1].split('```')[0].strip()
             
             # Try to parse as JSON
             topics = json.loads(response_text)
@@ -198,7 +226,22 @@ Topics (JSON array):"""
         formatted = []
         
         for msg in messages:
-            role = "User" if msg.get('memory_type') == 'user_message' else bot_name
+            # CRITICAL FIX: Use 'role' field (user/bot) not 'memory_type' (conversation/fact/etc)
+            msg_role = msg.get('role', '')
+            
+            # Determine display name
+            if msg_role == 'user':
+                role = "User"
+            elif msg_role in ('bot', 'assistant'):
+                role = bot_name
+            # FALLBACK: Old memory_type field for backward compatibility
+            elif msg.get('memory_type') == 'user_message':
+                role = "User"
+            elif msg.get('memory_type') == 'bot_response':
+                role = bot_name
+            else:
+                role = bot_name  # Default to bot if unclear
+            
             content = msg.get('content', '')[:2000]  # Discord limit: 2000 chars - preserve full fidelity
             timestamp = msg.get('timestamp', '')
             

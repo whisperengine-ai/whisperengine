@@ -19,6 +19,7 @@ Key advantages over inline extraction:
 
 import logging
 import json
+import os
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
@@ -35,10 +36,10 @@ class ExtractedFact:
     relationship_type: str  # likes, dislikes, owns, does, visited, etc.
     confidence: float
     confirmation_count: int = 1  # How many times confirmed in conversation
-    related_facts: List[str] = None
-    temporal_context: str = None  # "recent", "long-term", "past", etc.
-    reasoning: str = None
-    source_messages: List[str] = None  # Message IDs that support this fact
+    related_facts: Optional[List[str]] = None
+    temporal_context: Optional[str] = None  # "recent", "long-term", "past", etc.
+    reasoning: Optional[str] = None
+    source_messages: Optional[List[str]] = None  # Message IDs that support this fact
     
     def __post_init__(self):
         if self.related_facts is None:
@@ -109,12 +110,7 @@ class FactExtractionEngine:
         bot_name: str
     ) -> List[ExtractedFact]:
         """
-        Extract facts from conversation window with multi-message context.
-        
-        This provides SUPERIOR quality compared to single-message extraction:
-        - Confirmation patterns: "I love pizza" + "pepperoni is my favorite" = high confidence
-        - Context understanding: Follow-up clarifications improve accuracy
-        - Related facts: Links "loves pizza" → "makes dough" → "cooking skills"
+        Extract facts from a conversation window using LLM analysis.
         
         Args:
             messages: List of message dicts with content, timestamp, memory_type
@@ -127,53 +123,98 @@ class FactExtractionEngine:
         if not messages:
             return []
         
+        # CRITICAL: Chunk large conversations to avoid context window limits!
+        # LLM can only process ~4000 tokens at once (including prompt + response)
+        # 640 messages would be ~100K tokens - way too big!
+        MAX_MESSAGES_PER_CHUNK = 20  # Conservative - ~2000 tokens per chunk
+        
+        all_facts = []
+        
+        # Process in chunks if conversation is large
+        if len(messages) > MAX_MESSAGES_PER_CHUNK:
+            logger.info(
+                "Large conversation (%d messages) - processing in chunks of %d",
+                len(messages), MAX_MESSAGES_PER_CHUNK
+            )
+            
+            for i in range(0, len(messages), MAX_MESSAGES_PER_CHUNK):
+                chunk = messages[i:i + MAX_MESSAGES_PER_CHUNK]
+                chunk_facts = await self._extract_facts_from_chunk(chunk, user_id, bot_name)
+                all_facts.extend(chunk_facts)
+            
+            logger.info(
+                "Extracted %d total facts from %d chunks (user %s)",
+                len(all_facts), (len(messages) + MAX_MESSAGES_PER_CHUNK - 1) // MAX_MESSAGES_PER_CHUNK,
+                user_id
+            )
+            return all_facts
+        
+        # Small conversation - process directly
+        return await self._extract_facts_from_chunk(messages, user_id, bot_name)
+    
+    async def _extract_facts_from_chunk(
+        self,
+        messages: List[Dict],
+        user_id: str,
+        bot_name: str
+    ) -> List[ExtractedFact]:
+        """Extract facts from a single conversation chunk (internal helper)"""
+        if not messages:
+            return []
+        
         # Build conversation context from window
         conversation_text = self._format_conversation_window(messages)
         
-        # Build extraction prompt
-        extraction_prompt = f"""Analyze this conversation and extract clear, confirmed personal facts about the user.
+        # 🔍 DEBUG: Log conversation text IMMEDIATELY after formatting
+        logger.warning("🔍 CONVERSATION TEXT BUILT: %d chars", len(conversation_text))
+        
+        # Build extraction prompt (MATCHES inline bot implementation for consistency)
+        # Simpler prompt = better LLM compliance and fact extraction
+        extraction_prompt = f"""Analyze this conversation and extract ONLY clear, factual personal statements about the user.
 
 Conversation:
 {conversation_text}
 
 Instructions:
-- Look for facts CONFIRMED across multiple messages (higher confidence)
-- Link related facts together (e.g., "loves pizza" + "makes dough" = "cooking skills")
-- Note temporal patterns (e.g., preferences that emerged recently vs. long-term)
-- Extract: preferences, skills, possessions, relationships, goals, experiences
-- Higher confidence for facts mentioned multiple times or with follow-up clarification
-- Detect meta-facts: If user mentions "hiking every weekend" + "trail running" → "outdoor lifestyle"
+- Extract personal preferences: Foods/drinks/hobbies they explicitly like/dislike/enjoy
+- Extract personal facts: Pets they own, places they've visited, hobbies they actively do
+- DO NOT extract: Conversational phrases, questions, abstract concepts, philosophical statements
+- DO NOT extract: Things the user asks about or discusses theoretically - only facts about themselves
 
-Return JSON:
+Return JSON (return empty list if no clear facts found):
 {{
     "facts": [
         {{
             "entity_name": "pizza",
             "entity_type": "food",
-            "relationship_type": "loves",
-            "confidence": 0.95,
-            "confirmation_count": 3,
-            "related_facts": ["makes homemade pizza", "baking skills"],
-            "temporal_context": "long-term preference, mentioned across conversations",
-            "reasoning": "User mentioned loving pizza, specified pepperoni, and revealed making own dough - high confidence"
+            "relationship_type": "likes",
+            "confidence": 0.9,
+            "reasoning": "User explicitly stated they love pizza"
         }}
     ]
 }}
 
-Valid entity_types: food, drink, hobby, place, pet, skill, goal, occupation, relationship, experience, possession, other
-Valid relationship_types:
-- Preferences: likes, loves, dislikes, hates, prefers, enjoys
+Valid entity_types: food, drink, hobby, place, pet, skill, goal, occupation, other
+Valid relationship_types: 
+- Preferences: likes, dislikes, enjoys, loves, hates, prefers
 - Possessions: owns, has, bought, sold, lost
-- Actions: does, practices, plays, visited, traveled_to, went_to
-- Skills: good_at, excels_at, learning, skilled_in
+- Actions: visited, traveled_to, went_to, does, practices, plays
 - Aspirations: wants, needs, plans_to, hopes_to, dreams_of
 - Experiences: tried, learned, studied, worked_at, lived_in
 - Relationships: knows, friends_with, family_of, works_with
-"""
+
+Be conservative - only extract clear, unambiguous facts."""
+        
+        # 🔍 DEBUG: Log final prompt size
+        logger.warning("🔍 EXTRACTION PROMPT SIZE: %d chars (conversation: %d chars)", 
+                      len(extraction_prompt), len(conversation_text))
         
         try:
             # Call LLM for fact extraction
             result = await self._call_llm(extraction_prompt)
+            
+            # CRITICAL DEBUG: Always log first 300 chars of LLM response to diagnose 0-fact issue
+            logger.warning("🔍 LLM RESPONSE (first 300 chars): %s", result[:300] if result else "NONE")
             
             # Parse and structure results
             facts = self._parse_fact_extraction_result(result, messages)
@@ -390,21 +431,41 @@ Valid relationship_types:
     # Helper methods
     
     def _format_conversation_window(self, messages: List[Dict]) -> str:
-        """Format messages into conversation context"""
+        """
+        Format messages into readable text for fact extraction.
+        
+        IMPORTANT: Only includes USER messages since we're extracting facts ABOUT the user,
+        not the bot. Bot responses don't contain user facts.
+        """
+        logger.debug("_format_conversation_window: Received %d messages", len(messages))
+        
         formatted = []
         for msg in messages:
-            memory_type = msg.get('memory_type', '')
+            # Use 'role' field (user/bot) not 'memory_type' (conversation/fact/etc)
+            role = msg.get('role', '')
             content = msg.get('content', '')
             
-            if memory_type == 'user_message':
+            # ONLY include user messages for fact extraction
+            if role == 'user':
                 formatted.append(f"User: {content}")
-            elif memory_type == 'bot_response':
-                formatted.append(f"Bot: {content}")
+            # FALLBACK: Try old memory_type field for backward compatibility
+            elif msg.get('memory_type') == 'user_message':
+                formatted.append(f"User: {content}")
         
-        return "\n".join(formatted)
+        conversation_text = "\n".join(formatted)
+        logger.debug("Formatted %d user messages into %d chars", len(formatted), len(conversation_text))
+        
+        return conversation_text
     
-    async def _call_llm(self, prompt: str, max_tokens: int = 1000) -> str:
+    async def _call_llm(self, prompt: str, max_tokens: Optional[int] = None) -> str:
         """Call LLM for fact extraction"""
+        # CRITICAL: Enrichment processes 20-message chunks and needs larger output capacity
+        # than inline extraction (which processes single messages)
+        # Default: 3000 tokens = ~10-15 facts with full reasoning per chunk
+        # Override via LLM_MAX_TOKENS_CHAT environment variable (matches bot convention)
+        if max_tokens is None:
+            max_tokens = int(os.getenv('LLM_MAX_TOKENS_CHAT', '3000'))
+        
         try:
             # Use better model for enrichment (not time-critical)
             response = await asyncio.to_thread(
@@ -435,7 +496,11 @@ Valid relationship_types:
         llm_response: str,
         messages: List[Dict]
     ) -> List[ExtractedFact]:
-        """Parse LLM response into structured facts"""
+        """
+        Parse LLM response into structured facts.
+        
+        MATCHES inline bot implementation - simpler structure for better LLM compliance.
+        """
         try:
             # Handle markdown code blocks
             if '```json' in llm_response:
@@ -446,17 +511,27 @@ Valid relationship_types:
             data = json.loads(llm_response)
             facts = []
             
-            for fact_data in data.get('facts', []):
+            # Debug logging when no facts found  
+            facts_list = data.get('facts', [])
+            if len(facts_list) == 0:
+                logger.info(
+                    "ℹ️ No facts extracted from conversation. Data keys: %s, Response sample: %s",
+                    list(data.keys()), llm_response[:200]
+                )
+            
+            for fact_data in facts_list:
+                # Use simpler structure matching inline extraction
+                # Optional fields get sensible defaults
                 fact = ExtractedFact(
                     entity_name=fact_data.get('entity_name', ''),
                     entity_type=fact_data.get('entity_type', 'other'),
                     relationship_type=fact_data.get('relationship_type', ''),
-                    confidence=float(fact_data.get('confidence', 0.5)),
-                    confirmation_count=int(fact_data.get('confirmation_count', 1)),
-                    related_facts=fact_data.get('related_facts', []),
-                    temporal_context=fact_data.get('temporal_context'),
-                    reasoning=fact_data.get('reasoning'),
-                    source_messages=[msg.get('id') for msg in messages if msg.get('id')]
+                    confidence=float(fact_data.get('confidence', 0.8)),
+                    confirmation_count=1,  # Enrichment sees full conversation, count as confirmed
+                    related_facts=[],  # Can be enriched later if needed
+                    temporal_context=None,  # Optional - not in simple prompt
+                    reasoning=fact_data.get('reasoning', 'Extracted from conversation window'),
+                    source_messages=[msg.get('id', '') for msg in messages if msg.get('id')]
                 )
                 facts.append(fact)
             
@@ -464,6 +539,7 @@ Valid relationship_types:
             
         except json.JSONDecodeError as e:
             logger.error("Failed to parse fact extraction result: %s", e)
+            logger.debug("Raw LLM response: %s", llm_response[:500])
             return []
     
     def _analyze_potential_conflict(

@@ -12,6 +12,8 @@ import asyncio
 import logging
 import sys
 import json
+import os
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
@@ -110,7 +112,7 @@ class EnrichmentWorker:
         total_preferences_extracted = 0
         
         for collection_name in collections:
-            bot_name = self._extract_bot_name(collection_name)
+            bot_name = await self._extract_bot_name(collection_name)
             
             try:
                 # Process conversation summaries for this bot
@@ -304,6 +306,7 @@ class EnrichmentWorker:
                     'content': point.payload.get('content', ''),
                     'timestamp': point.payload.get('timestamp', ''),
                     'memory_type': point.payload.get('memory_type', ''),
+                    'role': point.payload.get('role', ''),  # CRITICAL: Include role field for message formatting
                     'emotion_label': point.payload.get('emotion_label', 'neutral')
                 })
             
@@ -359,6 +362,9 @@ class EnrichmentWorker:
                 timestamp_str = point.payload.get('timestamp', '')
                 try:
                     timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    # Make timezone-naive for comparison consistency
+                    if timestamp.tzinfo is not None:
+                        timestamp = timestamp.replace(tzinfo=None)
                 except:
                     timestamp = datetime.utcnow()
                 
@@ -366,6 +372,7 @@ class EnrichmentWorker:
                     'content': point.payload.get('content', ''),
                     'timestamp': timestamp,
                     'memory_type': point.payload.get('memory_type', ''),
+                    'role': point.payload.get('role', ''),  # CRITICAL: Include role field for message formatting
                     'emotion_label': point.payload.get('emotion_label', 'neutral')
                 })
             
@@ -546,19 +553,37 @@ class EnrichmentWorker:
         
         return list(users)
     
-    def _extract_bot_name(self, collection_name: str) -> str:
-        """Extract bot name from collection name"""
-        # whisperengine_memory_elena -> elena
-        # chat_memories_aethys -> aethys
-        if collection_name.startswith('whisperengine_memory_'):
-            return collection_name.replace('whisperengine_memory_', '')
-        elif collection_name.startswith('chat_memories_'):
-            return collection_name.replace('chat_memories_', '')
-        else:
-            return collection_name
-
-
-        return bot_name
+    async def _extract_bot_name(self, collection_name: str) -> str:
+        """
+        Extract bot name from Qdrant collection name using standard naming convention.
+        
+        Collection names follow the convention: whisperengine_memory_{bot_name}
+        This method removes the prefix and any _7d suffix to get the bot name.
+        
+        Examples:
+        - whisperengine_memory_elena → elena
+        - whisperengine_memory_elena_7d → elena (legacy suffix removed)
+        - whisperengine_memory_jake → jake
+        - whisperengine_memory_jake_7d → jake (legacy suffix removed)
+        """
+        prefix = "whisperengine_memory_"
+        
+        if collection_name.startswith(prefix):
+            bot_name = collection_name.removeprefix(prefix)
+            
+            # Remove legacy _7d suffix if present
+            if bot_name.endswith("_7d"):
+                bot_name = bot_name.removesuffix("_7d")
+            
+            logger.debug(f"Extracted bot name '{bot_name}' from collection '{collection_name}'")
+            return bot_name
+        
+        # Fallback: collection name doesn't match convention
+        logger.warning(
+            f"Collection '{collection_name}' doesn't follow naming convention "
+            f"'{prefix}{{bot_name}}'. Using collection name as-is."
+        )
+        return collection_name
 
 
     async def _process_fact_extraction(
@@ -591,12 +616,29 @@ class EnrichmentWorker:
                 existing_facts = await self._get_existing_facts(user_id, bot_name)
                 
                 if existing_facts:
-                    # Find most recent fact extraction timestamp
-                    last_processed = max(
-                        fact.get('created_at', datetime.utcnow() - timedelta(days=30))
-                        for fact in existing_facts
-                    )
-                    logger.debug("Last fact extraction for user %s: %s", user_id, last_processed)
+                    # Find most recent MESSAGE timestamp we've processed
+                    # CRITICAL FIX: Use latest_message_timestamp from context_metadata, not created_at
+                    # This ensures we don't reprocess messages, only get NEW ones
+                    timestamps = []
+                    for fact in existing_facts:
+                        if fact.get('context_metadata', {}).get('latest_message_timestamp'):
+                            ts = datetime.fromisoformat(fact['context_metadata']['latest_message_timestamp'])
+                            # Make timezone-naive for comparison
+                            if ts.tzinfo is not None:
+                                ts = ts.replace(tzinfo=None)
+                            timestamps.append(ts)
+                        elif fact.get('created_at'):
+                            ts = fact['created_at']
+                            if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
+                                ts = ts.replace(tzinfo=None)
+                            timestamps.append(ts)
+                    
+                    if timestamps:
+                        last_processed = max(timestamps)
+                    else:
+                        last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                    
+                    logger.debug("Last processed MESSAGE timestamp for user %s: %s", user_id, last_processed)
                 else:
                     # No facts yet - backfill from 30 days ago
                     last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
@@ -618,6 +660,9 @@ class EnrichmentWorker:
                     continue
                 
                 logger.info("🔍 Extracting facts from %s new messages (user %s)", len(new_messages), user_id)
+                
+                # Track the latest message timestamp for incremental processing
+                latest_message_timestamp = max(msg['timestamp'] for msg in new_messages)
                 
                 # Extract facts from NEW conversation window
                 extracted_facts = await self.fact_extractor.extract_facts_from_conversation_window(
@@ -659,7 +704,8 @@ class EnrichmentWorker:
                     facts=extracted_facts,
                     relationships=relationships,
                     user_id=user_id,
-                    bot_name=bot_name
+                    bot_name=bot_name,
+                    latest_message_timestamp=latest_message_timestamp  # Track for incremental processing
                 )
                 
                 facts_extracted += stored_count
@@ -756,7 +802,8 @@ class EnrichmentWorker:
         facts: List,
         relationships: List[Dict],
         user_id: str,
-        bot_name: str
+        bot_name: str,
+        latest_message_timestamp: datetime
     ) -> int:
         """
         Store extracted facts in PostgreSQL using SAME schema as inline extraction.
@@ -770,6 +817,11 @@ class EnrichmentWorker:
         3. Check for opposing relationship conflicts
         4. Insert/update user_fact_relationships
         5. Auto-discover similar entities
+        
+        Args:
+            latest_message_timestamp: The timestamp of the LATEST message in the conversation window.
+                This is used for incremental processing - we'll query for messages AFTER this timestamp
+                in the next enrichment cycle, avoiding reprocessing the same messages.
         """
         stored_count = 0
         
@@ -807,6 +859,7 @@ class EnrichmentWorker:
                         
                         # Build context_metadata JSONB for user_fact_relationships
                         # This leverages PostgreSQL graph features for rich metadata
+                        # CRITICAL: Include latest_message_timestamp for incremental processing
                         context_metadata = {
                             'confirmation_count': fact.confirmation_count,
                             'related_facts': fact.related_facts,
@@ -815,8 +868,10 @@ class EnrichmentWorker:
                             'source_messages': fact.source_messages,
                             'extraction_method': 'enrichment_worker',
                             'extracted_at': datetime.utcnow().isoformat(),
+                            'latest_message_timestamp': latest_message_timestamp.isoformat(),  # For incremental processing
                             'conversation_window_size': len(relationships) if relationships else 1,
-                            'multi_message_confirmed': fact.confirmation_count > 1
+                            'multi_message_confirmed': fact.confirmation_count > 1,
+                            'bot_name': bot_name  # Track which bot extracted this
                         }
                         
                         # Check for opposing relationship conflicts (matches semantic_router.py)
@@ -935,49 +990,36 @@ class EnrichmentWorker:
                             continue
                         
                         # Store in entity_relationships table
+                        # NOTE: Removed context_metadata - column doesn't exist in schema
                         await conn.execute("""
                             INSERT INTO entity_relationships 
-                            (from_entity_id, to_entity_id, relationship_type, weight, context_metadata)
-                            VALUES ($1, $2, $3, $4, $5)
+                            (from_entity_id, to_entity_id, relationship_type, weight)
+                            VALUES ($1, $2, $3, $4)
                             ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
                             DO UPDATE SET 
                                 weight = GREATEST(entity_relationships.weight, $4),
                                 updated_at = NOW()
                         """, source_entity_id, target_entity_id, 
                              relationship['relationship_type'], 
-                             relationship['confidence'],
-                             json.dumps({
-                                'reasoning': relationship.get('reasoning'),
-                                'extraction_method': 'enrichment_worker'
-                             }))
+                             relationship['confidence'])
                         
                     except Exception as e:
                         logger.error("Failed to store relationship: %s", e)
                         continue
                 
                 # Track character interactions (PostgreSQL graph feature)
-                # This enables character-aware responses by tracking which character learned which facts
-                if facts:
-                    entity_names = [fact.entity_name for fact in facts]
-                    
-                    await conn.execute("""
-                        INSERT INTO character_interactions (
-                            user_id, character_name, interaction_type,
-                            entity_references, emotional_tone, metadata
-                        ) VALUES ($1, $2, $3, $4, $5, $6)
-                    """, user_id, bot_name, 'fact_mention',
-                         json.dumps(entity_names),
-                         'analytical',  # Enrichment worker tone
-                         json.dumps({
-                             'extraction_method': 'enrichment_worker',
-                             'facts_extracted': len(facts),
-                             'relationships_created': len(relationships),
-                             'extracted_at': datetime.utcnow().isoformat()
-                         }))
-                    
-                    logger.info(
-                        f"✅ CHARACTER INTERACTION: Logged {len(entity_names)} entity mentions by {bot_name}"
-                    )
+                # NOTE: Disabled - character_interactions table doesn't exist in current schema
+                # TODO: Enable when table is created
+                # if facts:
+                #     entity_names = [fact.entity_name for fact in facts]
+                #     await conn.execute("""
+                #         INSERT INTO character_interactions (
+                #             user_id, character_name, interaction_type,
+                #             entity_references, emotional_tone, metadata
+                #         ) VALUES ($1, $2, $3, $4, $5, $6)
+                #     """, user_id, bot_name, 'fact_mention',
+                #          json.dumps(entity_names), 'analytical',
+                #          json.dumps({'extraction_method': 'enrichment_worker'}))
         
         return stored_count
     
@@ -1304,12 +1346,18 @@ JSON Response:"""
         formatted = []
         
         for msg in messages:
-            memory_type = msg.get('memory_type', '')
+            # CRITICAL FIX: Use 'role' field (user/bot) not 'memory_type' (conversation/fact/etc)
+            role = msg.get('role', '')
             content = msg.get('content', '')
             
-            if memory_type == 'user_message':
+            if role == 'user':
                 formatted.append(f"User: {content}")
-            elif memory_type == 'bot_response':
+            elif role in ('bot', 'assistant'):
+                formatted.append(f"Bot: {content}")
+            # FALLBACK: Old memory_type field for backward compatibility
+            elif msg.get('memory_type') == 'user_message':
+                formatted.append(f"User: {content}")
+            elif msg.get('memory_type') == 'bot_response':
                 formatted.append(f"Bot: {content}")
         
         return "\n".join(formatted)

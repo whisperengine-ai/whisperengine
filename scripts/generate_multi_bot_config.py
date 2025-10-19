@@ -50,6 +50,10 @@ class BotConfigDiscovery:
                 # Read health check port from env file
                 health_port = self._extract_health_port(env_file)
                 
+                # Read bot name and collection name from env file
+                discord_bot_name = self._extract_env_var(env_file, 'DISCORD_BOT_NAME') or bot_name
+                collection_name = self._extract_env_var(env_file, 'QDRANT_COLLECTION_NAME') or f"whisperengine_memory_{bot_name}"
+                
                 # WhisperEngine now uses database-based CDL storage - no JSON files required
                 # Character data is loaded dynamically from PostgreSQL database
                 
@@ -59,7 +63,9 @@ class BotConfigDiscovery:
                     "service_name": f"{bot_name}-bot",
                     "container_name": f"{bot_name}-bot",
                     "display_name": self._get_display_name(bot_name),
-                    "character_file": None  # Database-based CDL - no character files needed
+                    "character_file": None,  # Database-based CDL - no character files needed
+                    "DISCORD_BOT_NAME": discord_bot_name,
+                    "QDRANT_COLLECTION_NAME": collection_name
                 }
                 
         return bot_configs
@@ -76,6 +82,23 @@ class BotConfigDiscovery:
         
         # Default port based on bot name hash for consistency
         return 9000 + abs(hash(env_file.stem)) % 1000
+    
+    def _extract_env_var(self, env_file: Path, var_name: str) -> Optional[str]:
+        """Extract any environment variable from .env file."""
+        try:
+            with open(env_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.startswith(f'{var_name}='):
+                        value = line.split('=', 1)[1].strip()
+                        # Remove quotes if present
+                        if value.startswith('"') and value.endswith('"'):
+                            value = value[1:-1]
+                        elif value.startswith("'") and value.endswith("'"):
+                            value = value[1:-1]
+                        return value if value else None
+        except (IOError, IndexError):
+            pass
+        return None
     
     def _find_character_file(self, bot_name: str) -> Optional[str]:
         """

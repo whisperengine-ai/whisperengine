@@ -218,6 +218,12 @@ services:
       - LLM_MODEL=${ENRICHMENT_LLM_MODEL:-anthropic/claude-3.5-sonnet}
       - LLM_CHAT_API_URL=${LLM_CHAT_API_URL}
       - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY}
+      
+      # InfluxDB configuration (read-only access for temporal analysis)
+      - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-whisperengine-fidelity-first-metrics-token}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-whisperengine}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-performance_metrics}
     depends_on:
       - postgres
       - qdrant

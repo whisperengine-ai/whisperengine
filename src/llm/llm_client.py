@@ -186,7 +186,6 @@ class LLMClient:
         # WhisperEngine uses remote APIs only - no local model initialization
 
         self.chat_endpoint = f"{self.api_url}/chat/completions"
-        self.completions_endpoint = f"{self.api_url}/completions"
         self.emotion_chat_endpoint = (
             f"{self.emotion_api_url}/chat/completions" if self.emotion_api_url else None
         )
@@ -1243,91 +1242,6 @@ class LLMClient:
             tools=tools,
             **kwargs
         )
-
-    def generate_completion(
-        self,
-        prompt: str,
-        model: str | None = None,
-        temperature: float = 0.7,
-        max_tokens: int | None = None,
-    ) -> dict[str, Any]:
-        """
-        Generate a text completion response
-
-        Args:
-            prompt: The prompt text to complete
-            model: Name of the model (usually just use "local-model" for LM Studio)
-            temperature: Randomness of the generation (0.0 to 1.0)
-            max_tokens: Maximum tokens to generate (defaults to environment config)
-
-        Returns:
-            The response from the API
-        """
-        # Use environment default if model not specified
-        if model is None:
-            model = self.default_model_name
-
-        # Use environment default if max_tokens not specified
-        if max_tokens is None:
-            max_tokens = self.default_max_tokens_completion
-
-        self.logger.debug(f"Generating text completion for prompt: {prompt[:50]}...")
-        self.logger.debug(
-            f"Parameters: model={model}, temperature={temperature}, max_tokens={max_tokens}"
-        )
-
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-
-        try:
-            self.logger.debug(f"Sending request to {self.completions_endpoint}")
-
-            # SECURITY ENHANCEMENT: Prepare headers with secure credential handling
-            headers = {"Content-Type": "application/json"}
-            if self.api_key:
-                if self.api_key_manager:
-                    secure_headers = self.api_key_manager.secure_header_creation(
-                        self.api_key, "Bearer"
-                    )
-                    headers.update(secure_headers)
-                else:
-                    headers["Authorization"] = f"Bearer {self.api_key}"  # Fallback
-
-            response = self.session.post(
-                self.completions_endpoint,
-                json=payload,
-                headers=headers,
-                timeout=(self.connection_timeout, self.request_timeout),
-            )
-            response.raise_for_status()
-            result = response.json()
-            self.logger.debug("Successfully received text completion response")
-            return result
-        except requests.ConnectionError as e:
-            self.logger.error(f"Connection error generating completion: {e}")
-            raise LLMConnectionError(
-                f"Cannot connect to {self.service_name} server. Is it running?"
-            )
-        except requests.Timeout as e:
-            self.logger.error(f"Timeout error generating completion: {e}")
-            raise LLMTimeoutError(f"Request to {self.service_name} timed out")
-        except requests.HTTPError as e:
-            if e.response.status_code == 429:
-                raise LLMRateLimitError(f"{self.service_name} rate limit exceeded")
-            elif e.response.status_code >= 500:
-                raise LLMError(f"{self.service_name} server error: {e.response.status_code}")
-            else:
-                raise LLMError(f"HTTP error: {e.response.status_code}")
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Invalid JSON response: {e}")
-            raise LLMError(f"Invalid response from {self.service_name} server")
-        except Exception as e:
-            self.logger.error(f"Unexpected error generating completion: {e}")
-            raise LLMError(f"Unexpected error: {str(e)}")
 
     @monitor_performance("emotion_analysis", timeout_ms=15000)
     def generate_emotion_chat_completion(
