@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements-enrichment.txt
 COPY src/enrichment/ ./src/enrichment/
 COPY src/llm/ ./src/llm/
 COPY src/database/ ./src/database/
+COPY src/utils/ ./src/utils/
 
 # Create logs directory
 RUN mkdir -p logs/enrichment

@@ -232,6 +232,10 @@ class EnrichmentWorker:
     ) -> List[Dict]:
         """Retrieve all messages in a time window from Qdrant"""
         try:
+            # Convert datetime to Unix timestamps for Qdrant query
+            start_timestamp = start_time.timestamp()
+            end_timestamp = end_time.timestamp()
+            
             # Scroll through Qdrant with filters
             results, _ = self.qdrant_client.scroll(
                 collection_name=collection_name,
@@ -242,10 +246,10 @@ class EnrichmentWorker:
                             match=MatchValue(value=user_id)
                         ),
                         FieldCondition(
-                            key="timestamp",
+                            key="timestamp_unix",
                             range=Range(
-                                gte=start_time.isoformat(),
-                                lte=end_time.isoformat()
+                                gte=start_timestamp,
+                                lte=end_timestamp
                             )
                         )
                     ]

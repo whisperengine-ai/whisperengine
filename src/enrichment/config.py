@@ -38,7 +38,8 @@ class EnrichmentConfig:
     
     # LLM configuration
     LLM_MODEL: str = os.getenv("LLM_MODEL", "anthropic/claude-3.5-sonnet")
-    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+    # Support both OPENROUTER_API_KEY and LLM_CHAT_API_KEY (for compatibility)
+    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY") or os.getenv("LLM_CHAT_API_KEY", "")
     
     # Processing thresholds
     MIN_MESSAGES_FOR_SUMMARY: int = int(os.getenv("MIN_MESSAGES_FOR_SUMMARY", "5"))
@@ -54,7 +55,7 @@ class EnrichmentConfig:
     def validate(cls) -> None:
         """Validate configuration"""
         if not cls.OPENROUTER_API_KEY:
-            raise ValueError("OPENROUTER_API_KEY environment variable is required")
+            raise ValueError("OPENROUTER_API_KEY or LLM_CHAT_API_KEY environment variable is required")
         
         if not cls.POSTGRES_PASSWORD:
             raise ValueError("POSTGRES_PASSWORD environment variable is required")

@@ -216,12 +216,11 @@ services:
       
       # LLM configuration
       - LLM_MODEL=${ENRICHMENT_LLM_MODEL:-anthropic/claude-3.5-sonnet}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LLM_CHAT_API_URL=${LLM_CHAT_API_URL}
+      - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY}
     depends_on:
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
+      - postgres
+      - qdrant
     networks:
       - bot_network
     volumes:
