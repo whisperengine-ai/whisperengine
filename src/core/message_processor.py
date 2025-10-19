@@ -831,9 +831,16 @@ class MessageProcessor:
             # Bot self-facts would be redundant with the episodic memory system
             
             # Phase 9c: User preference extraction and storage (PostgreSQL)
-            preference_stored = await self._extract_and_store_user_preferences(
-                message_context
-            )
+            # FEATURE FLAG: Runtime preference extraction (disabled by default - enrichment worker handles this)
+            # Runtime extraction uses regex patterns (brittle, limited to 4 types)
+            # Enrichment worker provides better quality with LLM analysis + conversation context
+            preference_stored = False
+            if os.getenv('ENABLE_RUNTIME_PREFERENCE_EXTRACTION', 'false').lower() == 'true':
+                preference_stored = await self._extract_and_store_user_preferences(
+                    message_context
+                )
+            else:
+                logger.debug("⏭️ RUNTIME PREFERENCE EXTRACTION: Disabled (enrichment worker handles preference extraction)")
             
             # Phase 10: Learning Intelligence Orchestrator - Unified Learning Coordination
             await self._coordinate_learning_intelligence(
