@@ -107,6 +107,7 @@ class EnrichmentWorker:
         
         total_summaries_created = 0
         total_facts_extracted = 0
+        total_preferences_extracted = 0
         
         for collection_name in collections:
             bot_name = self._extract_bot_name(collection_name)
@@ -128,13 +129,21 @@ class EnrichmentWorker:
                 
                 total_facts_extracted += facts_extracted
                 
+                # Process preference extraction (LLM-based conversation analysis)
+                preferences_extracted = await self._process_preference_extraction(
+                    collection_name=collection_name,
+                    bot_name=bot_name
+                )
+                
+                total_preferences_extracted += preferences_extracted
+                
             except Exception as e:
                 logger.error("Error processing collection %s: %s", collection_name, e)
                 continue
         
         cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
-        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts extracted in %.2fs",
-                   total_summaries_created, total_facts_extracted, cycle_duration)
+        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences extracted in %.2fs",
+                   total_summaries_created, total_facts_extracted, total_preferences_extracted, cycle_duration)
     
     async def _process_conversation_summaries(
         self,
@@ -1049,6 +1058,328 @@ class EnrichmentWorker:
                 )
         
         return 'resolved'
+        
+        return stored_count
+
+    async def _process_preference_extraction(
+        self,
+        collection_name: str,
+        bot_name: str
+    ) -> int:
+        """
+        Process conversation-level preference extraction using LLM analysis.
+        
+        Extracts user preferences from conversation windows:
+        - Preferred name/nicknames
+        - Pronouns (he/him, she/her, they/them, etc.)
+        - Timezone/location
+        - Communication style (brief, detailed, casual, formal)
+        - Response length preferences
+        - Language preferences
+        - Topic preferences
+        
+        SUPERIOR to inline regex extraction:
+        - Conversation context (Q&A patterns, confirmations)
+        - Implicit preferences (repeated behavior patterns)
+        - Preference evolution tracking
+        - Unlimited preference types (not hardcoded)
+        
+        Stores in PostgreSQL universal_users.preferences JSONB (same as inline).
+        """
+        logger.info("👤 Processing preference extraction for %s...", bot_name)
+        
+        # Get users with conversations
+        users = await self._get_users_in_collection(collection_name)
+        logger.debug("Found %s users for preference extraction", len(users))
+        
+        preferences_extracted = 0
+        
+        for user_id in users:
+            try:
+                # Get last preference extraction timestamp
+                last_extraction = await self._get_last_preference_extraction(user_id, bot_name)
+                
+                # Get NEW messages since last extraction
+                new_messages = await self._get_new_messages_since(
+                    collection_name=collection_name,
+                    user_id=user_id,
+                    since_timestamp=last_extraction
+                )
+                
+                if not new_messages:
+                    logger.debug("✅ No new messages for preference extraction (user %s)", user_id)
+                    continue
+                
+                if len(new_messages) < 3:  # Need at least a few messages for context
+                    logger.debug("Skipping user %s - only %s new messages", user_id, len(new_messages))
+                    continue
+                
+                logger.info("🔍 Extracting preferences from %s new messages (user %s)", len(new_messages), user_id)
+                
+                # Extract preferences from conversation window using LLM
+                extracted_prefs = await self._extract_preferences_from_window(
+                    messages=new_messages,
+                    user_id=user_id,
+                    bot_name=bot_name
+                )
+                
+                if not extracted_prefs:
+                    logger.debug("No preferences extracted from new messages (user %s)", user_id)
+                    continue
+                
+                # Store preferences in PostgreSQL
+                stored_count = await self._store_preferences_in_postgres(
+                    preferences=extracted_prefs,
+                    user_id=user_id,
+                    bot_name=bot_name
+                )
+                
+                preferences_extracted += stored_count
+                logger.info("✅ Extracted and stored %s preferences for user %s", stored_count, user_id)
+                
+            except Exception as e:
+                logger.error("Error extracting preferences for user %s: %s", user_id, e, exc_info=True)
+                continue
+        
+        logger.info("✅ Extracted %s total preferences for %s", preferences_extracted, bot_name)
+        return preferences_extracted
+    
+    async def _get_last_preference_extraction(self, user_id: str, bot_name: str) -> datetime:
+        """
+        Get timestamp of last preference extraction for incremental processing.
+        
+        Checks universal_users.preferences JSONB for extraction timestamps.
+        Falls back to 30 days ago if no preferences exist.
+        """
+        async with self.db_pool.acquire() as conn:
+            # Check if user has any preferences with extraction timestamp
+            row = await conn.fetchrow("""
+                SELECT preferences
+                FROM universal_users
+                WHERE universal_id = $1
+            """, user_id)
+            
+            if row and row['preferences']:
+                # Find most recent preference extraction timestamp
+                prefs = row['preferences']
+                timestamps = []
+                
+                for pref_type, pref_data in prefs.items():
+                    if isinstance(pref_data, dict) and 'updated_at' in pref_data:
+                        try:
+                            ts = datetime.fromisoformat(pref_data['updated_at'].replace('Z', '+00:00'))
+                            timestamps.append(ts)
+                        except (ValueError, AttributeError):
+                            continue
+                
+                if timestamps:
+                    last_extraction = max(timestamps)
+                    logger.debug("Last preference extraction for user %s: %s", user_id, last_extraction)
+                    return last_extraction
+            
+            # No preferences yet - backfill from 30 days ago
+            backfill_from = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+            logger.debug("No existing preferences for user %s, backfilling from %s", user_id, backfill_from)
+            return backfill_from
+    
+    async def _extract_preferences_from_window(
+        self,
+        messages: List[Dict],
+        user_id: str,
+        bot_name: str
+    ) -> List[Dict]:
+        """
+        Use LLM to extract preferences from conversation window.
+        
+        Analyzes conversation for:
+        - Explicit preferences ("call me Mark", "I prefer brief responses")
+        - Implicit preferences (user consistently requests shorter answers)
+        - Preference changes over time
+        - Confirmation patterns (Bot asks, user confirms)
+        
+        Returns list of preferences with type, value, confidence, reasoning.
+        """
+        # Format conversation for LLM analysis
+        conversation_text = self._format_messages_for_preference_analysis(messages)
+        
+        prompt = f"""Analyze this conversation and extract user preferences.
+
+Conversation between user and {bot_name}:
+{conversation_text}
+
+Extract ANY of these preference types that are clearly stated or strongly implied:
+
+**Preference Types**:
+1. **preferred_name**: What the user wants to be called
+2. **pronouns**: Preferred pronouns (he/him, she/her, they/them, etc.)
+3. **timezone**: User's timezone (EST, PST, GMT+8, etc.)
+4. **location**: Where the user lives/is located
+5. **communication_style**: How they prefer responses (brief, detailed, casual, formal, technical, simple)
+6. **response_length**: Preferred length (short, medium, long)
+7. **language**: Preferred language if not English
+8. **topic_preferences**: Topics they want to focus on or avoid
+9. **formality_level**: Preferred formality (casual, professional, friendly, formal)
+
+**CRITICAL RULES**:
+- ONLY extract if clearly stated OR strongly implied from repeated patterns
+- Mark explicit statements with confidence 0.9-1.0
+- Mark implied/inferred preferences with confidence 0.6-0.8
+- Include conversation context showing where preference came from
+- Detect preference CHANGES (user updated their preference)
+- Handle Q&A patterns (Bot: "What should I call you?" User: "Mark is fine")
+
+**Return JSON ONLY** (no markdown, no explanations):
+{{
+  "preferences": [
+    {{
+      "preference_type": "preferred_name",
+      "preference_value": "Mark",
+      "confidence": 0.95,
+      "reasoning": "User explicitly stated 'call me Mark' when asked",
+      "conversation_context": "Bot asked 'What should I call you?' and user responded 'Mark is fine'",
+      "is_explicit": true,
+      "is_preference_change": false
+    }}
+  ]
+}}
+
+If no clear preferences found, return {{"preferences": []}}
+
+JSON Response:"""
+        
+        try:
+            # Call LLM with low temperature for consistency
+            messages_for_llm = [
+                {
+                    "role": "system",
+                    "content": "You are a preference extraction specialist. Extract user preferences from conversations with high accuracy. Return ONLY valid JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            response = await self.llm_client.get_chat_response(
+                messages_for_llm,
+                temperature=0.2,  # Low temperature for consistency
+                model=config.LLM_FACT_EXTRACTION_MODEL  # Reuse fact extraction model
+            )
+            
+            # Parse JSON response (handle markdown code blocks)
+            if '```json' in response:
+                response = response.split('```json')[1].split('```')[0].strip()
+            elif '```' in response:
+                response = response.split('```')[1].split('```')[0].strip()
+            
+            result = json.loads(response)
+            preferences = result.get('preferences', [])
+            
+            logger.debug("LLM extracted %s preferences from %s messages", len(preferences), len(messages))
+            return preferences
+            
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse LLM preference response: %s", e)
+            logger.debug("Raw LLM response: %s", response[:500])
+            return []
+        except Exception as e:
+            logger.error("LLM preference extraction failed: %s", e)
+            return []
+    
+    def _format_messages_for_preference_analysis(self, messages: List[Dict]) -> str:
+        """Format messages into readable conversation for LLM"""
+        formatted = []
+        
+        for msg in messages:
+            memory_type = msg.get('memory_type', '')
+            content = msg.get('content', '')
+            
+            if memory_type == 'user_message':
+                formatted.append(f"User: {content}")
+            elif memory_type == 'bot_response':
+                formatted.append(f"Bot: {content}")
+        
+        return "\n".join(formatted)
+    
+    async def _store_preferences_in_postgres(
+        self,
+        preferences: List[Dict],
+        user_id: str,
+        bot_name: str
+    ) -> int:
+        """
+        Store extracted preferences in PostgreSQL universal_users.preferences JSONB.
+        
+        Uses SAME storage schema as inline preference extraction (semantic_router.store_user_preference).
+        This ensures bots see preferences from BOTH inline AND enrichment extraction.
+        
+        Storage format:
+        {
+          "preferred_name": {
+            "value": "Mark",
+            "confidence": 0.95,
+            "updated_at": "2025-10-19T...",
+            "metadata": {
+              "extraction_method": "enrichment_worker",
+              "reasoning": "...",
+              "conversation_context": "...",
+              "is_explicit": true
+            }
+          }
+        }
+        """
+        stored_count = 0
+        
+        async with self.db_pool.acquire() as conn:
+            async with conn.transaction():
+                # Auto-create user in universal_users (FK requirement)
+                await conn.execute("""
+                    INSERT INTO universal_users 
+                    (universal_id, primary_username, display_name, created_at, last_active, preferences)
+                    VALUES ($1, $2, $3, NOW(), NOW(), '{}'::jsonb)
+                    ON CONFLICT (universal_id) DO UPDATE SET last_active = NOW()
+                """, user_id, f"user_{user_id[-8:]}", f"User {user_id[-6:]}")
+                
+                for pref in preferences:
+                    try:
+                        pref_type = pref.get('preference_type')
+                        pref_value = pref.get('preference_value')
+                        confidence = pref.get('confidence', 0.8)
+                        
+                        if not pref_type or not pref_value:
+                            logger.warning("Skipping invalid preference: %s", pref)
+                            continue
+                        
+                        # Build preference object (matches inline extraction format)
+                        preference_obj = {
+                            'value': pref_value,
+                            'confidence': confidence,
+                            'updated_at': datetime.utcnow().isoformat(),
+                            'metadata': {
+                                'extraction_method': 'enrichment_worker',
+                                'reasoning': pref.get('reasoning', ''),
+                                'conversation_context': pref.get('conversation_context', ''),
+                                'is_explicit': pref.get('is_explicit', False),
+                                'is_preference_change': pref.get('is_preference_change', False),
+                                'bot_name': bot_name
+                            }
+                        }
+                        
+                        # Update preferences JSONB (merge with existing)
+                        await conn.execute("""
+                            UPDATE universal_users
+                            SET preferences = COALESCE(preferences::jsonb, '{}'::jsonb) || 
+                                jsonb_build_object($2::text, $3::jsonb)
+                            WHERE universal_id = $1
+                        """, user_id, pref_type, json.dumps(preference_obj))
+                        
+                        stored_count += 1
+                        logger.info("✅ PREFERENCE: Stored %s='%s' for user %s (confidence: %.2f, method: enrichment_worker)",
+                                  pref_type, pref_value, user_id, confidence)
+                        
+                    except Exception as e:
+                        logger.error("Failed to store preference %s: %s", pref, e)
+                        continue
         
         return stored_count
 
