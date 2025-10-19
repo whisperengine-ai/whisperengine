@@ -644,15 +644,11 @@ class EnrichmentWorker:
                 
                 for fact in facts:
                     try:
-                        # Build attributes JSONB
+                        # Build attributes JSONB for fact_entities
                         attributes = {
-                            'confirmation_count': fact.confirmation_count,
-                            'related_facts': fact.related_facts,
-                            'temporal_context': fact.temporal_context,
-                            'reasoning': fact.reasoning,
-                            'source_messages': fact.source_messages,
                             'extraction_method': 'enrichment_worker',
-                            'extracted_at': datetime.utcnow().isoformat()
+                            'extracted_at': datetime.utcnow().isoformat(),
+                            'tags': fact.related_facts  # Used for full-text search
                         }
                         
                         # Insert or update entity in fact_entities
@@ -665,6 +661,20 @@ class EnrichmentWorker:
                                 updated_at = NOW()
                             RETURNING id
                         """, fact.entity_type, fact.entity_name, json.dumps(attributes))
+                        
+                        # Build context_metadata JSONB for user_fact_relationships
+                        # This leverages PostgreSQL graph features for rich metadata
+                        context_metadata = {
+                            'confirmation_count': fact.confirmation_count,
+                            'related_facts': fact.related_facts,
+                            'temporal_context': fact.temporal_context,
+                            'reasoning': fact.reasoning,
+                            'source_messages': fact.source_messages,
+                            'extraction_method': 'enrichment_worker',
+                            'extracted_at': datetime.utcnow().isoformat(),
+                            'conversation_window_size': len(relationships) if relationships else 1,
+                            'multi_message_confirmed': fact.confirmation_count > 1
+                        }
                         
                         # Check for opposing relationship conflicts (matches semantic_router.py)
                         conflict_result = await self._detect_opposing_relationships_inline_style(
@@ -679,27 +689,55 @@ class EnrichmentWorker:
                             )
                             continue
                         
-                        # Insert or update user-fact relationship
+                        # Insert or update user-fact relationship with context_metadata
+                        # Leverages PostgreSQL graph features: context_metadata JSONB for rich storage
                         await conn.execute("""
                             INSERT INTO user_fact_relationships 
                             (user_id, entity_id, relationship_type, confidence, emotional_context, 
-                             mentioned_by_character, source_conversation_id)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                             mentioned_by_character, source_conversation_id, context_metadata)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                             ON CONFLICT (user_id, entity_id, relationship_type)
                             DO UPDATE SET
                                 confidence = GREATEST(user_fact_relationships.confidence, $4),
+                                context_metadata = user_fact_relationships.context_metadata || $8::jsonb,
                                 mentioned_by_character = COALESCE($6, user_fact_relationships.mentioned_by_character),
                                 updated_at = NOW()
                         """, user_id, entity_id, fact.relationship_type, fact.confidence,
                              'neutral',  # Emotional context from conversation analysis
                              bot_name, 
-                             None)  # No source_conversation_id for enrichment
+                             None,  # No source_conversation_id for enrichment
+                             json.dumps(context_metadata))
                         
                         stored_count += 1
                         logger.info(
                             f"✅ ENRICHMENT FACT: Stored '{fact.entity_name}' "
                             f"({fact.entity_type}, {fact.relationship_type}, confidence={fact.confidence:.2f})"
                         )
+                        
+                        # Build related_entities JSONB array (PostgreSQL graph feature)
+                        # Links facts to their semantic relationships for fast graph traversal
+                        related_entities_array = []
+                        for related_fact_name in fact.related_facts:
+                            # Find related entity ID
+                            related_entity_id = await conn.fetchval("""
+                                SELECT id FROM fact_entities 
+                                WHERE entity_name = $1
+                            """, related_fact_name)
+                            
+                            if related_entity_id:
+                                related_entities_array.append({
+                                    'entity_id': str(related_entity_id),
+                                    'relation': 'semantic_link',
+                                    'weight': 0.8
+                                })
+                        
+                        # Update related_entities JSONB array
+                        if related_entities_array:
+                            await conn.execute("""
+                                UPDATE user_fact_relationships
+                                SET related_entities = $1
+                                WHERE user_id = $2 AND entity_id = $3 AND relationship_type = $4
+                            """, json.dumps(related_entities_array), user_id, entity_id, fact.relationship_type)
                         
                         # Auto-discover similar entities (matches semantic_router.py)
                         similar_entities = await conn.fetch("""
@@ -714,13 +752,16 @@ class EnrichmentWorker:
                         """, fact.entity_name, fact.entity_type, entity_id)
                         
                         # Create entity relationships for similar entities
+                        # Mark as bidirectional (PostgreSQL graph feature for symmetric relationships)
                         for similar in similar_entities:
                             await conn.execute("""
                                 INSERT INTO entity_relationships 
-                                (from_entity_id, to_entity_id, relationship_type, weight)
-                                VALUES ($1, $2, 'similar_to', $3)
+                                (from_entity_id, to_entity_id, relationship_type, weight, bidirectional)
+                                VALUES ($1, $2, 'similar_to', $3, true)
                                 ON CONFLICT (from_entity_id, to_entity_id, relationship_type) 
-                                DO UPDATE SET weight = GREATEST(entity_relationships.weight, $3)
+                                DO UPDATE SET 
+                                    weight = GREATEST(entity_relationships.weight, $3),
+                                    bidirectional = true
                             """, entity_id, similar["id"], min(float(similar["sim_score"]), 0.9))
                         
                     except Exception as e:
@@ -770,6 +811,30 @@ class EnrichmentWorker:
                     except Exception as e:
                         logger.error("Failed to store relationship: %s", e)
                         continue
+                
+                # Track character interactions (PostgreSQL graph feature)
+                # This enables character-aware responses by tracking which character learned which facts
+                if facts:
+                    entity_names = [fact.entity_name for fact in facts]
+                    
+                    await conn.execute("""
+                        INSERT INTO character_interactions (
+                            user_id, character_name, interaction_type,
+                            entity_references, emotional_tone, metadata
+                        ) VALUES ($1, $2, $3, $4, $5, $6)
+                    """, user_id, bot_name, 'fact_mention',
+                         json.dumps(entity_names),
+                         'analytical',  # Enrichment worker tone
+                         json.dumps({
+                             'extraction_method': 'enrichment_worker',
+                             'facts_extracted': len(facts),
+                             'relationships_created': len(relationships),
+                             'extracted_at': datetime.utcnow().isoformat()
+                         }))
+                    
+                    logger.info(
+                        f"✅ CHARACTER INTERACTION: Logged {len(entity_names)} entity mentions by {bot_name}"
+                    )
         
         return stored_count
     
