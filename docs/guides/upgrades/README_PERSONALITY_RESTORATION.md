@@ -4,9 +4,27 @@ Your assistant lost its personality after upgrading from v1.0.6 to v1.0.24? Here
 
 ---
 
-## 📖 Choose Your Method
+## ⚡ **NEW: Automatic Fix (Easiest Method!)** ⭐⭐⭐ 
 
-### 🎨 **Method 1: Web UI (Non-Technical Users)** ⭐ RECOMMENDED
+**UPDATE (Oct 19, 2025):** This issue now **fixes itself automatically** through database migrations!
+
+� **[AUTOMATIC FIX INSTRUCTIONS](./AUTOMATIC_FIX_INSTRUCTIONS.md)** 👈
+
+**What you do:**
+1. Pull latest code: `git pull origin main`
+2. Restart containers: `docker compose up -d --build`
+3. Wait 30 seconds for migrations
+4. Done! ✅
+
+**No manual steps, no Web UI, no SQL scripts needed!**
+
+---
+
+## 📖 Alternative Manual Methods
+
+If you prefer manual control or the automatic fix doesn't work:
+
+### 🎨 **Method 1: Web UI (Non-Technical Users)**
 **Perfect for:** Users who prefer clicking through a friendly interface
 
 **Start here:**
@@ -47,7 +65,7 @@ Your assistant lost its personality after upgrading from v1.0.6 to v1.0.24? Here
 
 ## 🎯 Quick Decision Guide
 
-**Choose Web UI if:**
+**Use Automatic Fix if:**
 - ✅ You're not comfortable with command-line tools
 - ✅ You prefer visual interfaces
 - ✅ You want to understand what each value does
