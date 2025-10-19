@@ -54,6 +54,23 @@ After upgrading from v1.0.6 to v1.0.24, your assistant bot lost its personality 
 
 ---
 
+## 📦 New Optional Feature: Enrichment Worker
+
+**Note**: This update also includes an optional enrichment worker for background conversation analysis. It's **disabled by default** to avoid unexpected token usage.
+
+**To enable enrichment features** (conversation summaries, enhanced fact extraction):
+```bash
+# Start all services including enrichment worker
+docker compose --profile enrichment up -d
+
+# Or start just the enrichment worker
+docker compose --profile enrichment up -d enrichment-worker
+```
+
+**Important**: The enrichment worker will process recent conversation history on first run. Default lookback is 3 days to minimize token usage. Adjust via `LOOKBACK_DAYS` environment variable if needed.
+
+---
+
 ## ℹ️ What Happened?
 
 - A new database migration was added: `20251019_2308_c64001afbd46_backfill_assistant_personality_data.py`

@@ -190,6 +190,8 @@ services:
 
   # ===== BACKGROUND ENRICHMENT WORKER =====
   enrichment-worker:
+    profiles:
+      - enrichment  # Optional: Start with --profile enrichment
     build:
       context: .
       dockerfile: docker/Dockerfile.enrichment-worker
@@ -212,7 +214,7 @@ services:
       - ENRICHMENT_BATCH_SIZE=${ENRICHMENT_BATCH_SIZE:-50}
       - MIN_MESSAGES_FOR_SUMMARY=${MIN_MESSAGES_FOR_SUMMARY:-5}
       - TIME_WINDOW_HOURS=${TIME_WINDOW_HOURS:-24}
-      - LOOKBACK_DAYS=${LOOKBACK_DAYS:-30}
+      - LOOKBACK_DAYS=${LOOKBACK_DAYS:-3}  # Reduced from 30 to avoid massive token burn on first run
       
       # LLM configuration
       - LLM_MODEL=${ENRICHMENT_LLM_MODEL:-anthropic/claude-3.5-sonnet}
