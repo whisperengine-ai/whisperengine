@@ -389,17 +389,34 @@ cdl_integration = CDLAIPromptIntegration()
 - **Dream**: Mythological entity with fantasy/mystical archetype
 - **Dotty**: Additional character
 
-### **Bot-Specific Memory Isolation**
+### **Bot-Specific Memory Isolation & Naming Convention**
+
+**Standardized Collection Naming:** `whisperengine_memory_{bot_name}`
+
 Each bot uses its own dedicated Qdrant collection for complete memory isolation:
-- Elena: `whisperengine_memory_elena`
-- Marcus: `whisperengine_memory_marcus` 
-- Gabriel: `whisperengine_memory_gabriel`
-- Sophia: `whisperengine_memory_sophia`
-- Jake: `whisperengine_memory_jake`
-- Ryan: `whisperengine_memory_ryan`
-- Dream: `whisperengine_memory_dream`
-- Aethys: `chat_memories_aethys`
+- Elena: `whisperengine_memory_elena` (alias → `whisperengine_memory_elena_7d`)
+- Marcus: `whisperengine_memory_marcus` (alias → `whisperengine_memory_marcus_7d`)
+- Gabriel: `whisperengine_memory_gabriel` (alias → `whisperengine_memory_gabriel_7d`)
+- Sophia: `whisperengine_memory_sophia` (alias → `whisperengine_memory_sophia_7d`)
+- Jake: `whisperengine_memory_jake` (alias → `whisperengine_memory_jake_7d`)
+- Ryan: `whisperengine_memory_ryan` (alias → `whisperengine_memory_ryan_7d`)
+- Dream: `whisperengine_memory_dream` (alias → `whisperengine_memory_dream_7d`)
+- Aethys: `whisperengine_memory_aethys`
 - Aetheris: `whisperengine_memory_aetheris`
+- Dotty: `whisperengine_memory_dotty`
+
+**Collection Aliases:**
+- 7 collections use aliases to maintain backward compatibility with `_7d` suffix
+- Bots use clean names via aliases (e.g., `whisperengine_memory_elena`)
+- Aliases point to actual collections with data (e.g., `whisperengine_memory_elena_7d`)
+- Enrichment worker processes `_7d` collections directly and extracts bot names
+
+**Bot Name Extraction:**
+- Remove `whisperengine_memory_` prefix
+- Remove `_7d` suffix if present
+- Example: `whisperengine_memory_elena_7d` → `elena`
+- No environment variable mapping needed (e.g., NO `BOT_COLLECTION_MAPPING`)
+
 
 ## 🔧 INFRASTRUCTURE DETAILS
 
@@ -494,6 +511,31 @@ docker ps | grep -E "qdrant|postgres"  # Should show both services running
 - **BOTH user AND bot messages** get full RoBERTa analysis
 - **NEVER use keyword matching** - RoBERTa data is pre-computed and stored
 - **Location**: `src/intelligence/enhanced_vector_emotion_analyzer.py`
+
+## 🗄️ QDRANT COLLECTION MANAGEMENT
+
+### **Collection Naming Convention**
+- **Standard Format**: `whisperengine_memory_{bot_name}`
+- **Benefits**: Simple bot name extraction via string prefix/suffix removal
+- **No Mapping Needed**: Eliminates `BOT_COLLECTION_MAPPING` environment variable
+
+### **Collection Aliases**
+- **Purpose**: Point clean names to legacy `_7d` collections without data migration
+- **Setup Script**: `scripts/setup_collection_aliases.py`
+- **Features**: Dry-run mode, validation, automatic conflict resolution
+- **Usage**: `python scripts/setup_collection_aliases.py [--dry-run]`
+
+### **Collection Cleanup**
+- **Cleanup Script**: `scripts/delete_orphaned_collections.py`
+- **Safety**: Protects active collections, requires confirmation
+- **Reporting**: Generates markdown report of deleted collections
+- **Usage**: `python scripts/delete_orphaned_collections.py [--dry-run]`
+- **Last Cleanup**: October 19, 2025 - Removed 10 orphaned collections (7,084 points)
+
+### **Current Collection State** (as of Oct 2025)
+- **10 Active Collections**: 67,515 total memory points
+- **7 Aliases**: Clean names pointing to `_7d` collections
+- **Bot Name Extraction**: `collection.removeprefix('whisperengine_memory_').removesuffix('_7d')`
 
 ## 🎯 CURRENT ROADMAPS & DEVELOPMENT FOCUS
 
