@@ -107,25 +107,43 @@ class SummarizationEngine:
         }
     
     async def _generate_summary_text(
-        self,
-        conversation_text: str,
+        self, 
+        conversation_text: str, 
         message_count: int,
         bot_name: str
     ) -> str:
-        """Generate natural language summary using LLM"""
+        """
+        Generate natural language summary using LLM
+        
+        DESIGN NOTE: 3rd Person Perspective for Prompt Injection Consistency
+        -----------------------------------------------------------------------
+        Summaries are written in 3rd person to match WhisperEngine's system
+        prompt style. The system prompt addresses the bot as "You are {name}"
+        but describes past interactions in 3rd person ("The user discussed...").
+        
+        This matches the memory injection format:
+        "User: {message content}\nBot: {bot response}"
+        
+        Example: "The user asked about marine biology and shared their passion
+        for ocean conservation. They expressed interest in research careers..."
+        
+        NOT "You asked..." (that would incorrectly address the bot)
+        """
         summary_prompt = f"""You are an expert conversation analyst. Summarize this conversation between a user and {bot_name} (an AI character).
 
 Focus on:
 1. Key topics discussed
-2. Important information shared
+2. Important information the user shared about themselves
 3. Emotional tone and evolution
-4. Decisions made or plans discussed
-5. Any personal details or preferences mentioned
+4. Decisions made or plans discussed  
+5. Any personal details or preferences the user mentioned
 
 Conversation ({message_count} messages):
 {conversation_text}
 
-Provide a comprehensive 3-5 sentence summary that captures the essence of this conversation. Be specific and preserve important details."""
+Provide a comprehensive 3-5 sentence summary in 3rd person perspective. Write about what "the user" did/said, what {bot_name} discussed, etc. Example: "The user asked about marine biology and shared their passion..." NOT "You asked about..."
+
+Be specific and preserve important details."""
 
         # 🔄 RETRY LOGIC: Handle transient LLM failures with exponential backoff
         max_retries = 3
