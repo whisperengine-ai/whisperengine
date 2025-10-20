@@ -1,8 +1,40 @@
 # Qdrant Schema Management Analysis
 
-**Date**: October 12, 2025  
+**Date**: October 12, 2025 (Updated: October 20, 2025)  
 **Status**: 🚨 CRITICAL GAP IDENTIFIED  
 **Context**: Post-v1.0.6 migration system implementation
+
+---
+
+## 📊 **Collection Cleanup & Standardization (October 2025)**
+
+### **Collection Naming Convention Standardized**
+- **Standard Format**: `whisperengine_memory_{bot_name}`
+- **Alias Support**: Collections with `_7d` suffix use aliases for backward compatibility
+- **Bot Name Extraction**: Simple prefix/suffix removal (no environment variable mapping needed)
+
+### **Cleanup Completed - October 19, 2025**
+- **Orphaned Collections Removed**: 10 collections (7,084 memory points)
+- **Active Collections**: 10 production bots
+- **Total Memory Points**: 67,515 points across all collections
+- **Cleanup Script**: `scripts/delete_orphaned_collections.py` (with dry-run mode)
+- **Alias Management**: `scripts/setup_collection_aliases.py` for backward compatibility
+
+### **Current Active Collections**
+```
+whisperengine_memory_elena (alias → whisperengine_memory_elena_7d)
+whisperengine_memory_marcus (alias → whisperengine_memory_marcus_7d)
+whisperengine_memory_gabriel (alias → whisperengine_memory_gabriel_7d)
+whisperengine_memory_sophia (alias → whisperengine_memory_sophia_7d)
+whisperengine_memory_jake (alias → whisperengine_memory_jake_7d)
+whisperengine_memory_ryan (alias → whisperengine_memory_ryan_7d)
+whisperengine_memory_dream (alias → whisperengine_memory_dream_7d)
+whisperengine_memory_aethys
+whisperengine_memory_aetheris
+whisperengine_memory_dotty
+```
+
+---
 
 ## 🔍 Current State Analysis
 

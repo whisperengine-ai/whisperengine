@@ -515,23 +515,26 @@ class WorkflowManager:
             return False
         
         try:
-            # Use generate_completion for yes/no validation
-            response = self.llm_client.generate_completion(
-                prompt=prompt,
+            # Use get_chat_response for yes/no validation
+            text = self.llm_client.get_chat_response(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a validation assistant. Answer only 'yes' or 'no'."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
                 max_tokens=10,
                 temperature=0.1
             )
             
-            # Extract text from completion response
-            if "choices" not in response:
-                self.logger.error(f"Invalid LLM response format - missing 'choices' key")
-                return False
-                
-            text = response["choices"][0]["text"].strip()
             self.logger.info(f"🎯 LLM VALIDATION RESULT: {text}")
             
             # Check if answer indicates "yes"
-            answer = text.lower()
+            answer = text.lower().strip()
             is_yes = "yes" in answer or "true" in answer
             
             return is_yes

@@ -48,6 +48,10 @@ WhisperEngine is a **multi-character Discord AI roleplay platform** featuring:
 - **Primary System**: Vector-native memory via Qdrant + FastEmbed
 - **Named Vectors**: 3D system (content, emotion, semantic) - 384 dimensions each
 - **Bot Isolation**: Each character has dedicated Qdrant collection
+  - **Collection Naming**: `whisperengine_memory_{bot_name}` (standardized Oct 2025)
+  - **Alias Support**: 7 collections use `_7d` suffix aliases for backward compatibility
+  - **Bot Name Extraction**: Remove prefix/suffix → no `BOT_COLLECTION_MAPPING` needed
+  - **Active Collections**: 10 bots with 67,515 total memory points (as of Oct 20, 2025)
 - **Memory Protocol**: Factory pattern enabling A/B testing (`memory_type=vector`)
 - **Storage**: `src/memory/vector_memory_system.py` (5,363 lines)
 

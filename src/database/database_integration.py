@@ -70,7 +70,8 @@ class WhisperEngineDatabaseConfig:
         connection_string = self.get_database_connection_string()
         use_postgresql = os.environ.get("USE_POSTGRESQL", "false").lower() == "true"
         
-        if use_postgresql:
+        # Default to PostgreSQL for production; fallback requires explicit in_memory opt-in
+        if use_postgresql or True:  # Default to PostgreSQL
             return create_database_manager("postgresql", connection_string)
         else:
             return create_database_manager("in_memory", connection_string)

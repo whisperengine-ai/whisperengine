@@ -394,10 +394,23 @@ class VectorMemoryStore:
         - Performance optimizations
         """
         try:
+            # Check both collections and aliases
             collections = self.client.get_collections().collections
             collection_names = [c.name for c in collections]
+            
+            # Check if an alias exists with this name
+            alias_exists = False
+            try:
+                aliases = self.client.get_aliases()
+                alias_names = [alias.alias_name for alias in aliases.aliases]
+                if self.collection_name in alias_names:
+                    alias_exists = True
+                    logger.info(f"Found existing alias: {self.collection_name}")
+            except Exception as e:
+                logger.debug(f"Could not check aliases: {e}")
 
-            if self.collection_name not in collection_names:
+            # Only create if neither collection nor alias exists
+            if self.collection_name not in collection_names and not alias_exists:
                 # 🎯 QDRANT FEATURE: 3D named vectors for multi-dimensional intelligence (CURRENT SYSTEM)
                 vectors_config = {
                     # Main content vector for semantic similarity

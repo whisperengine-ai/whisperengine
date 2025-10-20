@@ -83,12 +83,6 @@ class NoOpLLMClient:
         self.logger.debug("LLM client disabled - generate_chat_completion no-op")
         return {"choices": [{"message": {"content": "LLM functionality disabled"}}]}
     
-    async def generate_completion(self, prompt, **kwargs):
-        """No-op completion."""
-        _ = prompt, kwargs  # Unused arguments
-        self.logger.debug("LLM client disabled - generate_completion no-op")
-        return {"choices": [{"text": "LLM functionality disabled"}]}
-    
     def chat_completion_sync(self, messages, **kwargs):
         """No-op sync chat completion."""
         _ = messages, kwargs  # Unused arguments

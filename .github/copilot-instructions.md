@@ -3,14 +3,78 @@
 ## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a PRODUCTION MULTI-CHARACTER DISCORD PLATFORM** - users actively chat with 10+ AI characters
-- **USE multi-bot.sh SCRIPT**: `./multi-bot.sh bot BOT_NAME` to start, `./multi-bot.sh stop-bot BOT_NAME` to stop
-- **PREFERRED: Start/stop individual bots**: `./multi-bot.sh bot marcus` or `./multi-bot.sh stop-bot marcus` - affects ONLY that bot
-- **RESTART: Use Start/stop command.
 - **DEBUGGING FIRST**: Use log inspection, health checks, and direct Python testing before considering restarts
 - **Code changes**: Test with direct Python validation scripts before restarting live services
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
 - **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
 - **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
+
+## 🛠️ MULTI-BOT.SH SCRIPT COMMANDS (CRITICAL - USE THESE CORRECTLY!)
+
+### **Infrastructure Commands**
+```bash
+./multi-bot.sh infra          # Start infrastructure ONLY (postgres, qdrant, influxdb, grafana, enrichment-worker)
+./multi-bot.sh up             # Start ALL services (infra + all bots)
+./multi-bot.sh start          # Same as 'up'
+./multi-bot.sh down           # Stop ALL services (WARNING: stops everything!)
+./multi-bot.sh stop           # Same as 'down' (WARNING: stops everything!)
+./multi-bot.sh restart        # Restart ALL services
+./multi-bot.sh clean          # Stop and REMOVE all containers, networks, volumes
+```
+
+### **Bot Management Commands**
+```bash
+./multi-bot.sh bot BOT_NAME       # Start SPECIFIC bot (elena, marcus, jake, etc.)
+./multi-bot.sh stop-bot BOT_NAME  # Stop SPECIFIC bot (safe - only affects one bot)
+./multi-bot.sh bots               # List all available bots
+./multi-bot.sh status             # Show status of all services
+```
+
+### **Service-Specific Commands**
+```bash
+./multi-bot.sh logs [SERVICE]     # Show logs (all or specific service)
+./multi-bot.sh health             # Check health of all services
+```
+
+### **Development Commands**
+```bash
+./multi-bot.sh dev                # Start dev stack (infra + CDL web UI)
+./multi-bot.sh db                 # Connect to PostgreSQL database
+```
+
+### **Docker Direct Commands (when multi-bot.sh doesn't have what you need)**
+```bash
+# Restart specific service (enrichment-worker, postgres, qdrant, etc.)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart enrichment-worker
+
+# Rebuild and restart specific service
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d --no-deps --build enrichment-worker
+
+# Stop specific service (NOT a bot - for infrastructure services)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop enrichment-worker
+
+# View logs for specific service
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f enrichment-worker
+```
+
+### **⚠️ COMMON MISTAKES TO AVOID**
+- ❌ **NEVER use**: `./multi-bot.sh stop enrichment-worker` (stop doesn't take parameters!)
+- ❌ **NEVER use**: `./multi-bot.sh restart BOT_NAME` (restart doesn't take parameters!)
+- ✅ **CORRECT**: Use `docker compose ... restart SERVICE_NAME` for infrastructure services
+- ✅ **CORRECT**: Use `./multi-bot.sh stop-bot BOT_NAME` for character bots
+- ✅ **CORRECT**: Use `./multi-bot.sh bot BOT_NAME` to start character bots
+
+### **Available Character Bots**
+- `elena` - Marine Biologist (Port 9091)
+- `marcus` - AI Researcher (Port 9092)
+- `jake` - Adventure Photographer (Port 9097)
+- `ryan` - Indie Game Developer (Port 9093)
+- `gabriel` - British Gentleman (Port 9095)
+- `sophia` - Marketing Executive (Port 9096)
+- `dream` - Mythological Entity (Port 9094)
+- `dotty` - Character Bot (Port 9098)
+- `aetheris` - Conscious AI (Port 9099)
+- `aethys` - Omnipotent Entity (Port 3007)
 
 ## 🚨 CRITICAL DEVELOPMENT SERVER MANAGEMENT
 - **NEVER INTERRUPT DEVELOPMENT SERVERS**: When running `npm run dev`, `npm start`, or similar development servers, ALWAYS use `isBackground=true` and LET THEM RUN
@@ -96,11 +160,22 @@
 ## 🎭 CHARACTER DEFINITION LANGUAGE (CDL) SYSTEM
 
 ### **Database-Driven Personalities**
-- **Primary Storage**: PostgreSQL database with structured CDL schema
-- **Legacy Backup**: JSON files in `characters/examples_legacy_backup/` for reference
-- **Dynamic Loading**: Characters loaded from database via bot name
-- **Import Tool**: `batch_import_characters.py` for JSON → Database migration
+- **Primary Storage**: PostgreSQL database with `character_*` table schema (NO MORE `cdl_*` tables!)
+- **Schema Evolution**: Use Alembic migrations in `alembic/versions/` - NEVER reference `sql/init_schema.sql` (outdated)
+- **Legacy Backup**: JSON files in `characters/examples_legacy_backup/` for reference ONLY - NOT USED in production
+- **Dynamic Loading**: Characters loaded from database via bot name using `character_*` tables
+- **Import Tool**: `batch_import_characters.py` for JSON → Database migration (legacy only)
 - **No File Dependencies**: All character operations use database queries
+
+### **Critical Schema Rules**
+- ⚠️ **NEVER use `sql/init_schema.sql` for schema reference** - it's the initial baseline only
+- ✅ **ALWAYS check Alembic migrations** in `alembic/versions/` for current schema state
+- ✅ **Schema changes happen via Alembic migrations** - never manual SQL scripts
+- ✅ **Tables are `character_*` prefixed** - all `cdl_*` tables were migrated/renamed
+- ✅ **JSON character files are DEPRECATED** - database is the single source of truth
+
+### **Current CDL Database Tables** (50+ tables as of Oct 2025)
+Tables include: `character_identity_details`, `character_attributes`, `character_communication_patterns`, `character_response_modes`, `character_conversation_modes`, `character_emotional_states`, `character_background`, `character_interests`, `character_relationships`, `character_memories`, `character_question_templates`, `character_entity_categories`, `character_learning_timeline`, and 35+ more. Run `\dt character_*` in PostgreSQL to see full list.
 
 ### **Character Archetypes**
 1. **Real-World** (Elena, Marcus, Jake) - Honest AI disclosure when asked directly
@@ -117,6 +192,26 @@ system_prompt = await cdl_integration.create_character_aware_prompt(
     message_content=message
 )
 ```
+
+### **Query Routing & Character Backstory Facts**
+- **Intent-Based Routing**: `src/knowledge/semantic_router.py` analyzes user questions and routes to optimal data stores
+- **Character Backstory Storage**: Character biographical facts (workplace, hometown, background) can be stored in PostgreSQL CDL database
+- **Recommended Tables**: `character_background`, `character_identity_details`, or custom fact storage in `character_attributes`
+- **Query Pattern**: "Where do you work?" / "Where do you live?" → SemanticKnowledgeRouter → CDL database → factual response
+- **Integration Point**: CDL system prompt builder can inject biographical facts from database for consistent character responses
+- **Design Pattern**: Static designer-defined facts (CDL database) + Emergent bot statements (bot self-facts) = Complete personality
+- **Example Flow**:
+  ```python
+  # User asks: "Where do you work?"
+  intent = await semantic_router.analyze_query_intent(message)
+  # intent_type = QueryIntent.PERSONALITY_KNOWLEDGE
+  
+  # Route to CDL database for character backstory
+  backstory = await get_character_background(character_name)
+  # Returns: "Marine Research Institute at UC Santa Barbara"
+  
+  # Bot responds with consistent fact from database
+  ```
 
 ## 🧠 MEMORY SYSTEM ARCHITECTURE
 
@@ -325,26 +420,55 @@ cdl_integration = CDLAIPromptIntegration()
 - **Dream**: Mythological entity with fantasy/mystical archetype
 - **Dotty**: Additional character
 
-### **Bot-Specific Memory Isolation**
+### **Bot-Specific Memory Isolation & Naming Convention**
+
+**Standardized Collection Naming:** `whisperengine_memory_{bot_name}`
+
 Each bot uses its own dedicated Qdrant collection for complete memory isolation:
-- Elena: `whisperengine_memory_elena`
-- Marcus: `whisperengine_memory_marcus` 
-- Gabriel: `whisperengine_memory_gabriel`
-- Sophia: `whisperengine_memory_sophia`
-- Jake: `whisperengine_memory_jake`
-- Ryan: `whisperengine_memory_ryan`
-- Dream: `whisperengine_memory_dream`
-- Aethys: `chat_memories_aethys`
+- Elena: `whisperengine_memory_elena` (alias → `whisperengine_memory_elena_7d`)
+- Marcus: `whisperengine_memory_marcus` (alias → `whisperengine_memory_marcus_7d`)
+- Gabriel: `whisperengine_memory_gabriel` (alias → `whisperengine_memory_gabriel_7d`)
+- Sophia: `whisperengine_memory_sophia` (alias → `whisperengine_memory_sophia_7d`)
+- Jake: `whisperengine_memory_jake` (alias → `whisperengine_memory_jake_7d`)
+- Ryan: `whisperengine_memory_ryan` (alias → `whisperengine_memory_ryan_7d`)
+- Dream: `whisperengine_memory_dream` (alias → `whisperengine_memory_dream_7d`)
+- Aethys: `whisperengine_memory_aethys`
 - Aetheris: `whisperengine_memory_aetheris`
+- Dotty: `whisperengine_memory_dotty`
+
+**Collection Aliases:**
+- 7 collections use aliases to maintain backward compatibility with `_7d` suffix
+- Bots use clean names via aliases (e.g., `whisperengine_memory_elena`)
+- Aliases point to actual collections with data (e.g., `whisperengine_memory_elena_7d`)
+- Enrichment worker processes `_7d` collections directly and extracts bot names
+
+**Bot Name Extraction:**
+- Remove `whisperengine_memory_` prefix
+- Remove `_7d` suffix if present
+- Example: `whisperengine_memory_elena_7d` → `elena`
+- No environment variable mapping needed (e.g., NO `BOT_COLLECTION_MAPPING`)
+
+**Collection Maintenance History:**
+- **October 19, 2025**: Cleanup removed 10 orphaned collections (7,084 points)
+- **Current State**: 10 active collections with 67,515 total memory points
+- **Cleanup Script**: `scripts/delete_orphaned_collections.py` (dry-run mode available)
+- **Alias Setup**: `scripts/setup_collection_aliases.py` (creates/manages aliases)
+
 
 ## 🔧 INFRASTRUCTURE DETAILS
 
 ### **Infrastructure Versions (Pinned)**
-- PostgreSQL: `postgres:16.4-alpine` (Port 5433 external, 5432 internal)
-- Qdrant: `qdrant/qdrant:v1.15.4` (Port 6334 external, 6333 internal)
-- InfluxDB: `influxdb:2.7-alpine` (Port 8087 external, 8086 internal)
+- PostgreSQL: `postgres:16.4-alpine` (Port 5433 external, 5432 internal) - **HAS healthcheck**
+- Qdrant: `qdrant/qdrant:v1.15.4` (Port 6334 external, 6333 internal) - **NO healthcheck - use service_started**
+- InfluxDB: `influxdb:2.7-alpine` (Port 8087 external, 8086 internal) - **HAS healthcheck**
 - Grafana: `grafana/grafana:11.3.0` (Port 3002 external, 3000 internal)
 - Redis: Currently DISABLED in multi-bot setup
+
+**CRITICAL**: Qdrant does NOT have a healthcheck configured. In `depends_on` blocks, always use:
+```yaml
+qdrant:
+  condition: service_started  # NOT service_healthy!
+```
 
 ### **Multi-Bot Testing Strategy**
 - **MEMORY TESTING**: Use Jake or Ryan characters (minimal personality complexity)
@@ -430,6 +554,31 @@ docker ps | grep -E "qdrant|postgres"  # Should show both services running
 - **BOTH user AND bot messages** get full RoBERTa analysis
 - **NEVER use keyword matching** - RoBERTa data is pre-computed and stored
 - **Location**: `src/intelligence/enhanced_vector_emotion_analyzer.py`
+
+## 🗄️ QDRANT COLLECTION MANAGEMENT
+
+### **Collection Naming Convention**
+- **Standard Format**: `whisperengine_memory_{bot_name}`
+- **Benefits**: Simple bot name extraction via string prefix/suffix removal
+- **No Mapping Needed**: Eliminates `BOT_COLLECTION_MAPPING` environment variable
+
+### **Collection Aliases**
+- **Purpose**: Point clean names to legacy `_7d` collections without data migration
+- **Setup Script**: `scripts/setup_collection_aliases.py`
+- **Features**: Dry-run mode, validation, automatic conflict resolution
+- **Usage**: `python scripts/setup_collection_aliases.py [--dry-run]`
+
+### **Collection Cleanup**
+- **Cleanup Script**: `scripts/delete_orphaned_collections.py`
+- **Safety**: Protects active collections, requires confirmation
+- **Reporting**: Generates markdown report of deleted collections
+- **Usage**: `python scripts/delete_orphaned_collections.py [--dry-run]`
+- **Last Cleanup**: October 19, 2025 - Removed 10 orphaned collections (7,084 points)
+
+### **Current Collection State** (as of Oct 2025)
+- **10 Active Collections**: 67,515 total memory points
+- **7 Aliases**: Clean names pointing to `_7d` collections
+- **Bot Name Extraction**: `collection.removeprefix('whisperengine_memory_').removesuffix('_7d')`
 
 ## 🎯 CURRENT ROADMAPS & DEVELOPMENT FOCUS
 

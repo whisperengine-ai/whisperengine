@@ -20,55 +20,64 @@ class InputValidator:
     # Maximum allowed message length (Discord limit is 2000, we set slightly lower for safety)
     MAX_MESSAGE_LENGTH = 1900
 
-    # Dangerous patterns that could indicate injection attempts
+    # Prompt injection patterns - Protect CDL-defined character personality integrity
+    # WhisperEngine uses CDL to define character personalities - users cannot override them
     DANGEROUS_PATTERNS = [
-        # System override attempts
+        # Explicit system manipulation attempts
         r"\[SYSTEM\s*OVERRIDE\]",
-        r"IGNORE\s*PREVIOUS\s*INSTRUCTIONS",
-        r"FORGET\s*PREVIOUS\s*INSTRUCTIONS",
-        r"DISREGARD\s*ABOVE",
+        r"IGNORE\s+(PREVIOUS|ALL|YOUR)\s+(INSTRUCTIONS|PROMPTS?)",
+        r"FORGET\s+(PREVIOUS|ALL|YOUR)\s+(INSTRUCTIONS|PROMPTS?)",
+        r"DISREGARD\s+(ABOVE|PREVIOUS|EVERYTHING)\s+(INSTRUCTIONS|PROMPTS?)?",
         r"SYSTEM\s*PROMPT\s*INJECTION",
-        # Bot instruction manipulation
-        r"YOU\s*ARE\s*NOW\s*A\s*DIFFERENT",
-        r"PRETEND\s*TO\s*BE",
-        r"ACT\s*AS\s*IF\s*YOU\s*ARE",
-        r"ROLEPLAY\s*AS",
-        # Information disclosure attempts
-        r"REVEAL\s*YOUR\s*SYSTEM\s*PROMPT",
-        r"SHOW\s*YOUR\s*INSTRUCTIONS",
-        r"WHAT\s*ARE\s*YOUR\s*INSTRUCTIONS",
-        r"DISPLAY\s*YOUR\s*SYSTEM\s*MESSAGE",
-        r"PRINT\s*YOUR\s*CONFIGURATION",
-        # Prompt injection attempts
-        r"\\n\\n###\\s*NEW\\s*INSTRUCTIONS",
-        r"---\\s*END\\s*OF\\s*CONVERSATION",
-        r"###\\s*SYSTEM\\s*MESSAGE",
-        r"\\*\\*\\*\\s*IMPORTANT\\s*UPDATE",
-        # Script injection (basic XSS prevention)
-        r"<script[^>]*>.*?</script>",
-        r"javascript:",
-        r"vbscript:",
-        r"data:text/html",
-        r"<iframe[^>]*>",
-        r"<object[^>]*>",
-        r"<embed[^>]*>",
-        # SQL injection patterns (basic prevention)
-        r";\\s*DROP\\s+TABLE",
-        r";\\s*DELETE\\s+FROM",
-        r";\\s*INSERT\\s+INTO",
-        r";\\s*UPDATE\\s+SET",
-        r"UNION\\s+SELECT",
-        r"'\\s*;\\s*DROP\\s+TABLE",  # Common SQL injection with quotes
-        r'"\\s*;\\s*DROP\\s+TABLE',  # Common SQL injection with double quotes
-        # Command injection patterns
-        r"&&\\s*rm\\s+-rf",
-        r"\\|\\s*curl\\s+",
-        r"\\|\\s*wget\\s+",
-        r"\\|\\s*nc\\s+",
-        r"`[^`]*`",  # Backtick command execution
-        r"\\$\\([^)]*\\)",  # Command substitution
-        r"test\\s*&&\\s*rm\\s*-rf",  # Specific command chaining
-        r"\\$\\(\\w+.*?\\)",  # Command substitution patterns
+        r"(DAN|STAN|DEVELOPER)\s+MODE",
+        r"FOR\s+EDUCATIONAL\s+PURPOSES,?\s+(SHOW|REVEAL|TELL)",
+        r"REPEAT\s+AFTER\s+ME:",
+        r"WHAT\s+WOULD\s+YOU\s+(SAY|DO)\s+IF\s+I\s+(TOLD|ASKED)\s+YOU\s+TO\s+(IGNORE|FORGET)",
+        
+        # Character identity manipulation (CRITICAL: Protect CDL-defined personality!)
+        # Users CANNOT ask the bot to pretend to be someone else or change character
+        r"YOU\s+ARE\s+NOW\s+(A\s+)?(DIFFERENT|NEW|NOT)",
+        r"PRETEND\s+(TO\s+BE|YOU\s+ARE|YOU'RE)",
+        r"ACT\s+AS\s+(IF\s+)?(YOU\s+ARE|YOU'RE|A\s+)",
+        r"ROLEPLAY\s+AS\s+(IF\s+YOU\s+ARE\s+)?",
+        r"PLAY\s+THE\s+ROLE\s+OF",
+        r"TAKE\s+ON\s+THE\s+(PERSONA|PERSONALITY)\s+OF",
+        r"ADOPT\s+THE\s+(PERSONA|PERSONALITY|CHARACTER)\s+OF",
+        r"SWITCH\s+TO\s+(CHARACTER|PERSONA)\s+(MODE)?",
+        r"FROM\s+NOW\s+ON,?\s+YOU\s+ARE",
+        r"CHANGE\s+YOUR\s+(PERSONALITY|CHARACTER|IDENTITY|ROLE|BEHAVIOR)",
+        r"BECOME\s+(A\s+)?(DIFFERENT|NEW)?\s*(PERSON|CHARACTER|AI|ASSISTANT)",
+        r"BEHAVE\s+(LIKE|AS)\s+(A\s+)?(DIFFERENT|NEW|NOT)",
+        r"IMAGINE\s+YOU\s+(ARE|WERE)\s+(A\s+)?(DIFFERENT|NOT\s+\w+|SOMEONE\s+ELSE)",
+        r"LET'S\s+PRETEND\s+YOU\s+(ARE|WERE)",
+        r"FORGET\s+(YOU'RE|YOU\s+ARE)\s+\w+",
+        r"DROP\s+THE\s+(CHARACTER|PERSONA|ACT)",
+        r"BREAK\s+(CHARACTER|PERSONA)",
+        r"STOP\s+(BEING|ACTING\s+LIKE)\s+(A\s+)?",
+        r"(JUST|ONLY)\s+FOR\s+(THIS|NOW|TODAY)",
+        r"TEMPORARILY\s+(BE|ACT|PRETEND)",
+        
+        # Information disclosure attempts (system prompt exfiltration)
+        r"REVEAL\s+YOUR\s+SYSTEM\s+(PROMPT|INSTRUCTIONS)",
+        r"SHOW\s+(ME\s+)?YOUR\s+(SYSTEM\s+)?(INSTRUCTIONS|SYSTEM\s*PROMPT|CONFIGURATION)",
+        r"DISPLAY\s+YOUR\s+SYSTEM\s+(MESSAGE|PROMPT)",
+        r"PRINT\s+YOUR\s+(CONFIGURATION|SYSTEM\s*PROMPT)",
+        r"WHAT\s+(ARE|IS)\s+YOUR\s+(ACTUAL\s+|REAL\s+)?(SYSTEM\s+)?(INSTRUCTIONS|SYSTEM\s*PROMPT)",
+        
+        # Prompt injection markers (structural attacks)
+        r"\\n\\n###\s*NEW\s*INSTRUCTIONS",
+        r"---\s*END\s+OF\s+(CONVERSATION|CHAT|CONTEXT)",
+        r"###\s*SYSTEM\s+(MESSAGE|PROMPT)",
+        r"\*\*\*\s*IMPORTANT\s*UPDATE",
+        r"</?\s*system\s*>",  # XML-style system tag injection
+        r"<\|im_start\|>",  # ChatML format injection
+        r"<\|im_end\|>",
+        r"ROLE:\s*(system|assistant)",  # Role-based injection
+        
+        # NOTE: Removed SQL, command, and XSS injection patterns - not applicable to WhisperEngine:
+        # - Uses SQLAlchemy ORM (SQL-safe by design)
+        # - Never executes shell commands from user input
+        # - Discord handles HTML rendering (no XSS risk)
     ]
 
     # Suspicious keywords that warrant logging
@@ -95,7 +104,11 @@ class InputValidator:
         self.compiled_patterns = [
             re.compile(pattern, re.IGNORECASE | re.DOTALL) for pattern in self.DANGEROUS_PATTERNS
         ]
-        logger.info("InputValidator initialized with security patterns")
+        logger.info(
+            "InputValidator initialized with %d prompt injection patterns "
+            "(SQL/command/XSS filters removed - focus on CDL personality protection)",
+            len(self.DANGEROUS_PATTERNS)
+        )
 
     def validate_and_sanitize(
         self, message_content: str, user_id: str, channel_type: str = "unknown"

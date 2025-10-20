@@ -5,6 +5,7 @@ Uses sophisticated LLM prompts and multi-step reasoning since we're NOT
 in the hot path and can take our time for better quality.
 """
 
+import asyncio
 import logging
 import json
 from typing import List, Dict, Any
@@ -73,7 +74,29 @@ class SummarizationEngine:
         # Confidence score (simple heuristic - could be enhanced)
         confidence_score = self._calculate_confidence(messages)
         
-        logger.info(f"Generated summary: {len(summary_text)} chars, {len(key_topics)} topics, {emotional_tone} tone")
+        # ✅ QUALITY VALIDATION: Check for issues and log structured warnings
+        quality_issues = []
+        
+        if len(summary_text) < 100:
+            quality_issues.append(f"summary_too_short:{len(summary_text)}")
+        
+        if compression_ratio < 0.05:
+            quality_issues.append(f"compression_too_aggressive:{compression_ratio:.3f}")
+        
+        if "general conversation" in key_topics:
+            quality_issues.append("generic_topic_fallback")
+        
+        if quality_issues:
+            logger.warning(
+                f"📊 SUMMARY QUALITY ISSUES | user={user_id} | bot={bot_name} | "
+                f"messages={len(messages)} | issues=[{', '.join(quality_issues)}]"
+            )
+        else:
+            logger.info(
+                f"✅ SUMMARY QUALITY GOOD | user={user_id} | bot={bot_name} | "
+                f"messages={len(messages)} | length={len(summary_text)} | "
+                f"compression={compression_ratio:.2%} | topics={len(key_topics)}"
+            )
         
         return {
             'summary_text': summary_text,
@@ -84,46 +107,97 @@ class SummarizationEngine:
         }
     
     async def _generate_summary_text(
-        self,
-        conversation_text: str,
+        self, 
+        conversation_text: str, 
         message_count: int,
         bot_name: str
     ) -> str:
-        """Generate natural language summary using LLM"""
+        """
+        Generate natural language summary using LLM
+        
+        DESIGN NOTE: 3rd Person Perspective for Prompt Injection Consistency
+        -----------------------------------------------------------------------
+        Summaries are written in 3rd person to match WhisperEngine's system
+        prompt style. The system prompt addresses the bot as "You are {name}"
+        but describes past interactions in 3rd person ("The user discussed...").
+        
+        This matches the memory injection format:
+        "User: {message content}\nBot: {bot response}"
+        
+        Example: "The user asked about marine biology and shared their passion
+        for ocean conservation. They expressed interest in research careers..."
+        
+        NOT "You asked..." (that would incorrectly address the bot)
+        """
         summary_prompt = f"""You are an expert conversation analyst. Summarize this conversation between a user and {bot_name} (an AI character).
 
 Focus on:
 1. Key topics discussed
-2. Important information shared
+2. Important information the user shared about themselves
 3. Emotional tone and evolution
-4. Decisions made or plans discussed
-5. Any personal details or preferences mentioned
+4. Decisions made or plans discussed  
+5. Any personal details or preferences the user mentioned
 
 Conversation ({message_count} messages):
 {conversation_text}
 
-Provide a comprehensive 3-5 sentence summary that captures the essence of this conversation. Be specific and preserve important details."""
+Provide a comprehensive 3-5 sentence summary in 3rd person perspective. Write about what "the user" did/said, what {bot_name} discussed, etc. Example: "The user asked about marine biology and shared their passion..." NOT "You asked about..."
 
-        try:
-            # Use LLM client to generate summary
-            response = await self.llm_client.generate_completion(
-                prompt=summary_prompt,
-                model=self.llm_model,
-                temperature=0.5,
-                max_tokens=500
-            )
-            
-            summary_text = response.strip() if isinstance(response, str) else response.get('content', '').strip()
-            
-            if not summary_text:
-                logger.warning("LLM returned empty summary, using fallback")
-                return self._generate_fallback_summary(message_count, bot_name)
-            
-            return summary_text
-            
-        except Exception as e:
-            logger.error(f"Error generating summary with LLM: {e}")
-            return self._generate_fallback_summary(message_count, bot_name)
+Be specific and preserve important details."""
+
+        # 🔄 RETRY LOGIC: Handle transient LLM failures with exponential backoff
+        max_retries = 3
+        min_summary_length = 100  # Quality threshold
+        
+        for attempt in range(max_retries):
+            try:
+                # Use get_chat_response for modern chat API (asyncio.to_thread for sync method)
+                response = await asyncio.to_thread(
+                    self.llm_client.get_chat_response,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert conversation analyst. Provide clear, detailed summaries."
+                        },
+                        {
+                            "role": "user",
+                            "content": summary_prompt
+                        }
+                    ],
+                    model=self.llm_model,
+                    temperature=0.5,
+                    max_tokens=500
+                )
+                
+                # get_chat_response returns a string directly
+                summary_text = response.strip() if response else ''
+                
+                # ✅ QUALITY VALIDATION: Check summary meets minimum standards
+                if summary_text and len(summary_text) >= min_summary_length:
+                    if attempt > 0:
+                        logger.info(f"✅ Summary generation succeeded on retry {attempt + 1}")
+                    return summary_text
+                
+                # Summary too short - retry if attempts remaining
+                logger.warning(
+                    f"⚠️  Summary quality issue (length={len(summary_text)} chars, min={min_summary_length}), "
+                    f"retry {attempt + 1}/{max_retries}"
+                )
+                
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff: 1s, 2s, 3s
+                
+            except Exception as e:
+                logger.warning(f"⚠️  Summary generation attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
+        
+        # All retries exhausted - use fallback
+        logger.error(
+            f"❌ All {max_retries} summary generation attempts failed for {message_count} messages, "
+            f"using fallback template"
+        )
+        return self._generate_fallback_summary(message_count, bot_name)
     
     async def _extract_key_topics(self, conversation_text: str) -> List[str]:
         """Extract 3-5 key topics from conversation"""
@@ -135,14 +209,30 @@ Conversation:
 Topics (JSON array):"""
 
         try:
-            response = await self.llm_client.generate_completion(
-                prompt=topics_prompt,
+            # Use get_chat_response for modern chat API
+            response_text = await asyncio.to_thread(
+                self.llm_client.get_chat_response,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a topic extraction specialist. Return ONLY valid JSON arrays."
+                    },
+                    {
+                        "role": "user",
+                        "content": topics_prompt
+                    }
+                ],
                 model=self.llm_model,
                 temperature=0.3,
                 max_tokens=100
             )
             
-            response_text = response if isinstance(response, str) else response.get('content', '')
+            # get_chat_response returns string directly - parse JSON
+            # Handle markdown code blocks
+            if '```json' in response_text:
+                response_text = response_text.split('```json')[1].split('```')[0].strip()
+            elif '```' in response_text:
+                response_text = response_text.split('```')[1].split('```')[0].strip()
             
             # Try to parse as JSON
             topics = json.loads(response_text)
@@ -198,8 +288,23 @@ Topics (JSON array):"""
         formatted = []
         
         for msg in messages:
-            role = "User" if msg.get('memory_type') == 'user_message' else bot_name
-            content = msg.get('content', '')[:500]  # Truncate very long messages
+            # CRITICAL FIX: Use 'role' field (user/bot) not 'memory_type' (conversation/fact/etc)
+            msg_role = msg.get('role', '')
+            
+            # Determine display name
+            if msg_role == 'user':
+                role = "User"
+            elif msg_role in ('bot', 'assistant'):
+                role = bot_name
+            # FALLBACK: Old memory_type field for backward compatibility
+            elif msg.get('memory_type') == 'user_message':
+                role = "User"
+            elif msg.get('memory_type') == 'bot_response':
+                role = bot_name
+            else:
+                role = bot_name  # Default to bot if unclear
+            
+            content = msg.get('content', '')[:2000]  # Discord limit: 2000 chars - preserve full fidelity
             timestamp = msg.get('timestamp', '')
             
             # Format timestamp if it's a datetime object

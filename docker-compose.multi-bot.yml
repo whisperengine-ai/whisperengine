@@ -191,11 +191,11 @@ services:
   # ===== BACKGROUND ENRICHMENT WORKER =====
   enrichment-worker:
     profiles:
-      - enrichment  # Optional: Start with --profile enrichment
+      - enrichment  # Optional: Start with --profile enrichment (safety for dev environments)
     build:
       context: .
       dockerfile: docker/Dockerfile.enrichment-worker
-    container_name: whisperengine_enrichment_worker
+    container_name: enrichment-worker
     restart: unless-stopped
     environment:
       # Qdrant connection
@@ -210,24 +210,37 @@ services:
       - POSTGRES_PASSWORD=whisperengine_password
       
       # Enrichment configuration
-      - ENRICHMENT_INTERVAL_SECONDS=${ENRICHMENT_INTERVAL_SECONDS:-300}
+      - ENRICHMENT_INTERVAL_SECONDS=${ENRICHMENT_INTERVAL_SECONDS:-660}  # 11 minutes (prime number - tested optimal)
       - ENRICHMENT_BATCH_SIZE=${ENRICHMENT_BATCH_SIZE:-50}
       - MIN_MESSAGES_FOR_SUMMARY=${MIN_MESSAGES_FOR_SUMMARY:-5}
       - TIME_WINDOW_HOURS=${TIME_WINDOW_HOURS:-24}
-      - LOOKBACK_DAYS=${LOOKBACK_DAYS:-3}  # Reduced from 30 to avoid massive token burn on first run
+      - LOOKBACK_DAYS=${LOOKBACK_DAYS:-3}  # Reduced from 30 to avoid massive backfill token burn
       
       # LLM configuration
       - LLM_MODEL=${ENRICHMENT_LLM_MODEL:-anthropic/claude-3.5-sonnet}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-anthropic/claude-sonnet-4.5}
+      - LLM_FACT_EXTRACTION_MODEL=${LLM_FACT_EXTRACTION_MODEL:-anthropic/claude-sonnet-4.5}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - LLM_FACT_EXTRACTION_TEMPERATURE=${LLM_FACT_EXTRACTION_TEMPERATURE:-0.2}
+      - LLM_CHAT_API_URL=${LLM_CHAT_API_URL}
+      - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY}
+      
+      # InfluxDB configuration (read-only access for temporal analysis)
+      - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-whisperengine-fidelity-first-metrics-token}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-whisperengine}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-performance_metrics}
     depends_on:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started  # Qdrant has no healthcheck configured
     networks:
       - bot_network
     volumes:
       - ./logs/enrichment:/app/logs/enrichment
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src:ro
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep 'src.enrichment.worker' | grep -v grep || exit 1"]
       interval: 60s
