@@ -593,34 +593,8 @@ class BotEventHandlers:
             logger.error(f"SECURITY: Unsafe input detected from user {user_id} in DM")
             logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
             
-            # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
-            try:
-                # 🎯 Get character name for emoji frequency lookup
-                from src.memory.vector_memory_system import get_normalized_bot_name_from_env
-                bot_character = get_normalized_bot_name_from_env()  # e.g., "jake"
-                
-                # Evaluate emoji response for inappropriate content
-                emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
-                    user_id=user_id,
-                    user_message=message.content,
-                    bot_character=bot_character,
-                    security_validation_result=validation_result,
-                    emotional_context=None,
-                    conversation_context={'channel_type': 'dm'}
-                )
-                
-                if emoji_decision.should_use_emoji:
-                    logger.info(f"🎭 SECURITY + EMOJI: Using emoji '{emoji_decision.emoji_choice}' for inappropriate content")
-                    await self.emoji_response_intelligence.apply_emoji_response(message, emoji_decision)
-                    return
-                    
-            except Exception as e:
-                logger.error(f"Error in security emoji response: {e}")
-            
-            # Fallback to text warning if emoji response fails
-            await reply_channel.send(
-                "⚠️ Your message contains content that could not be processed for security reasons. Please rephrase your message."
-            )
+            # 🔇 SILENT SECURITY DROP: Log the violation but don't send any response
+            logger.info(f"🔇 SECURITY: Silently dropping message from user {user_id} in DM (security filter hit)")
             return
 
         # Use sanitized content
@@ -886,32 +860,8 @@ class BotEventHandlers:
             )
             logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
             
-            # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
-            try:
-                # Get character name for emoji frequency lookup
-                from src.memory.vector_memory_system import get_normalized_bot_name_from_env
-                bot_character = get_normalized_bot_name_from_env()
-                
-                # Evaluate emoji response for inappropriate content
-                emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
-                    user_id=user_id,
-                    user_message=content,
-                    bot_character=bot_character,
-                    security_validation_result=validation_result,
-                    emotional_context=None,
-                    conversation_context={'channel_type': 'guild'}
-                )
-                
-                if emoji_decision.should_use_emoji:
-                    logger.info(f"🎭 SECURITY + EMOJI: Adding emoji '{emoji_decision.emoji_choice}' for inappropriate content in guild")
-                    await message.add_reaction(emoji_decision.emoji_choice)
-                    
-            except Exception as e:
-                logger.error(f"Error in security emoji response: {e}")
-            
-            # Send text warning (with or without emoji)
-            security_msg = f"⚠️ {message.author.mention} Your message contains content that could not be processed for security reasons. Please rephrase your message."
-            await message.reply(security_msg, mention_author=False)  # mention_author=False since we already include the mention
+            # 🔇 SILENT SECURITY DROP: Log the violation but don't send any response
+            logger.info(f"🔇 SECURITY: Silently dropping message from user {user_id} in server {message.guild.name} (security filter hit)")
             return
 
         content = validation_result["sanitized_content"]
