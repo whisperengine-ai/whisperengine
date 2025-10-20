@@ -106,7 +106,7 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart en
 ./multi-bot.sh restart
 
 # OR direct Docker restart
-docker restart whisperengine_enrichment_worker
+docker restart enrichment-worker
 ```
 
 ### Step 4: Verify Fix

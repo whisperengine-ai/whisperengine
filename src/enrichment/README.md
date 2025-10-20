@@ -103,7 +103,7 @@ TIME_WINDOW_HOURS=6  # More granular summaries
 ./multi-bot.sh logs enrichment-worker
 
 # Monitor enrichment worker
-docker logs -f whisperengine_enrichment_worker
+docker logs -f enrichment-worker
 ```
 
 ### Manual Docker Compose
@@ -159,7 +159,7 @@ CREATE TABLE conversation_summaries (
 tail -f logs/enrichment/worker.log
 
 # Or via Docker
-docker logs -f whisperengine_enrichment_worker
+docker logs -f enrichment-worker
 ```
 
 ### Key Log Messages
@@ -177,7 +177,7 @@ docker logs -f whisperengine_enrichment_worker
 docker ps | grep enrichment-worker
 
 # Manual health check
-docker exec whisperengine_enrichment_worker ps aux | grep worker
+docker exec enrichment-worker ps aux | grep worker
 ```
 
 ## Performance Impact
@@ -220,7 +220,7 @@ Total: ~$3/day or $90/month
 
 ```bash
 # Check logs for errors
-docker logs whisperengine_enrichment_worker
+docker logs enrichment-worker
 
 # Common issues:
 # 1. Missing OPENROUTER_API_KEY
@@ -300,7 +300,7 @@ alembic upgrade head
 ## Support
 
 For issues or questions:
-1. Check logs: `docker logs whisperengine_enrichment_worker`
+1. Check logs: `docker logs enrichment-worker`
 2. Review configuration in `.env` or docker-compose
 3. Validate database migration: `alembic current`
 4. Check Qdrant collections: Visit http://localhost:6334/dashboard

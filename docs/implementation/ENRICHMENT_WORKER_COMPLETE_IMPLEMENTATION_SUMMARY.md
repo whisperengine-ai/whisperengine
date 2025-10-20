@@ -204,7 +204,7 @@ attributes = {
 - [x] Comprehensive documentation
 
 ### **🚀 Deployment Results**
-- **Container**: Running successfully (`whisperengine_enrichment_worker`)
+- **Container**: Running successfully (`enrichment-worker`)
 - **Summaries**: 1,587 conversation summaries created (10 bots, 236 users)
 - **Cycle**: 5-minute enrichment intervals
 - **Model**: Claude Sonnet 4.5 (anthropic/claude-sonnet-4.5)

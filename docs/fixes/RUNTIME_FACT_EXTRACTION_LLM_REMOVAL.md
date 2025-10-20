@@ -177,7 +177,7 @@ export ENABLE_RUNTIME_FACT_EXTRACTION=true
 
 ```bash
 # Check enrichment worker logs
-docker logs whisperengine_enrichment_worker 2>&1 | grep "FACT EXTRACTION"
+docker logs enrichment-worker 2>&1 | grep "FACT EXTRACTION"
 
 # Expected output:
 # ✅ FACT EXTRACTION: Extracted 5 facts from 24-hour window

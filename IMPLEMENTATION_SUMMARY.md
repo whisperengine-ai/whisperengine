@@ -263,7 +263,7 @@ ENRICHMENT_QUICKSTART.md                        ✅ NEW - Quick start guide
 - Worker uptime/restarts
 
 **Log Files**:
-- Container logs: `docker logs whisperengine_enrichment_worker`
+- Container logs: `docker logs enrichment-worker`
 - File logs: `logs/enrichment/worker.log`
 
 ---

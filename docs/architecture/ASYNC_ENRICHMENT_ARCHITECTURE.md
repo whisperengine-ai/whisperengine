@@ -533,7 +533,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.enrichment-worker
-    container_name: whisperengine_enrichment_worker
+    container_name: enrichment-worker
     environment:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333

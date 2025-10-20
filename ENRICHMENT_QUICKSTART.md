@@ -88,7 +88,7 @@ Watch the logs for enrichment cycles:
 
 ```bash
 # Follow logs
-docker logs -f whisperengine_enrichment_worker
+docker logs -f enrichment-worker
 
 # Or via file
 tail -f logs/enrichment/worker.log
@@ -178,7 +178,7 @@ python test_summary_retrieval.py
 
 ```bash
 # Check logs
-docker logs whisperengine_enrichment_worker
+docker logs enrichment-worker
 
 # Common issues:
 # 1. Missing OPENROUTER_API_KEY - add to .env or docker-compose
@@ -195,7 +195,7 @@ docker exec -it qdrant sh
 curl 'http://localhost:6333/collections'
 
 # Check if enrichment cycle is running
-docker logs whisperengine_enrichment_worker | grep "Starting enrichment cycle"
+docker logs enrichment-worker | grep "Starting enrichment cycle"
 
 # Verify minimum message threshold (default: 5 messages)
 # If conversations have fewer messages, they won't be summarized
@@ -208,7 +208,7 @@ docker logs whisperengine_enrichment_worker | grep "Starting enrichment cycle"
 docker ps | grep enrichment-worker
 
 # View full logs
-docker logs whisperengine_enrichment_worker 2>&1 | less
+docker logs enrichment-worker 2>&1 | less
 
 # Common causes:
 # - API key invalid

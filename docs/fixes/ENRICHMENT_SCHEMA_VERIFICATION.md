@@ -205,7 +205,7 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps enrichm
 **Output**:
 ```
 NAME                              STATUS    PORTS
-whisperengine_enrichment_worker   Up        healthy
+enrichment-worker   Up        healthy
 ```
 
 ### Processing Logs: ✅ WORKING

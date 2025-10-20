@@ -1,6 +1,6 @@
 # Enrichment Worker Status Report
 **Date**: October 20, 2025, 06:04 UTC  
-**Container**: whisperengine_enrichment_worker  
+**Container**: enrichment-worker  
 **Status**: ✅ **RUNNING - INCREMENTAL MODE**
 
 ---
@@ -9,7 +9,7 @@
 
 ### **Container Info**
 ```
-NAME: whisperengine_enrichment_worker
+NAME: enrichment-worker
 IMAGE: whisperengine-multi-enrichment-worker
 STATUS: Up 11 minutes (unhealthy) ← Note: Healthcheck may need adjustment
 CREATED: October 20, 2025, ~05:53 UTC
