@@ -160,11 +160,22 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f en
 ## 🎭 CHARACTER DEFINITION LANGUAGE (CDL) SYSTEM
 
 ### **Database-Driven Personalities**
-- **Primary Storage**: PostgreSQL database with structured CDL schema
-- **Legacy Backup**: JSON files in `characters/examples_legacy_backup/` for reference
-- **Dynamic Loading**: Characters loaded from database via bot name
-- **Import Tool**: `batch_import_characters.py` for JSON → Database migration
+- **Primary Storage**: PostgreSQL database with `character_*` table schema (NO MORE `cdl_*` tables!)
+- **Schema Evolution**: Use Alembic migrations in `alembic/versions/` - NEVER reference `sql/init_schema.sql` (outdated)
+- **Legacy Backup**: JSON files in `characters/examples_legacy_backup/` for reference ONLY - NOT USED in production
+- **Dynamic Loading**: Characters loaded from database via bot name using `character_*` tables
+- **Import Tool**: `batch_import_characters.py` for JSON → Database migration (legacy only)
 - **No File Dependencies**: All character operations use database queries
+
+### **Critical Schema Rules**
+- ⚠️ **NEVER use `sql/init_schema.sql` for schema reference** - it's the initial baseline only
+- ✅ **ALWAYS check Alembic migrations** in `alembic/versions/` for current schema state
+- ✅ **Schema changes happen via Alembic migrations** - never manual SQL scripts
+- ✅ **Tables are `character_*` prefixed** - all `cdl_*` tables were migrated/renamed
+- ✅ **JSON character files are DEPRECATED** - database is the single source of truth
+
+### **Current CDL Database Tables** (50+ tables as of Oct 2025)
+Tables include: `character_identity_details`, `character_attributes`, `character_communication_patterns`, `character_response_modes`, `character_conversation_modes`, `character_emotional_states`, `character_background`, `character_interests`, `character_relationships`, `character_memories`, `character_question_templates`, `character_entity_categories`, `character_learning_timeline`, and 35+ more. Run `\dt character_*` in PostgreSQL to see full list.
 
 ### **Character Archetypes**
 1. **Real-World** (Elena, Marcus, Jake) - Honest AI disclosure when asked directly
@@ -181,6 +192,26 @@ system_prompt = await cdl_integration.create_character_aware_prompt(
     message_content=message
 )
 ```
+
+### **Query Routing & Character Backstory Facts**
+- **Intent-Based Routing**: `src/knowledge/semantic_router.py` analyzes user questions and routes to optimal data stores
+- **Character Backstory Storage**: Character biographical facts (workplace, hometown, background) can be stored in PostgreSQL CDL database
+- **Recommended Tables**: `character_background`, `character_identity_details`, or custom fact storage in `character_attributes`
+- **Query Pattern**: "Where do you work?" / "Where do you live?" → SemanticKnowledgeRouter → CDL database → factual response
+- **Integration Point**: CDL system prompt builder can inject biographical facts from database for consistent character responses
+- **Design Pattern**: Static designer-defined facts (CDL database) + Emergent bot statements (bot self-facts) = Complete personality
+- **Example Flow**:
+  ```python
+  # User asks: "Where do you work?"
+  intent = await semantic_router.analyze_query_intent(message)
+  # intent_type = QueryIntent.PERSONALITY_KNOWLEDGE
+  
+  # Route to CDL database for character backstory
+  backstory = await get_character_background(character_name)
+  # Returns: "Marine Research Institute at UC Santa Barbara"
+  
+  # Bot responds with consistent fact from database
+  ```
 
 ## 🧠 MEMORY SYSTEM ARCHITECTURE
 
