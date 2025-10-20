@@ -355,6 +355,22 @@ async def run_migrations():
                             if result.returncode == 0:
                                 print(f"✅ Database stamped with Alembic revision: {INIT_SQL_ALEMBIC_REVISION}")
                                 print("ℹ️  Future Alembic migrations will now apply incrementally from this point")
+                                
+                                # CRITICAL: Run Alembic migrations NOW (not on second restart!)
+                                # This applies all migrations AFTER baseline (e.g., c64001afbd46 personality backfill)
+                                print("\n🔄 Running Alembic migrations from baseline to head...")
+                                upgrade_result = subprocess.run([
+                                    'alembic', 'upgrade', 'head'
+                                ], cwd='/app', env=env, capture_output=True, text=True)
+                                
+                                if upgrade_result.returncode == 0:
+                                    print("✅ All Alembic migrations completed successfully!")
+                                    if upgrade_result.stdout:
+                                        print(f"📋 Migration output:\n{upgrade_result.stdout}")
+                                else:
+                                    print(f"⚠️  Alembic migrations failed: {upgrade_result.stderr}")
+                                    print(f"⚠️  STDOUT: {upgrade_result.stdout}")
+                                    print("⚠️  Fresh install may be missing recent schema updates")
                             else:
                                 print(f"⚠️  Failed to stamp Alembic revision: {result.stderr}")
                                 print("⚠️  Continuing anyway - you may need to manually run: alembic stamp 20251011_baseline_v106")
