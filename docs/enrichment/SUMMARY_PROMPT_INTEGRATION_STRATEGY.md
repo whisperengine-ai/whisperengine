@@ -444,6 +444,431 @@ async def test_summary_in_prompt_for_recall():
 
 ---
 
+---
+
+## 🚀 ADDITIONAL STRATEGIC IDEAS (Comprehensive Architecture Review)
+
+### 💡 Idea 1: Leverage Existing Enrichment Data for Auto-Summarization Triggers
+
+**Current System Analysis:**
+- Enrichment worker already generates `key_topics`, `emotional_tone`, and `compression_ratio`
+- These are stored in PostgreSQL `conversation_summaries` table
+- **Opportunity**: Use this metadata to auto-detect when summaries should be added!
+
+**Implementation:**
+```python
+# In semantic router intent analysis
+async def should_trigger_summary_from_enrichment_metadata(
+    user_id: str,
+    bot_name: str,
+    message: str
+) -> bool:
+    """
+    Use enrichment metadata to detect when summaries are contextually important
+    
+    Triggers:
+    - User mentions topic that appears in recent summary key_topics
+    - Current message emotional_tone matches recent summary emotional_tone
+    - Conversation gap detection (last summary > 7 days old)
+    """
+    # Query recent summaries with metadata
+    recent_summaries = await conn.fetch("""
+        SELECT key_topics, emotional_tone, created_at
+        FROM conversation_summaries
+        WHERE user_id = $1 AND bot_name = $2
+        ORDER BY created_at DESC
+        LIMIT 3
+    """, user_id, bot_name)
+    
+    # Check for topic overlap (user is asking about a past conversation topic)
+    for summary in recent_summaries:
+        topics = summary['key_topics']
+        if any(topic.lower() in message.lower() for topic in topics):
+            logger.info(f"🎯 TOPIC MATCH: User mentioned '{topic}' from past summary")
+            return True
+    
+    return False
+```
+
+**Benefits:**
+- ✅ More intelligent triggering (not just RECALL intent keywords)
+- ✅ Uses existing enrichment data (no new infrastructure)
+- ✅ Character can reference "we talked about X" naturally
+
+---
+
+### 💡 Idea 2: Cross-Pollinate Summaries with Facts System
+
+**Current Integration Gap:**
+- Facts system uses `SemanticKnowledgeRouter.get_user_facts()` (lines 1379-1500 in CDL integration)
+- Summaries will be SEPARATE retrieval
+- **Opportunity**: Unify presentation for LLM!
+
+**Enhanced Prompt Integration:**
+```python
+# Instead of separate sections, create UNIFIED intelligence section
+prompt += "\n\n🧠 UNIFIED INTELLIGENCE ABOUT USER:\n"
+
+# 1. Structured Facts (from PostgreSQL)
+if facts:
+    prompt += "\n📊 Known Facts:\n"
+    for fact in facts:
+        prompt += f"  • {fact['relationship_type']}: {fact['entity_name']}\n"
+
+# 2. Conversation Summaries (from enrichment)
+if summaries:
+    prompt += "\n📚 Past Conversation Topics:\n"
+    for summary in summaries:
+        topics = ', '.join(summary['key_topics'][:3])
+        prompt += f"  • {summary['start_timestamp'].strftime('%B %d')}: {topics}\n"
+        prompt += f"    Context: {summary['summary_text'][:100]}...\n"
+
+# 3. Unified synthesis instruction
+prompt += "\nSynthesize facts and conversation history naturally - weave them together as memories."
+```
+
+**Benefits:**
+- ✅ LLM sees facts + summaries as unified context
+- ✅ Reduces prompt section overhead
+- ✅ More natural character synthesis
+
+---
+
+### 💡 Idea 3: Emotional Tone Routing (Use RoBERTa Metadata!)
+
+**Current Constraint:**
+- Strategy uses intent-based routing (RECALL/REFLECTION)
+- **Missed Opportunity**: RoBERTa emotion analysis is stored for EVERY message!
+
+**Emotional Context Summaries:**
+```python
+# Add emotional tone matching to summary retrieval
+async def get_emotionally_relevant_summaries(
+    user_id: str,
+    bot_name: str,
+    current_emotion: str,  # From RoBERTa analysis of current message
+    current_intensity: float
+) -> List[Dict]:
+    """
+    Retrieve summaries matching emotional context
+    
+    Use cases:
+    - User is sad → show summaries from past sad conversations (emotional continuity)
+    - User is excited → show summaries from past exciting moments (shared joy)
+    """
+    # Query summaries with matching emotional tone
+    summaries = await conn.fetch("""
+        SELECT summary_text, emotional_tone, start_timestamp, key_topics
+        FROM conversation_summaries
+        WHERE user_id = $1 AND bot_name = $2
+          AND emotional_tone = $3
+        ORDER BY created_at DESC
+        LIMIT 3
+    """, user_id, bot_name, current_emotion)
+    
+    return summaries
+```
+
+**Benefits:**
+- ✅ Emotional continuity between conversations
+- ✅ "I remember when you felt this way before" capability
+- ✅ Leverages existing RoBERTa infrastructure
+
+---
+
+### 💡 Idea 4: Multi-Vector Summary Search (Use Qdrant!)
+
+**Current Plan:**
+- Strategy uses PostgreSQL queries only
+- **Missed Opportunity**: Summaries could be embedded in Qdrant for semantic search!
+
+**Hybrid Approach:**
+```python
+# Store summary embeddings in Qdrant for semantic retrieval
+# Then enrich with PostgreSQL metadata
+
+async def get_semantically_similar_summaries(
+    user_id: str,
+    bot_name: str,
+    query: str
+) -> List[Dict]:
+    """
+    Use Qdrant to find summaries semantically similar to current query
+    Then fetch full metadata from PostgreSQL
+    """
+    # 1. Embed query
+    query_embedding = await embedder.embed(query)
+    
+    # 2. Search Qdrant summary collection (NEW collection: conversation_summaries_vectors)
+    qdrant_results = await qdrant_client.search(
+        collection_name=f"summaries_{bot_name}",
+        query_vector=query_embedding,
+        query_filter={"user_id": user_id},
+        limit=5
+    )
+    
+    # 3. Enrich with PostgreSQL metadata
+    summary_ids = [r.id for r in qdrant_results]
+    full_summaries = await postgres.fetch("""
+        SELECT * FROM conversation_summaries
+        WHERE id = ANY($1)
+    """, summary_ids)
+    
+    return full_summaries
+```
+
+**Benefits:**
+- ✅ Semantic similarity instead of keyword matching
+- ✅ Better topic detection across conversations
+- ✅ Consistent with WhisperEngine's vector-first architecture
+
+---
+
+### 💡 Idea 5: Conversation Continuity Score
+
+**Current Gap:**
+- No measurement of when summaries actually help
+- **Opportunity**: Track summary usage effectiveness!
+
+**Implementation:**
+```python
+# After adding summaries to prompt, track if they were used
+async def track_summary_effectiveness(
+    user_id: str,
+    bot_name: str,
+    summaries_added: List[str],
+    bot_response: str
+):
+    """
+    Track if bot actually referenced the summaries in response
+    
+    Metrics:
+    - Did bot mention topics from summaries?
+    - Did bot explicitly reference "we talked about X"?
+    - Was summary relevant to response?
+    """
+    # Simple keyword overlap analysis
+    summary_topics = set()
+    for summary in summaries_added:
+        summary_topics.update(summary['key_topics'])
+    
+    response_lower = bot_response.lower()
+    topics_used = [topic for topic in summary_topics if topic.lower() in response_lower]
+    
+    usage_ratio = len(topics_used) / len(summary_topics) if summary_topics else 0
+    
+    # Log to InfluxDB for trend analysis
+    await influx_client.write({
+        "measurement": "summary_effectiveness",
+        "tags": {
+            "bot_name": bot_name,
+            "user_id": user_id
+        },
+        "fields": {
+            "summaries_added": len(summaries_added),
+            "topics_referenced": len(topics_used),
+            "usage_ratio": usage_ratio
+        }
+    })
+```
+
+**Benefits:**
+- ✅ Data-driven optimization of summary triggers
+- ✅ Detect when summaries are wasteful (low usage_ratio)
+- ✅ Fine-tune intent detection thresholds
+
+---
+
+### 💡 Idea 6: Progressive Summary Depth
+
+**Current Strategy:**
+- Fixed summary length (~80 tokens)
+- **Opportunity**: Vary summary depth based on query specificity!
+
+**Adaptive Summary Detail:**
+```python
+async def get_adaptive_summaries(
+    user_id: str,
+    bot_name: str,
+    intent: QueryIntent,
+    query_specificity: float  # 0.0 = vague, 1.0 = specific
+) -> List[Dict]:
+    """
+    Adjust summary detail based on query specificity
+    
+    Examples:
+    - "What did we talk about?" → High-level overview (1-2 sentences)
+    - "Remind me what I said about Python yesterday" → Detailed excerpt (5-10 sentences)
+    """
+    if query_specificity > 0.8:
+        # Specific query → detailed summaries
+        return await get_detailed_summaries(user_id, bot_name, limit=2)
+    elif query_specificity > 0.5:
+        # Medium specificity → balanced summaries
+        return await get_standard_summaries(user_id, bot_name, limit=3)
+    else:
+        # Vague query → brief overview
+        return await get_brief_summaries(user_id, bot_name, limit=5)
+```
+
+**Benefits:**
+- ✅ Token efficiency (brief for vague queries)
+- ✅ Better recall accuracy (detailed for specific queries)
+- ✅ User satisfaction (right amount of detail)
+
+---
+
+### 💡 Idea 7: Temporal Pattern Detection
+
+**Current System:**
+- Reactivation logic: 7+ day gap triggers summaries
+- **Opportunity**: Detect conversation rhythm patterns!
+
+**Smart Reactivation:**
+```python
+async def detect_conversation_rhythm(user_id: str, bot_name: str) -> Dict:
+    """
+    Learn user's conversation patterns and adapt summary triggers
+    
+    Patterns:
+    - Daily chatterer → no reactivation summaries (would be redundant)
+    - Weekly check-in → always add recent summary after 5+ days
+    - Monthly deep-diver → add 2-3 summaries after 20+ days
+    """
+    # Query conversation frequency from InfluxDB or PostgreSQL
+    recent_conversations = await conn.fetch("""
+        SELECT DATE(start_timestamp) as convo_date, COUNT(*) as message_count
+        FROM conversation_summaries
+        WHERE user_id = $1 AND bot_name = $2
+          AND created_at > NOW() - INTERVAL '90 days'
+        GROUP BY DATE(start_timestamp)
+        ORDER BY convo_date DESC
+    """, user_id, bot_name)
+    
+    # Calculate rhythm
+    avg_gap_days = calculate_average_gap(recent_conversations)
+    
+    return {
+        'user_type': classify_user_type(avg_gap_days),
+        'suggested_reactivation_threshold': avg_gap_days * 1.5
+    }
+```
+
+**Benefits:**
+- ✅ Personalized reactivation logic per user
+- ✅ Avoids summary spam for daily users
+- ✅ Better context for infrequent users
+
+---
+
+### 💡 Idea 8: Summary Preview in Intent Analysis
+
+**Current Strategy:**
+- Intent detection → summary retrieval → add to prompt
+- **Opportunity**: Show summary preview DURING intent analysis!
+
+**Preview-Based Routing:**
+```python
+async def analyze_intent_with_summary_preview(query: str, user_id: str, bot_name: str):
+    """
+    Check if summaries exist BEFORE committing to RECALL intent
+    
+    Prevents:
+    - RECALL intent detected but NO summaries available (wasted tokens)
+    - False positive intent detection (no actual history to recall)
+    """
+    # Detect intent
+    intent = await semantic_router.analyze_query_intent(query)
+    
+    # If RECALL intent, preview summaries
+    if intent.intent_type == IntentType.RECALL:
+        preview = await conn.fetchval("""
+            SELECT COUNT(*) FROM conversation_summaries
+            WHERE user_id = $1 AND bot_name = $2
+              AND created_at > NOW() - INTERVAL '30 days'
+        """, user_id, bot_name)
+        
+        if preview == 0:
+            # No summaries available → downgrade to GENERAL intent
+            logger.info(f"🎯 RECALL INTENT: Downgraded to GENERAL (no summaries available)")
+            intent.intent_type = IntentType.GENERAL
+    
+    return intent
+```
+
+**Benefits:**
+- ✅ Prevents empty summary sections in prompts
+- ✅ Faster detection of "no history" scenarios
+- ✅ Better user experience (avoids "I don't remember" responses when summaries are missing)
+
+---
+
+## 📊 REVISED TOKEN BUDGET (With New Ideas)
+
+| Section | Max Tokens | Trigger Logic |
+|---------|-----------|---------------|
+| Core Identity | 500 | Always |
+| **Facts + Summaries (UNIFIED)** | **500** | **Semantic routing** |
+| Preferences | 100 | Always |
+| Semantic Memories | 800 | Always |
+| Episodic Recent | 600 | Always |
+| AI Intelligence | 400 | Always |
+| **Emotional Context Summaries** | **200** | **RoBERTa match** |
+
+**Total with all enhancements:** ~3,100 tokens (still acceptable!)
+
+---
+
+## 🎯 REVISED IMPLEMENTATION PRIORITY
+
+### Phase 1: Core Integration (2-3 hours) - UNCHANGED
+✅ Same as original plan
+
+### Phase 2: Enhanced Triggering (2-3 hours) - NEW
+1. ✅ Add enrichment metadata topic matching
+2. ✅ Add emotional tone routing
+3. ✅ Add conversation rhythm detection
+4. ✅ Test adaptive summary depth
+
+### Phase 3: Multi-Vector Enhancement (3-4 hours) - NEW
+1. ✅ Create Qdrant summary embeddings collection
+2. ✅ Implement semantic summary search
+3. ✅ Unified facts + summaries presentation
+4. ✅ Test semantic similarity vs keyword matching
+
+### Phase 4: Monitoring & Optimization (ongoing) - ENHANCED
+1. ✅ Summary effectiveness tracking (InfluxDB)
+2. ✅ Conversation rhythm analysis
+3. ✅ Token usage vs accuracy trade-offs
+4. ✅ Fine-tune all thresholds
+
+---
+
+## 💡 KEY INSIGHTS FROM ARCHITECTURE REVIEW
+
+### What We Already Have (Can Leverage!)
+1. ✅ **RoBERTa Emotion Analysis** - stored for EVERY message
+2. ✅ **Multi-Vector System** - content, semantic, emotion vectors
+3. ✅ **Enrichment Metadata** - key_topics, emotional_tone, compression_ratio
+4. ✅ **SemanticKnowledgeRouter** - proven intent detection system
+5. ✅ **InfluxDB Integration** - ready for effectiveness tracking
+
+### What We're Building
+1. 🚀 **Intelligent Summary Routing** - only when needed
+2. 🚀 **Unified Intelligence Presentation** - facts + summaries together
+3. 🚀 **Emotional Context Continuity** - RoBERTa-powered matching
+4. 🚀 **Multi-Vector Summary Search** - Qdrant semantic similarity
+5. 🚀 **Adaptive Summary Depth** - query specificity-based detail
+
+### Why This Is Better Than Original Strategy
+1. **Leverages Existing Infrastructure** - RoBERTa, Qdrant, InfluxDB
+2. **Unified Presentation** - facts + summaries = cohesive memory
+3. **Emotional Intelligence** - matches WhisperEngine's personality-first design
+4. **Data-Driven Optimization** - effectiveness tracking for continuous improvement
+5. **Personalized Experience** - conversation rhythm adaptation per user
+
+---
+
 **Last Updated:** October 19, 2025  
-**Status:** Design Complete - Ready for Implementation  
-**Estimated Effort:** 4-6 hours for full implementation
+**Status:** Design Complete - Enhanced with 8 Additional Strategic Ideas  
+**Estimated Effort:** 8-12 hours for full implementation (with enhancements)
