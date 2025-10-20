@@ -1,8 +1,8 @@
 # Fact Extraction Architecture Review 🔍
 
-**Date**: January 2025
-**Status**: Architecture Investigation - Potential Duplicate Code Found
-**Priority**: HIGH - Need to clarify fact/preference extraction strategy
+**Date**: October 11, 2025 (Created during docs reorganization)
+**Status**: ✅ RESOLVED - See BOT_LEARNING_SYSTEMS_OVERVIEW.md for clarification
+**Priority**: HISTORICAL REFERENCE - Questions answered in Oct 20, 2025 clarification work
 
 ## Critical Questions Raised
 
@@ -240,11 +240,48 @@ class IntelligenceSystemType(Enum):
 4. **Decide** if bot fact extraction is needed or redundant
 5. **Document** final architecture decision
 
-## Status: BLOCKED
+## Status: ✅ RESOLVED (October 20, 2025)
 
-**Cannot proceed with deployment** until we clarify:
-- Is bot fact extraction duplicate functionality?
-- Where/how are bot facts used in the system?
-- Should we keep, remove, or modify the new implementation?
+**Questions Answered**: All concerns raised in this document have been resolved through comprehensive architecture investigation.
 
-**User's intuition is likely correct** - this may be duplicate code that conflicts with existing character learning systems.
+### Resolution Summary
+
+1. **Bot Self-Fact Extraction is NOT Redundant**
+   - Character Episodic Intelligence: Pattern recognition from emotional analysis (ACTIVE)
+   - Bot Self-Fact Extraction: Statement consistency tracking (DESIGNED, not yet implemented)
+   - Both systems are **complementary**, not duplicate
+
+2. **Storage Design is Correct**
+   - User facts: `user_id = "discord_user_id"`
+   - Bot facts: `user_id = "myself"` (cleaner than `"bot_elena"`)
+   - Isolation via `mentioned_by_character` field
+   - No separate table needed
+
+3. **Query Patterns are Clear**
+   - User facts: `WHERE user_id = $1 AND mentioned_by_character = $2`
+   - Bot facts: `WHERE user_id = 'myself' AND mentioned_by_character = $2`
+   - Cross-bot queries: `WHERE user_id = 'myself'` (all bots)
+
+### Final Architectural Decision
+
+**✅ KEEP Bot Self-Fact Extraction (with updated design)**
+- Use case: Dynamic statement consistency from bot responses
+- Storage: PostgreSQL with `user_id="myself"` convention
+- Integration: Will be added to prompt building once implemented
+- Complementary to Character Episodic Intelligence (not duplicate)
+
+### Reference Documentation
+
+**See**: `docs/architecture/BOT_LEARNING_SYSTEMS_OVERVIEW.md` for comprehensive explanation of:
+- How Character Episodic Intelligence works (ACTIVE)
+- How Bot Self-Fact Extraction works (DESIGNED)
+- Why both systems are needed
+- Where each system appears to users
+
+---
+
+## Original Investigation (Historical Context)
+
+Below is the original investigation that raised important questions about potential architecture conflicts. These questions have now been answered.
+
+---

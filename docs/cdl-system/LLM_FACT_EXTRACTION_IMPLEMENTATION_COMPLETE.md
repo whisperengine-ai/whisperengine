@@ -1,22 +1,41 @@
-# LLM Fact Extraction Implementation Complete ✅
+# LLM Fact Extraction - Design Documentation
 
-**Date**: January 2025
-**Status**: Implemented and Ready for Testing
-**Impact**: 10x quality improvement (95% accuracy vs 10% regex baseline)
+**Date**: October 11, 2025 (Created during docs reorganization)
+**Status**: ⚠️ DESIGN DOCUMENTATION - NOT YET IMPLEMENTED
+**Impact**: Planned 10x quality improvement (95% accuracy vs 10% regex baseline)
 
-## Executive Summary
+## ⚠️ Important Clarification
 
-Replaced regex-based fact extraction with LLM-powered natural language understanding, addressing 90% noise rate in PostgreSQL knowledge graph. Implementation supports DUAL extraction paths:
+**This document describes PLANNED implementation, not current production code.**
+
+The methods and integration points described here (e.g., `_extract_and_store_knowledge_from_bot_response()`, Phase 9b/9c) represent the **design vision** for how bot self-fact extraction would work if implemented.
+
+**Current Status** (October 20, 2025):
+- ✅ Design complete and documented
+- ✅ Database schema ready (`user_id="myself"` convention)
+- ✅ Architecture clarified (complementary to Character Episodic Intelligence)
+- ❌ Implementation NOT started yet
+- ❌ Code examples below do NOT exist in codebase
+
+**See Also**:
+- `docs/features/BOT_SELF_FACT_EXTRACTION.md` - Current design specification
+- `docs/architecture/BOT_LEARNING_SYSTEMS_OVERVIEW.md` - Architecture overview
+
+---
+
+## Design Overview
+
+This document describes the planned replacement of regex-based fact extraction with LLM-powered natural language understanding, addressing 90% noise rate in PostgreSQL knowledge graph. Implementation will support DUAL extraction paths:
 - **User facts** extracted from user messages
 - **Bot self-facts** extracted from bot responses
 
-## Implementation Details
+## Planned Implementation Details
 
-### 1. Core Method: `_extract_and_store_knowledge()`
-**Location**: `src/core/message_processor.py` lines 4218-4397
+### 1. Core Method: `_extract_and_store_knowledge()` (PLANNED)
+**Location**: `src/core/message_processor.py` (PLANNED - NOT YET IMPLEMENTED)
 
-**Features**:
-- ✅ LLM-powered natural language fact extraction
+**Features** (PLANNED):
+- LLM-powered natural language fact extraction
 - ✅ Configurable model via `LLM_FACT_EXTRACTION_MODEL` env var
 - ✅ Async background processing (0ms user-facing latency)
 - ✅ JSON prompt format with strict filtering instructions
