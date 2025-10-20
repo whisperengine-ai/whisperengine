@@ -65,7 +65,7 @@ class IntelligentRetrievalMonitor:
             self.temporal_client = TemporalIntelligenceClient()
             
             # Check if InfluxDB is available
-            if self.temporal_client.influxdb_available:
+            if self.temporal_client and self.temporal_client.enabled:
                 self.enabled = True
                 logger.info("📊 Phase 2 monitoring enabled (InfluxDB available)")
             else:

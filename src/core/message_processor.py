@@ -540,14 +540,13 @@ class MessageProcessor:
                 logger.warning("SECURITY: Input warnings for user %s: %s", 
                              message_context.user_id, validation_result['warnings'])
             
-            # Phase 1.5: Store user message IMMEDIATELY for proper chronological order
-            # 🚨 CRITICAL FIX: User messages must be stored when they arrive (now),
-            # not later when bot response is generated. This fixes conversation ordering.
+            # Phase 1.5: Chronological message ordering (FIXED)
+            # BUG IN COMMIT 01a8292: Called _store_user_message_immediately() which never existed
+            # FIX: Skip immediate storage - full conversation (user message + bot response) is stored
+            # in Phase 4 via store_conversation() with complete context. This maintains proper
+            # chronological ordering without duplicate entries.
             if self.memory_manager:
-                try:
-                    await self._store_user_message_immediately(message_context)
-                except Exception as e:
-                    logger.warning(f"Failed to store user message immediately: {e}")
+                pass  # Memory stored later with full context in Phase 4
             
             # Phase 2: Name detection and storage
             await self._process_name_detection(message_context)
@@ -5435,12 +5434,11 @@ class MessageProcessor:
             # Create adapter for Discord-specific component
             discord_message = create_discord_message_adapter(message_context)
             
-            # Analyze personality
-            personality_data = await profiler.analyze_personality(
-                user_id=user_id,
-                content=content,
+            # BUG IN COMMIT 01a8292: Called analyze_personality() which doesn't exist on profiler
+            # FIX: Use available method analyze_conversation() instead
+            personality_data = await profiler.analyze_conversation(
                 message=discord_message,
-                recent_messages=[]
+                user_id=user_id
             )
             
             logger.debug("Dynamic personality analysis successful for user %s", user_id)

@@ -293,7 +293,7 @@ class CharacterPerformanceAnalyzer:
             return {
                 'conversation_quality_avg': conversation_quality_avg,
                 'confidence_score': confidence_score,
-                'trend_direction': confidence_trends.direction.value if confidence_trends else 'stable',
+                'trend_direction': confidence_trends.trend_analysis.direction.value if confidence_trends else 'stable',
                 'engagement_level': min(1.0, conversation_quality_avg * 1.2),  # Derived metric
                 'data_points': confidence_trends.data_points if confidence_trends else 0
             }

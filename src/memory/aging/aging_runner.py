@@ -20,7 +20,7 @@ class MemoryAgingRunner:
         if metrics:
             metrics.incr("memory_aging_runs_started", user_id=user_id)
         
-        all_memories = await self.memory_manager.get_memories_by_user(user_id)
+        all_memories = await self.memory_manager.get_recent_memories(user_id, limit=1000)
         scanned, flagged, pruned, preserved = 0, 0, 0, 0
         
         for mem in all_memories:
