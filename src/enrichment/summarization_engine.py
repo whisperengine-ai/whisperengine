@@ -74,7 +74,29 @@ class SummarizationEngine:
         # Confidence score (simple heuristic - could be enhanced)
         confidence_score = self._calculate_confidence(messages)
         
-        logger.info(f"Generated summary: {len(summary_text)} chars, {len(key_topics)} topics, {emotional_tone} tone")
+        # ✅ QUALITY VALIDATION: Check for issues and log structured warnings
+        quality_issues = []
+        
+        if len(summary_text) < 100:
+            quality_issues.append(f"summary_too_short:{len(summary_text)}")
+        
+        if compression_ratio < 0.05:
+            quality_issues.append(f"compression_too_aggressive:{compression_ratio:.3f}")
+        
+        if "general conversation" in key_topics:
+            quality_issues.append("generic_topic_fallback")
+        
+        if quality_issues:
+            logger.warning(
+                f"📊 SUMMARY QUALITY ISSUES | user={user_id} | bot={bot_name} | "
+                f"messages={len(messages)} | issues=[{', '.join(quality_issues)}]"
+            )
+        else:
+            logger.info(
+                f"✅ SUMMARY QUALITY GOOD | user={user_id} | bot={bot_name} | "
+                f"messages={len(messages)} | length={len(summary_text)} | "
+                f"compression={compression_ratio:.2%} | topics={len(key_topics)}"
+            )
         
         return {
             'summary_text': summary_text,
@@ -105,37 +127,59 @@ Conversation ({message_count} messages):
 
 Provide a comprehensive 3-5 sentence summary that captures the essence of this conversation. Be specific and preserve important details."""
 
-        try:
-            # Use get_chat_response for modern chat API (asyncio.to_thread for sync method)
-            response = await asyncio.to_thread(
-                self.llm_client.get_chat_response,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert conversation analyst. Provide clear, detailed summaries."
-                    },
-                    {
-                        "role": "user",
-                        "content": summary_prompt
-                    }
-                ],
-                model=self.llm_model,
-                temperature=0.5,
-                max_tokens=500
-            )
-            
-            # get_chat_response returns a string directly
-            summary_text = response.strip() if response else ''
-            
-            if not summary_text:
-                logger.warning("LLM returned empty summary, using fallback")
-                return self._generate_fallback_summary(message_count, bot_name)
-            
-            return summary_text
-            
-        except Exception as e:
-            logger.error(f"Error generating summary with LLM: {e}")
-            return self._generate_fallback_summary(message_count, bot_name)
+        # 🔄 RETRY LOGIC: Handle transient LLM failures with exponential backoff
+        max_retries = 3
+        min_summary_length = 100  # Quality threshold
+        
+        for attempt in range(max_retries):
+            try:
+                # Use get_chat_response for modern chat API (asyncio.to_thread for sync method)
+                response = await asyncio.to_thread(
+                    self.llm_client.get_chat_response,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert conversation analyst. Provide clear, detailed summaries."
+                        },
+                        {
+                            "role": "user",
+                            "content": summary_prompt
+                        }
+                    ],
+                    model=self.llm_model,
+                    temperature=0.5,
+                    max_tokens=500
+                )
+                
+                # get_chat_response returns a string directly
+                summary_text = response.strip() if response else ''
+                
+                # ✅ QUALITY VALIDATION: Check summary meets minimum standards
+                if summary_text and len(summary_text) >= min_summary_length:
+                    if attempt > 0:
+                        logger.info(f"✅ Summary generation succeeded on retry {attempt + 1}")
+                    return summary_text
+                
+                # Summary too short - retry if attempts remaining
+                logger.warning(
+                    f"⚠️  Summary quality issue (length={len(summary_text)} chars, min={min_summary_length}), "
+                    f"retry {attempt + 1}/{max_retries}"
+                )
+                
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff: 1s, 2s, 3s
+                
+            except Exception as e:
+                logger.warning(f"⚠️  Summary generation attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
+        
+        # All retries exhausted - use fallback
+        logger.error(
+            f"❌ All {max_retries} summary generation attempts failed for {message_count} messages, "
+            f"using fallback template"
+        )
+        return self._generate_fallback_summary(message_count, bot_name)
     
     async def _extract_key_topics(self, conversation_text: str) -> List[str]:
         """Extract 3-5 key topics from conversation"""
