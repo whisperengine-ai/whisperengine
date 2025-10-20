@@ -64,29 +64,27 @@ async def record_migration(conn, migration_name):
     )
 
 async def apply_sql_file(conn, file_path, migration_name):
-    """Apply a SQL file"""
-    print(f"📝 Applying migration: {migration_name}")
-    
-    with open(file_path, 'r') as f:
-        sql = f.read()
-    # Some pg_dump exports set search_path to an empty string which breaks
-    # unqualified table references (e.g. INSERT INTO characters). Replace
-    # that pattern with an explicit public search_path so subsequent
-    # statements find the expected tables.
-    if "pg_catalog.set_config('search_path', '', false)" in sql or "SET search_path = ''" in sql:
-        print("🔧 Adjusting search_path in SQL dump to use 'public' schema")
-        sql = sql.replace("pg_catalog.set_config('search_path', '', false)", "pg_catalog.set_config('search_path', 'public', false)")
-        sql = sql.replace("SET search_path = ''", "SET search_path = 'public'")
-    
+    """Apply a SQL migration file in a transaction for atomicity"""
     try:
-        # Execute the entire SQL file
-        # Note: asyncpg supports multi-statement execution; the SQL dump
-        # contains CREATE FUNCTION... $$ bodies and other complex constructs.
-        await conn.execute(sql)
-        print(f"✅ Migration {migration_name} applied successfully!")
+        sql_content = file_path.read_text()
+        
+        # 00_init.sql sets search_path to empty string which breaks our schema access
+        # Force search_path to public for all migrations
+        if 'SET search_path = TO' in sql_content or "SET search_path = ''" in sql_content:
+            print(f"🔧 Adjusting search_path in SQL dump to use 'public' schema")
+            sql_content = sql_content.replace("SET search_path = TO 'public';", "SET search_path = public;")
+            sql_content = sql_content.replace("SET search_path = '';", "SET search_path = public;")
+        
+        # Execute in transaction for atomicity
+        # If migration fails partway, entire transaction rolls back
+        print(f"📝 Applying migration: {migration_name} (in transaction)")
+        async with conn.transaction():
+            await conn.execute(sql_content)
+            print(f"✅ Migration {migration_name} applied successfully!")
         return True
     except Exception as e:
         print(f"❌ Error applying migration {migration_name}: {e}")
+        print("🔄 Transaction rolled back - database is unchanged")
         return False
 
 async def run_migrations():
