@@ -190,6 +190,8 @@ services:
 
   # ===== BACKGROUND ENRICHMENT WORKER =====
   enrichment-worker:
+    profiles:
+      - enrichment  # Optional: Start with --profile enrichment (safety for dev environments)
     build:
       context: .
       dockerfile: docker/Dockerfile.enrichment-worker
@@ -208,7 +210,7 @@ services:
       - POSTGRES_PASSWORD=whisperengine_password
       
       # Enrichment configuration
-      - ENRICHMENT_INTERVAL_SECONDS=${ENRICHMENT_INTERVAL_SECONDS:-660}  # 11 minutes (prime number)
+      - ENRICHMENT_INTERVAL_SECONDS=${ENRICHMENT_INTERVAL_SECONDS:-660}  # 11 minutes (prime number - tested optimal)
       - ENRICHMENT_BATCH_SIZE=${ENRICHMENT_BATCH_SIZE:-50}
       - MIN_MESSAGES_FOR_SUMMARY=${MIN_MESSAGES_FOR_SUMMARY:-5}
       - TIME_WINDOW_HOURS=${TIME_WINDOW_HOURS:-24}
@@ -222,6 +224,7 @@ services:
       - LLM_FACT_EXTRACTION_TEMPERATURE=${LLM_FACT_EXTRACTION_TEMPERATURE:-0.2}
       - LLM_CHAT_API_URL=${LLM_CHAT_API_URL}
       - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}  # Backward compatibility
       
       # InfluxDB configuration (read-only access for temporal analysis)
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
@@ -229,8 +232,10 @@ services:
       - INFLUXDB_ORG=${INFLUXDB_ORG:-whisperengine}
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-performance_metrics}
     depends_on:
-      - postgres
-      - qdrant
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
     networks:
       - bot_network
     volumes:

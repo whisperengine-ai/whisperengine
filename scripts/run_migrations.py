@@ -64,29 +64,27 @@ async def record_migration(conn, migration_name):
     )
 
 async def apply_sql_file(conn, file_path, migration_name):
-    """Apply a SQL file"""
-    print(f"📝 Applying migration: {migration_name}")
-    
-    with open(file_path, 'r') as f:
-        sql = f.read()
-    # Some pg_dump exports set search_path to an empty string which breaks
-    # unqualified table references (e.g. INSERT INTO characters). Replace
-    # that pattern with an explicit public search_path so subsequent
-    # statements find the expected tables.
-    if "pg_catalog.set_config('search_path', '', false)" in sql or "SET search_path = ''" in sql:
-        print("🔧 Adjusting search_path in SQL dump to use 'public' schema")
-        sql = sql.replace("pg_catalog.set_config('search_path', '', false)", "pg_catalog.set_config('search_path', 'public', false)")
-        sql = sql.replace("SET search_path = ''", "SET search_path = 'public'")
-    
+    """Apply a SQL migration file in a transaction for atomicity"""
     try:
-        # Execute the entire SQL file
-        # Note: asyncpg supports multi-statement execution; the SQL dump
-        # contains CREATE FUNCTION... $$ bodies and other complex constructs.
-        await conn.execute(sql)
-        print(f"✅ Migration {migration_name} applied successfully!")
+        sql_content = file_path.read_text()
+        
+        # 00_init.sql sets search_path to empty string which breaks our schema access
+        # Force search_path to public for all migrations
+        if 'SET search_path = TO' in sql_content or "SET search_path = ''" in sql_content:
+            print(f"🔧 Adjusting search_path in SQL dump to use 'public' schema")
+            sql_content = sql_content.replace("SET search_path = TO 'public';", "SET search_path = public;")
+            sql_content = sql_content.replace("SET search_path = '';", "SET search_path = public;")
+        
+        # Execute in transaction for atomicity
+        # If migration fails partway, entire transaction rolls back
+        print(f"📝 Applying migration: {migration_name} (in transaction)")
+        async with conn.transaction():
+            await conn.execute(sql_content)
+            print(f"✅ Migration {migration_name} applied successfully!")
         return True
     except Exception as e:
         print(f"❌ Error applying migration {migration_name}: {e}")
+        print("🔄 Transaction rolled back - database is unchanged")
         return False
 
 async def run_migrations():
@@ -167,8 +165,9 @@ async def run_migrations():
             
             if table_count < 30:
                 print(f"ℹ️  Small database ({table_count} tables) - likely true legacy v1.0.6")
-                print("🏷️  Stamping as fully up-to-date (v1.0.6 had full schema for its time)...")
-                stamp_revision = "head"
+                print("🏷️  Stamping with baseline revision to apply incremental updates...")
+                # v1.0.6 had ~20-25 tables, should stamp as baseline and run migrations
+                stamp_revision = "20251011_baseline_v106"
             elif emoji_columns_exist > 0:
                 print(f"ℹ️  Large database ({table_count} tables) with recent changes (emoji columns found)")
                 print("🏷️  Stamping as fully up-to-date...")
@@ -234,19 +233,66 @@ async def run_migrations():
             env['DATABASE_URL'] = database_url
             
             try:
-                # Run Alembic upgrade to head
+                # Show current migration status BEFORE upgrade
+                print("\n" + "=" * 80)
+                print("📊 CURRENT MIGRATION STATUS (BEFORE):")
+                print("=" * 80)
+                status_before = subprocess.run([
+                    'alembic', 'current', '--verbose'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                print(status_before.stdout if status_before.returncode == 0 else status_before.stderr)
+                
+                # Show what migrations are available
+                print("\n" + "=" * 80)
+                print("📋 AVAILABLE MIGRATIONS:")
+                print("=" * 80)
+                history_result = subprocess.run([
+                    'alembic', 'history', '--verbose'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                print(history_result.stdout if history_result.returncode == 0 else history_result.stderr)
+                
+                # Show heads
+                print("\n" + "=" * 80)
+                print("🎯 MIGRATION HEADS:")
+                print("=" * 80)
+                heads_result = subprocess.run([
+                    'alembic', 'heads'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                print(heads_result.stdout if heads_result.returncode == 0 else heads_result.stderr)
+                
+                # Run Alembic upgrade to head (no --verbose flag for upgrade command)
+                print("\n" + "=" * 80)
+                print("⚡ RUNNING ALEMBIC UPGRADE TO HEAD:")
+                print("=" * 80)
                 result = subprocess.run([
                     'alembic', 'upgrade', 'head'
                 ], cwd='/app', env=env, capture_output=True, text=True)
                 
+                print("STDOUT:")
+                print(result.stdout)
+                if result.stderr:
+                    print("\nSTDERR:")
+                    print(result.stderr)
+                
                 if result.returncode == 0:
-                    print("✅ Alembic migrations completed successfully!")
+                    # Show final migration status AFTER upgrade
+                    print("\n" + "=" * 80)
+                    print("📊 FINAL MIGRATION STATUS (AFTER):")
+                    print("=" * 80)
+                    status_after = subprocess.run([
+                        'alembic', 'current', '--verbose'
+                    ], cwd='/app', env=env, capture_output=True, text=True)
+                    print(status_after.stdout if status_after.returncode == 0 else status_after.stderr)
+                    
+                    print("\n" + "=" * 80)
+                    print("✅ ALEMBIC MIGRATIONS COMPLETED SUCCESSFULLY!")
+                    print("=" * 80)
                     print("🎉 All migrations complete!")
                     return 0
                 else:
-                    print(f"❌ Alembic migration failed!")
-                    print(f"STDOUT: {result.stdout}")
-                    print(f"STDERR: {result.stderr}")
+                    print("\n" + "=" * 80)
+                    print(f"❌ ALEMBIC MIGRATION FAILED! (Exit code: {result.returncode})")
+                    print("=" * 80)
                     
                     # In DEV mode, allow graceful failure if migration files are missing
                     if is_dev_mode and "Can't locate revision" in result.stderr:
@@ -308,6 +354,22 @@ async def run_migrations():
                             if result.returncode == 0:
                                 print(f"✅ Database stamped with Alembic revision: {INIT_SQL_ALEMBIC_REVISION}")
                                 print("ℹ️  Future Alembic migrations will now apply incrementally from this point")
+                                
+                                # CRITICAL: Run Alembic migrations NOW (not on second restart!)
+                                # This applies all migrations AFTER baseline (e.g., c64001afbd46 personality backfill)
+                                print("\n🔄 Running Alembic migrations from baseline to head...")
+                                upgrade_result = subprocess.run([
+                                    'alembic', 'upgrade', 'head'
+                                ], cwd='/app', env=env, capture_output=True, text=True)
+                                
+                                if upgrade_result.returncode == 0:
+                                    print("✅ All Alembic migrations completed successfully!")
+                                    if upgrade_result.stdout:
+                                        print(f"📋 Migration output:\n{upgrade_result.stdout}")
+                                else:
+                                    print(f"⚠️  Alembic migrations failed: {upgrade_result.stderr}")
+                                    print(f"⚠️  STDOUT: {upgrade_result.stdout}")
+                                    print("⚠️  Fresh install may be missing recent schema updates")
                             else:
                                 print(f"⚠️  Failed to stamp Alembic revision: {result.stderr}")
                                 print("⚠️  Continuing anyway - you may need to manually run: alembic stamp 20251011_baseline_v106")

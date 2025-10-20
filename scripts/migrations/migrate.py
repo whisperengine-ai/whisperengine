@@ -37,18 +37,69 @@ def run_alembic_command(args: list[str]) -> int:
     # Build command
     cmd = ["alembic"] + args
     
-    # Show what we're running
-    print(f"🔧 Running: {' '.join(cmd)}")
+    # Show detailed debug information
+    print("=" * 80)
+    print("🔍 MIGRATION DEBUG INFORMATION")
+    print("=" * 80)
+    print(f"🔧 Command: {' '.join(cmd)}")
     print(f"📁 Working directory: {os.getcwd()}")
+    print(f"📁 Project root: {project_root}")
+    print(f"🐍 Python executable: {sys.executable}")
+    print(f"🐍 Python version: {sys.version.split()[0]}")
     
     # Show database connection info (without password)
     db_host = os.getenv("POSTGRES_HOST", "localhost")
     db_port = os.getenv("POSTGRES_PORT", "5433")
     db_name = os.getenv("POSTGRES_DB", "whisperengine")
-    print(f"🗄️  Database: {db_name} at {db_host}:{db_port}\n")
+    db_user = os.getenv("POSTGRES_USER", "whisperengine")
+    print(f"\n🗄️  DATABASE CONNECTION:")
+    print(f"   Host: {db_host}")
+    print(f"   Port: {db_port}")
+    print(f"   Database: {db_name}")
+    print(f"   User: {db_user}")
     
-    # Execute
+    # Show Alembic configuration
+    alembic_ini = project_root / "alembic.ini"
+    print(f"\n📋 ALEMBIC CONFIGURATION:")
+    print(f"   Config file: {alembic_ini}")
+    print(f"   Config exists: {alembic_ini.exists()}")
+    
+    versions_dir = project_root / "alembic" / "versions"
+    print(f"   Migrations directory: {versions_dir}")
+    print(f"   Directory exists: {versions_dir.exists()}")
+    
+    if versions_dir.exists():
+        migration_files = list(versions_dir.glob("*.py"))
+        migration_files = [f for f in migration_files if f.name != "__init__.py"]
+        print(f"   Migration files found: {len(migration_files)}")
+    
+    # Show relevant environment variables
+    print(f"\n🔐 ENVIRONMENT VARIABLES:")
+    env_vars = [
+        "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_USER",
+        "FASTEMBED_CACHE_PATH", "QDRANT_HOST", "QDRANT_PORT"
+    ]
+    for var in env_vars:
+        value = os.getenv(var, "<not set>")
+        # Mask password
+        if "PASSWORD" in var and value != "<not set>":
+            value = "***"
+        print(f"   {var}: {value}")
+    
+    print("\n" + "=" * 80)
+    print("🚀 EXECUTING MIGRATION COMMAND")
+    print("=" * 80 + "\n")
+    
+    # Execute with real-time output
     result = subprocess.run(cmd, env=os.environ.copy())
+    
+    print("\n" + "=" * 80)
+    if result.returncode == 0:
+        print("✅ MIGRATION COMMAND COMPLETED SUCCESSFULLY")
+    else:
+        print(f"❌ MIGRATION COMMAND FAILED (Exit code: {result.returncode})")
+    print("=" * 80 + "\n")
+    
     return result.returncode
 
 
@@ -85,10 +136,33 @@ def create_migration(description: str):
 
 def upgrade_migrations(target: str = "head"):
     """Apply migrations up to target revision."""
-    print("=" * 60)
-    print(f"Upgrading database to: {target}")
-    print("=" * 60)
-    return run_alembic_command(["upgrade", target])
+    print("=" * 80)
+    print(f"📈 UPGRADING DATABASE TO: {target}")
+    print("=" * 80)
+    
+    # First show current status
+    print("\n📊 Current migration status:")
+    run_alembic_command(["current"])
+    
+    # Show pending migrations
+    print("\n📋 Checking for pending migrations...")
+    run_alembic_command(["history", "--verbose"])
+    
+    print("\n" + "=" * 80)
+    print("⚡ STARTING MIGRATION UPGRADE")
+    print("=" * 80)
+    
+    # Note: alembic upgrade doesn't support --verbose flag
+    result = run_alembic_command(["upgrade", target])
+    
+    if result == 0:
+        print("\n" + "=" * 80)
+        print("✅ DATABASE UPGRADE COMPLETED SUCCESSFULLY")
+        print("=" * 80)
+        print("\n📊 Final migration status:")
+        run_alembic_command(["current"])
+    
+    return result
 
 
 def downgrade_migrations(target: str = "-1"):
