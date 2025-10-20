@@ -231,6 +231,8 @@ services:
       - bot_network
     volumes:
       - ./logs/enrichment:/app/logs/enrichment
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src:ro
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep 'src.enrichment.worker' | grep -v grep || exit 1"]
       interval: 60s

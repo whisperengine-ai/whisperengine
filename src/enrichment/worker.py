@@ -1001,15 +1001,14 @@ class EnrichmentWorker:
                             continue
                         
                         # Store in entity_relationships table
-                        # NOTE: Removed context_metadata - column doesn't exist in schema
+                        # NOTE: Removed context_metadata and updated_at - columns don't exist in schema
                         await conn.execute("""
                             INSERT INTO entity_relationships 
                             (from_entity_id, to_entity_id, relationship_type, weight)
                             VALUES ($1, $2, $3, $4)
                             ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
                             DO UPDATE SET 
-                                weight = GREATEST(entity_relationships.weight, $4),
-                                updated_at = NOW()
+                                weight = GREATEST(entity_relationships.weight, $4)
                         """, source_entity_id, target_entity_id, 
                              relationship['relationship_type'], 
                              relationship['confidence'])
@@ -1220,28 +1219,40 @@ class EnrichmentWorker:
             if row and row['preferences']:
                 # Find most recent preference extraction timestamp
                 prefs = row['preferences']
-                timestamps = []
                 
-                for pref_type, pref_data in prefs.items():
-                    if isinstance(pref_data, dict) and 'updated_at' in pref_data:
-                        try:
-                            # Parse ISO timestamp (handles both with/without timezone)
-                            ts_str = pref_data['updated_at']
-                            if isinstance(ts_str, str):
-                                # Remove 'Z' and add UTC timezone if needed
-                                ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                                # Convert to naive UTC datetime for consistency with Qdrant queries
-                                if ts.tzinfo is not None:
-                                    ts = ts.replace(tzinfo=None)
-                                timestamps.append(ts)
-                        except (ValueError, AttributeError) as e:
-                            logger.warning("Failed to parse timestamp for preference %s: %s", pref_type, e)
-                            continue
+                # Handle case where preferences might be a JSON string instead of dict
+                if isinstance(prefs, str):
+                    import json
+                    try:
+                        prefs = json.loads(prefs)
+                    except json.JSONDecodeError:
+                        logger.warning("Failed to parse preferences JSON for user %s, using default backfill", user_id)
+                        prefs = {}  # Fall through to backfill logic
                 
-                if timestamps:
-                    last_extraction = max(timestamps)
-                    logger.debug("Last preference extraction for user %s: %s", user_id, last_extraction)
-                    return last_extraction
+                # Process preferences if we have a valid dict
+                if isinstance(prefs, dict) and prefs:
+                    timestamps = []
+                    
+                    for pref_type, pref_data in prefs.items():
+                        if isinstance(pref_data, dict) and 'updated_at' in pref_data:
+                            try:
+                                # Parse ISO timestamp (handles both with/without timezone)
+                                ts_str = pref_data['updated_at']
+                                if isinstance(ts_str, str):
+                                    # Remove 'Z' and add UTC timezone if needed
+                                    ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                                    # Convert to naive UTC datetime for consistency with Qdrant queries
+                                    if ts.tzinfo is not None:
+                                        ts = ts.replace(tzinfo=None)
+                                    timestamps.append(ts)
+                            except (ValueError, AttributeError) as e:
+                                logger.warning("Failed to parse timestamp for preference %s: %s", pref_type, e)
+                                continue
+                    
+                    if timestamps:
+                        last_extraction = max(timestamps)
+                        logger.debug("Last preference extraction for user %s: %s", user_id, last_extraction)
+                        return last_extraction
             
             # No preferences yet - backfill from 30 days ago
             backfill_from = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
@@ -1326,7 +1337,7 @@ JSON Response:"""
                 }
             ]
             
-            response = await self.llm_client.get_chat_response(
+            response = self.llm_client.get_chat_response(
                 messages_for_llm,
                 temperature=0.2,  # Low temperature for consistency
                 model=config.LLM_FACT_EXTRACTION_MODEL  # Reuse fact extraction model
