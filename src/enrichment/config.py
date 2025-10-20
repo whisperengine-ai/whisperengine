@@ -9,7 +9,7 @@ Environment variables:
 - POSTGRES_DB: PostgreSQL database name
 - POSTGRES_USER: PostgreSQL username
 - POSTGRES_PASSWORD: PostgreSQL password
-- ENRICHMENT_INTERVAL_SECONDS: How often to run enrichment cycle (default: 300)
+- ENRICHMENT_INTERVAL_SECONDS: How often to run enrichment cycle (default: 660 = 11 minutes)
 - ENRICHMENT_BATCH_SIZE: Messages to process per batch (default: 50)
 - LLM_CHAT_API_KEY: API key for LLM access (standardized with main bot)
 - LLM_CHAT_API_URL: LLM API URL (default: https://openrouter.ai/api/v1)
@@ -37,7 +37,7 @@ class EnrichmentConfig:
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "whisperengine_password")  # Match bot config
     
     # Enrichment settings
-    ENRICHMENT_INTERVAL_SECONDS: int = int(os.getenv("ENRICHMENT_INTERVAL_SECONDS", "300"))
+    ENRICHMENT_INTERVAL_SECONDS: int = int(os.getenv("ENRICHMENT_INTERVAL_SECONDS", "660"))  # 11 minutes (prime number - avoids harmonic interference)
     ENRICHMENT_BATCH_SIZE: int = int(os.getenv("ENRICHMENT_BATCH_SIZE", "50"))
     
     # LLM configuration

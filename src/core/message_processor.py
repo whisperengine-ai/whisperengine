@@ -2314,8 +2314,8 @@ class MessageProcessor:
                     if not is_bot_msg:
                         skip_next_bot_response = False
 
-                    # Truncate older messages to 500 chars
-                    truncated_content = msg_content[:500] + "..." if len(msg_content) > 500 else msg_content
+                    # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
+                    truncated_content = self._smart_truncate(msg_content, max_length=500)
                     role = "assistant" if is_bot_msg else "user"
                     user_assistant_messages.append({"role": role, "content": truncated_content})
                     logger.debug(f"🔥 CONTEXT (OLDER): Added truncated [{role}]: '{truncated_content[:100]}...'")
@@ -2357,9 +2357,9 @@ class MessageProcessor:
                         recent_content = msg_content
                         logger.info(f"🔥 CONTEXT (MOST RECENT): Full message [{idx}]")
                     else:
-                        # Older recent messages: 400 chars to prevent verbose pattern-matching
-                        recent_content = msg_content[:400] + "..." if len(msg_content) > 400 else msg_content
-                        logger.info(f"🔥 CONTEXT (RECENT): Truncated message [{idx}] to 400 chars")
+                        # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
+                        recent_content = self._smart_truncate(msg_content, max_length=400)
+                        logger.info(f"🔥 CONTEXT (RECENT): Smart-truncated message [{idx}] to 400 chars")
                     
                     role = "assistant" if is_bot_msg else "user"
                     conversation_context.append({"role": role, "content": recent_content})
@@ -3127,6 +3127,42 @@ class MessageProcessor:
         
         return keywords[:10]  # Top 10 topic keywords
     
+    def _smart_truncate(self, text: str, max_length: int) -> str:
+        """
+        Intelligently truncate text by removing the middle section while preserving
+        the beginning (context/tone) and ending (conclusion/sentiment).
+        
+        This creates more coherent truncated messages than simple end-truncation,
+        especially for emotional/roleplay conversations where the opening and closing
+        are critical for understanding the message's intent and emotional arc.
+        
+        Args:
+            text: The text to truncate
+            max_length: Maximum length (including ellipsis marker)
+            
+        Returns:
+            Truncated text with format: "beginning... [MIDDLE CUT] ...ending"
+        """
+        if len(text) <= max_length:
+            return text
+        
+        # Reserve space for ellipsis markers
+        ellipsis = "... [MIDDLE CUT] ..."
+        available_length = max_length - len(ellipsis)
+        
+        if available_length < 100:  # Not enough space for meaningful truncation
+            return text[:max_length - 3] + "..."
+        
+        # Split available space: 60% for beginning, 40% for ending
+        # This preserves more opening context while keeping the emotional conclusion
+        beginning_length = int(available_length * 0.6)
+        ending_length = available_length - beginning_length
+        
+        beginning = text[:beginning_length].rstrip()
+        ending = text[-ending_length:].lstrip()
+        
+        return f"{beginning}{ellipsis}{ending}"
+
     async def _get_recent_messages_structured(self, user_id: str) -> List[Dict[str, str]]:
         """Get recent conversation messages for structured context."""
         try:
@@ -3178,7 +3214,8 @@ class MessageProcessor:
                 if not is_bot:
                     skip_next_bot_response = False
                 
-                truncated = content[:500] + "..." if len(content) > 500 else content
+                # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
+                truncated = self._smart_truncate(content, max_length=500)
                 role = "assistant" if is_bot else "user"
                 formatted_messages.append({"role": role, "content": truncated})
                 logger.debug(f"  ✅ ADDED older message: role={role}, len={len(truncated)}")
@@ -3208,7 +3245,8 @@ class MessageProcessor:
                 if is_most_recent:
                     message_content = content
                 else:
-                    message_content = content[:400] + "..." if len(content) > 400 else content
+                    # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
+                    message_content = self._smart_truncate(content, max_length=400)
                 
                 role = "assistant" if is_bot else "user"
                 formatted_messages.append({"role": role, "content": message_content})
