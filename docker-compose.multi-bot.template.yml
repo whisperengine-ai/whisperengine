@@ -216,6 +216,10 @@ services:
       
       # LLM configuration
       - LLM_MODEL=${ENRICHMENT_LLM_MODEL:-anthropic/claude-3.5-sonnet}
+      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-anthropic/claude-sonnet-4.5}
+      - LLM_FACT_EXTRACTION_MODEL=${LLM_FACT_EXTRACTION_MODEL:-anthropic/claude-sonnet-4.5}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - LLM_FACT_EXTRACTION_TEMPERATURE=${LLM_FACT_EXTRACTION_TEMPERATURE:-0.2}
       - LLM_CHAT_API_URL=${LLM_CHAT_API_URL}
       - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY}
       
