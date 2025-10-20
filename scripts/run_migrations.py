@@ -234,19 +234,66 @@ async def run_migrations():
             env['DATABASE_URL'] = database_url
             
             try:
-                # Run Alembic upgrade to head
+                # Show current migration status BEFORE upgrade
+                print("\n" + "=" * 80)
+                print("📊 CURRENT MIGRATION STATUS (BEFORE):")
+                print("=" * 80)
+                status_before = subprocess.run([
+                    'alembic', 'current', '--verbose'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                print(status_before.stdout if status_before.returncode == 0 else status_before.stderr)
+                
+                # Show what migrations are available
+                print("\n" + "=" * 80)
+                print("📋 AVAILABLE MIGRATIONS:")
+                print("=" * 80)
+                history_result = subprocess.run([
+                    'alembic', 'history', '--verbose'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                print(history_result.stdout if history_result.returncode == 0 else history_result.stderr)
+                
+                # Show heads
+                print("\n" + "=" * 80)
+                print("🎯 MIGRATION HEADS:")
+                print("=" * 80)
+                heads_result = subprocess.run([
+                    'alembic', 'heads'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                print(heads_result.stdout if heads_result.returncode == 0 else heads_result.stderr)
+                
+                # Run Alembic upgrade to head with verbose output
+                print("\n" + "=" * 80)
+                print("⚡ RUNNING ALEMBIC UPGRADE TO HEAD:")
+                print("=" * 80)
                 result = subprocess.run([
-                    'alembic', 'upgrade', 'head'
+                    'alembic', 'upgrade', 'head', '--verbose'
                 ], cwd='/app', env=env, capture_output=True, text=True)
                 
+                print("STDOUT:")
+                print(result.stdout)
+                if result.stderr:
+                    print("\nSTDERR:")
+                    print(result.stderr)
+                
                 if result.returncode == 0:
-                    print("✅ Alembic migrations completed successfully!")
+                    # Show final migration status AFTER upgrade
+                    print("\n" + "=" * 80)
+                    print("📊 FINAL MIGRATION STATUS (AFTER):")
+                    print("=" * 80)
+                    status_after = subprocess.run([
+                        'alembic', 'current', '--verbose'
+                    ], cwd='/app', env=env, capture_output=True, text=True)
+                    print(status_after.stdout if status_after.returncode == 0 else status_after.stderr)
+                    
+                    print("\n" + "=" * 80)
+                    print("✅ ALEMBIC MIGRATIONS COMPLETED SUCCESSFULLY!")
+                    print("=" * 80)
                     print("🎉 All migrations complete!")
                     return 0
                 else:
-                    print(f"❌ Alembic migration failed!")
-                    print(f"STDOUT: {result.stdout}")
-                    print(f"STDERR: {result.stderr}")
+                    print("\n" + "=" * 80)
+                    print(f"❌ ALEMBIC MIGRATION FAILED! (Exit code: {result.returncode})")
+                    print("=" * 80)
                     
                     # In DEV mode, allow graceful failure if migration files are missing
                     if is_dev_mode and "Can't locate revision" in result.stderr:
