@@ -167,8 +167,9 @@ async def run_migrations():
             
             if table_count < 30:
                 print(f"ℹ️  Small database ({table_count} tables) - likely true legacy v1.0.6")
-                print("🏷️  Stamping as fully up-to-date (v1.0.6 had full schema for its time)...")
-                stamp_revision = "head"
+                print("🏷️  Stamping with baseline revision to apply incremental updates...")
+                # v1.0.6 had ~20-25 tables, should stamp as baseline and run migrations
+                stamp_revision = "20251011_baseline_v106"
             elif emoji_columns_exist > 0:
                 print(f"ℹ️  Large database ({table_count} tables) with recent changes (emoji columns found)")
                 print("🏷️  Stamping as fully up-to-date...")
