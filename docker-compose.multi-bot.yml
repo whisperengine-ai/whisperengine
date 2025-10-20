@@ -235,7 +235,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started  # Changed from service_healthy - Qdrant has no healthcheck
     networks:
       - bot_network
     volumes:

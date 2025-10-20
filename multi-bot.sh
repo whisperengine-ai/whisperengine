@@ -48,7 +48,8 @@ print_usage() {
     echo ""
     echo "Infrastructure Commands:"
     echo "  infra             Start infrastructure only (postgres, qdrant, influxdb, grafana)"
-    echo "  up, start         Start all services"
+    echo "  enrichment        Start infrastructure + enrichment worker"
+    echo "  up, start         Start all services (infra + enrichment + all bots)"
     echo "  down, stop        Stop all services"
     echo "  restart           Restart all services"
     echo "  clean             Stop and remove all containers, networks, and volumes"
@@ -95,6 +96,16 @@ start_infrastructure() {
     echo "  Qdrant:      http://localhost:6334"
     echo "  InfluxDB:    http://localhost:8087"
     echo "  Grafana:     http://localhost:3002"
+}
+
+start_enrichment() {
+    echo -e "${CYAN}Starting infrastructure + enrichment worker...${NC}"
+    start_infrastructure
+    echo ""
+    echo -e "${CYAN}Starting enrichment worker...${NC}"
+    docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" --profile enrichment up -d enrichment-worker
+    echo -e "${GREEN}Enrichment worker started!${NC}"
+    echo "  Check logs: $0 logs enrichment-worker"
 }
 
 start_bot() {
@@ -236,10 +247,15 @@ case "${1:-}" in
         print_banner
         start_infrastructure
         ;;
+    enrichment)
+        print_banner
+        start_enrichment
+        ;;
     up|start)
         print_banner
         echo -e "${GREEN}Starting WhisperEngine Multi-Bot Development Environment...${NC}"
-        run_command up -d
+        echo -e "${YELLOW}Note: Starting with enrichment worker enabled${NC}"
+        docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" --profile enrichment up -d
         echo ""
         echo -e "${GREEN}Services started! Access points:${NC}"
         echo "  PostgreSQL:  localhost:5433"
