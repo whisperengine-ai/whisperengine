@@ -261,12 +261,12 @@ async def run_migrations():
                 ], cwd='/app', env=env, capture_output=True, text=True)
                 print(heads_result.stdout if heads_result.returncode == 0 else heads_result.stderr)
                 
-                # Run Alembic upgrade to head with verbose output
+                # Run Alembic upgrade to head (no --verbose flag for upgrade command)
                 print("\n" + "=" * 80)
                 print("⚡ RUNNING ALEMBIC UPGRADE TO HEAD:")
                 print("=" * 80)
                 result = subprocess.run([
-                    'alembic', 'upgrade', 'head', '--verbose'
+                    'alembic', 'upgrade', 'head'
                 ], cwd='/app', env=env, capture_output=True, text=True)
                 
                 print("STDOUT:")

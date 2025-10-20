@@ -152,7 +152,8 @@ def upgrade_migrations(target: str = "head"):
     print("⚡ STARTING MIGRATION UPGRADE")
     print("=" * 80)
     
-    result = run_alembic_command(["upgrade", target, "--verbose"])
+    # Note: alembic upgrade doesn't support --verbose flag
+    result = run_alembic_command(["upgrade", target])
     
     if result == 0:
         print("\n" + "=" * 80)
