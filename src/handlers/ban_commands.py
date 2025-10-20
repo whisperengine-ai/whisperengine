@@ -439,14 +439,14 @@ class BanCommandHandlers:
     async def _remove_ban_from_database(self, discord_user_id: str, unbanned_by: str, reason: str) -> bool:
         """Remove a ban record from the database (mark as inactive)."""
         try:
-            # Update ban record to inactive instead of deleting (for audit trail)
+            # Update ban record to inactive with proper audit columns
             await self._execute_query(
                 """
                 UPDATE banned_users 
-                SET is_active = FALSE, 
-                    notes = COALESCE(notes, '') || E'\n' || 
-                           'Unbanned by ' || :unbanned_by || ' at ' || CURRENT_TIMESTAMP || 
-                           ' - Reason: ' || :reason
+                SET is_active = FALSE,
+                    unbanned_at = CURRENT_TIMESTAMP,
+                    unbanned_by = :unbanned_by,
+                    unban_reason = :reason
                 WHERE discord_user_id = :user_id AND is_active = TRUE
                 """,
                 {

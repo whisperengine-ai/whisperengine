@@ -458,11 +458,17 @@ Each bot uses its own dedicated Qdrant collection for complete memory isolation:
 ## 🔧 INFRASTRUCTURE DETAILS
 
 ### **Infrastructure Versions (Pinned)**
-- PostgreSQL: `postgres:16.4-alpine` (Port 5433 external, 5432 internal)
-- Qdrant: `qdrant/qdrant:v1.15.4` (Port 6334 external, 6333 internal)
-- InfluxDB: `influxdb:2.7-alpine` (Port 8087 external, 8086 internal)
+- PostgreSQL: `postgres:16.4-alpine` (Port 5433 external, 5432 internal) - **HAS healthcheck**
+- Qdrant: `qdrant/qdrant:v1.15.4` (Port 6334 external, 6333 internal) - **NO healthcheck - use service_started**
+- InfluxDB: `influxdb:2.7-alpine` (Port 8087 external, 8086 internal) - **HAS healthcheck**
 - Grafana: `grafana/grafana:11.3.0` (Port 3002 external, 3000 internal)
 - Redis: Currently DISABLED in multi-bot setup
+
+**CRITICAL**: Qdrant does NOT have a healthcheck configured. In `depends_on` blocks, always use:
+```yaml
+qdrant:
+  condition: service_started  # NOT service_healthy!
+```
 
 ### **Multi-Bot Testing Strategy**
 - **MEMORY TESTING**: Use Jake or Ryan characters (minimal personality complexity)

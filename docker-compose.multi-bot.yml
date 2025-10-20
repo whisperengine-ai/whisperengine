@@ -224,7 +224,6 @@ services:
       - LLM_FACT_EXTRACTION_TEMPERATURE=${LLM_FACT_EXTRACTION_TEMPERATURE:-0.2}
       - LLM_CHAT_API_URL=${LLM_CHAT_API_URL}
       - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}  # Backward compatibility
       
       # InfluxDB configuration (read-only access for temporal analysis)
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
@@ -235,7 +234,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_started  # Changed from service_healthy - Qdrant has no healthcheck
+        condition: service_started  # Qdrant has no healthcheck configured
     networks:
       - bot_network
     volumes:
