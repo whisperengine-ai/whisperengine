@@ -1,6 +1,21 @@
--- WhisperEngine PostgreSQL Schema - Dev Only
--- Simple schema with only essential tables for vector-native architecture
+-- ============================================================================
+-- DEPRECATED: WhisperEngine Legacy Schema - DO NOT USE
+-- ============================================================================
+-- 
+-- ⚠️  WARNING: This file is DEPRECATED and should NOT be used for new deployments
+-- 
+-- CURRENT SCHEMA SYSTEM: WhisperEngine now uses a hybrid migration architecture:
+--   1. alembic upgrade head                           # Core CDL (25 tables)
+--   2. psql -f sql/semantic_knowledge_graph_schema.sql # Enrichment (3 tables)
+--   3. psql -f sql/00_init.sql                       # Advanced features (40+ tables)
+--
+-- This file contains only basic tables that are superseded by the current system.
+-- For complete deployment instructions, see: docs/schema/UNIFIED_MIGRATION_GUIDE.md
+--
+-- Last Updated: October 20, 2025 (marked as deprecated)
+-- ============================================================================
 
+-- DEPRECATED SCHEMA - Maintained for reference only
 BEGIN;
 
 -- User Profiles: Fast structured user data with preferences

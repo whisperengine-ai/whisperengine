@@ -122,9 +122,13 @@ class CharacterSelfKnowledgeExtractor:
     
     async def _get_character_id(self, conn: asyncpg.Connection, character_name: str) -> Optional[int]:
         """Get character ID from database"""
+        # Import and use proper normalization function
+        from src.utils.bot_name_utils import normalize_bot_name
+        normalized_name = normalize_bot_name(character_name)
+        
         row = await conn.fetchrow(
-            "SELECT id FROM characters WHERE LOWER(name) = LOWER($1)",
-            character_name
+            "SELECT id FROM characters WHERE normalized_name = $1",
+            normalized_name
         )
         return row['id'] if row else None
     

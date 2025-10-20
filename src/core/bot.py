@@ -264,7 +264,7 @@ class DiscordBotCore:
         Note: Does NOT cache character data - validation only for startup safety.
         """
         try:
-            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            from src.utils.bot_name_utils import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
             
             self.logger.info("🔍 CDL Pre-flight: Validating character '%s' exists in database...", bot_name)

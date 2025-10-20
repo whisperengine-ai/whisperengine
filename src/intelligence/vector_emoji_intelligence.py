@@ -181,35 +181,9 @@ class VectorEmojiIntelligence:
                         self._emoji_frequency_cache[bot_character] = 'moderate'
                         return 'moderate'
             else:
-                # Fallback: create temporary connection (not recommended for production)
-                logger.warning("⚠️ CDL database manager not available, using temporary connection")
-                import asyncpg
-                
-                conn = await asyncpg.connect(
-                    host=os.getenv('POSTGRES_HOST', 'localhost'),
-                    port=int(os.getenv('POSTGRES_PORT', '5432')),
-                    user=os.getenv('POSTGRES_USER', 'whisperengine'),
-                    password=os.getenv('POSTGRES_PASSWORD', 'whisperengine_dev'),
-                    database=os.getenv('POSTGRES_DB', 'whisperengine')
-                )
-                
-                # Query by normalized_name (e.g., "jake" → "Jake Sterling")
-                result = await conn.fetchrow(
-                    'SELECT emoji_frequency FROM characters WHERE LOWER(normalized_name) = LOWER($1)',
-                    bot_character
-                )
-                
-                await conn.close()
-                
-                if result and result['emoji_frequency']:
-                    frequency = result['emoji_frequency']
-                    self._emoji_frequency_cache[bot_character] = frequency
-                    logger.info("📊 Character '%s' emoji_frequency: %s", bot_character, frequency)
-                    return frequency
-                else:
-                    logger.warning("⚠️ Character '%s' not found in database, using 'moderate'", bot_character)
-                    self._emoji_frequency_cache[bot_character] = 'moderate'
-                    return 'moderate'
+                # CDL database manager not ready yet - use default and try again later
+                logger.debug("⏳ CDL database manager not ready, using 'moderate' emoji frequency (will retry)")
+                return 'moderate'  # Don't cache, so it will retry on next call
                 
         except Exception as e:
             logger.error("Error fetching character emoji frequency: %s", str(e))

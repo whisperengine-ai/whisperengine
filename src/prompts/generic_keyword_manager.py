@@ -26,16 +26,15 @@ class GenericKeywordTemplateManager:
         self._cache = {}
         self._cache_timestamp = 0
         
-    async def get_keywords_by_category(self, category: str) -> List[str]:
+    async def get_keywords_for_category(self, category: str) -> List[str]:
         """
-        Get all keywords for a specific category from database.
-        
-        Args:
-            category: Category name (e.g., 'ai_identity', 'physical_interaction')
+        Get keywords for a specific category from database.
             
         Returns:
             List of keywords for LLM guidance
         """
+        # TODO: Accept connection pool as constructor parameter to avoid bypassing pool
+        logger.debug("⚠️ GenericKeywordManager creating direct connection - should use pool")
         try:
             DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER', 'whisperengine')}:{os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5433')}/{os.getenv('POSTGRES_DB', 'whisperengine')}"
             
@@ -92,6 +91,8 @@ class GenericKeywordTemplateManager:
     
     async def get_all_categories(self) -> List[str]:
         """Get list of all available keyword categories."""
+        # TODO: Accept connection pool as constructor parameter to avoid bypassing pool
+        logger.debug("⚠️ GenericKeywordManager creating direct connection - should use pool")
         try:
             DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER', 'whisperengine')}:{os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5433')}/{os.getenv('POSTGRES_DB', 'whisperengine')}"
             

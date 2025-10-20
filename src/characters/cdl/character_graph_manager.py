@@ -284,17 +284,30 @@ class CharacterGraphManager:
         start_time = time.time()
         
         async with self.postgres.acquire() as conn:
-            # Try exact match first (case-insensitive)
+            # Import and use proper normalization function
+            from src.utils.bot_name_utils import normalize_bot_name
+            normalized_name = normalize_bot_name(character_name)
+            
+            # Try normalized name first (exact match)
             row = await conn.fetchrow(
-                "SELECT id FROM characters WHERE LOWER(name) = LOWER($1)",
-                character_name
+                "SELECT id FROM characters WHERE normalized_name = $1",
+                normalized_name
             )
             
             query_time_ms = (time.time() - start_time) * 1000
             if row:
                 return row['id']
             
-            # Try partial match - find name that starts with the query
+            # Fallback: Try exact match on full name (case-insensitive)
+            row = await conn.fetchrow(
+                "SELECT id FROM characters WHERE LOWER(name) = LOWER($1)",
+                character_name
+            )
+            
+            if row:
+                return row['id']
+            
+            # Final fallback: Try partial match - find name that starts with the query
             row = await conn.fetchrow(
                 "SELECT id FROM characters WHERE LOWER(name) LIKE LOWER($1) || '%'",
                 character_name

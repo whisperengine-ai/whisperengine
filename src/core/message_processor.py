@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
-from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+from src.utils.bot_name_utils import get_normalized_bot_name_from_env
 from src.adapters.platform_adapters import (
     create_discord_message_adapter,
     create_discord_attachment_adapters
@@ -292,6 +292,20 @@ class MessageProcessor:
             )
             logger.info("🧠 Unified Character Intelligence Coordinator initialized")
             
+            # Initialize CDL Database Manager for character performance analysis
+            self.cdl_database_manager = None
+            try:
+                from src.database.cdl_database import CDLDatabaseManager
+                self.cdl_database_manager = CDLDatabaseManager()
+                # Pool initialization will be done lazily when needed
+                logger.info("📊 CDL Database Manager initialized")
+            except ImportError as e:
+                logger.warning("CDL Database Manager not available: %s", e)
+            
+            # Memory Effectiveness Analyzer disabled - was causing production failures
+            # TODO: Re-enable when protocol interface is fully implemented
+            self.memory_effectiveness_analyzer = None
+            
             # Initialize Character Learning Moment Detector for user experience enhancement
             try:
                 from src.characters.learning.character_learning_moment_detector import create_character_learning_moment_detector
@@ -414,6 +428,28 @@ class MessageProcessor:
             self._character_state_manager_initialized = True
             
             return self.character_state_manager is not None
+    
+    async def _ensure_cdl_database_pool_initialized(self):
+        """
+        Ensure CDL database manager pool is initialized (lazy initialization).
+        
+        Returns:
+            bool: True if CDL database manager pool is available
+        """
+        if not self.cdl_database_manager:
+            return False
+            
+        # Check if pool is already initialized
+        if self.cdl_database_manager.pool:
+            return True
+            
+        try:
+            await self.cdl_database_manager.initialize_pool()
+            logger.info("📊 CDL Database pool initialized (lazy)")
+            return True
+        except Exception as e:
+            logger.warning("📊 CDL Database pool initialization failed: %s", e)
+            return False
     
     def _try_initialize_emoji_selector(self):
         """
@@ -613,7 +649,6 @@ class MessageProcessor:
             
             if self.character_state_manager:
                 try:
-                    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
                     character_name = get_normalized_bot_name_from_env()
                     
                     if character_name:
@@ -649,7 +684,6 @@ class MessageProcessor:
             
             if self.character_state_manager and bot_emotion:
                 try:
-                    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
                     character_name = get_normalized_bot_name_from_env()
                     
                     if character_name:
@@ -5101,13 +5135,10 @@ class MessageProcessor:
     async def _analyze_character_performance_intelligence(self, user_id: str, message_context: MessageContext, 
                                                         conversation_context: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
         """
-        Analyze character performance and identify optimization opportunities.
+        DISABLED: Character Performance Intelligence analysis.
         
-        Character Performance Intelligence:
-        - Analyzes character effectiveness across adaptive learning metrics
-        - Identifies CDL parameter optimization opportunities
-        - Correlates personality traits with conversation success
-        - Provides data-driven character adaptation insights
+        This feature was causing production failures due to Memory Effectiveness Analyzer
+        dependency on incomplete protocol interface. Disabled until properly implemented.
         
         Args:
             user_id: User identifier for performance analysis
@@ -5115,111 +5146,9 @@ class MessageProcessor:
             conversation_context: Recent conversation history for effectiveness analysis
             
         Returns:
-            Dict with character performance analysis and optimization opportunities
+            None (disabled)
         """
-        try:
-            # Import character performance components
-            from src.characters.performance_analyzer import CharacterPerformanceAnalyzer
-            from src.characters.cdl_optimizer import create_cdl_parameter_optimizer
-            
-            # Get bot name for character-specific analysis
-            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
-            
-            # Initialize performance analyzer with all available adaptive learning components
-            performance_analyzer = CharacterPerformanceAnalyzer(
-                trend_analyzer=self.trend_analyzer,
-                memory_effectiveness_analyzer=getattr(self, 'memory_effectiveness_analyzer', None),
-                relationship_evolution_engine=getattr(self, 'relationship_engine', None),
-                cdl_parser=None,  # Not needed for runtime analysis
-                cdl_database_manager=getattr(self, 'cdl_database_manager', None),
-                postgres_pool=getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
-            )
-            
-            # Analyze character effectiveness across adaptive learning metrics
-            effectiveness_analysis = await performance_analyzer.analyze_character_effectiveness(
-                bot_name=bot_name,
-                days_back=14,
-                user_id=user_id  # Optional parameter for user-specific analysis
-            )
-            
-            # Identify optimization opportunities
-            optimization_opportunities = await performance_analyzer.identify_optimization_opportunities(
-                bot_name=bot_name
-            )
-            
-            # Correlate personality traits with conversation outcomes
-            trait_correlations = await performance_analyzer.correlate_personality_traits_with_outcomes(
-                bot_name=bot_name
-            )
-            
-            if effectiveness_analysis:
-                # Calculate overall character performance score from CharacterEffectivenessData
-                overall_score = effectiveness_analysis.overall_effectiveness
-                
-                # Determine character performance status
-                if overall_score >= 0.8:
-                    performance_status = "excellent"
-                elif overall_score >= 0.6:
-                    performance_status = "good"
-                elif overall_score >= 0.4:
-                    performance_status = "fair"
-                else:
-                    performance_status = "needs_improvement"
-                
-                # Convert CharacterEffectivenessData to JSON-serializable dict
-                effectiveness_dict = {
-                    'bot_name': effectiveness_analysis.bot_name,
-                    'analysis_period_days': effectiveness_analysis.analysis_period_days,
-                    'overall_effectiveness': effectiveness_analysis.overall_effectiveness,
-                    'conversation_quality_avg': effectiveness_analysis.conversation_quality_avg,
-                    'confidence_trend_direction': effectiveness_analysis.confidence_trend_direction,
-                    'memory_effectiveness_score': effectiveness_analysis.memory_effectiveness_score,
-                    'relationship_progression_rate': effectiveness_analysis.relationship_progression_rate,
-                    'trust_building_success': effectiveness_analysis.trust_building_success,
-                    'user_engagement_level': effectiveness_analysis.user_engagement_level,
-                    'data_points': effectiveness_analysis.data_points,
-                    'statistical_confidence': effectiveness_analysis.statistical_confidence,
-                    'analysis_timestamp': effectiveness_analysis.analysis_timestamp.isoformat() if effectiveness_analysis.analysis_timestamp else None
-                } if effectiveness_analysis else {}
-                
-                # Convert OptimizationOpportunity objects to JSON-serializable dicts
-                opportunities_dict = []
-                if optimization_opportunities:
-                    for opp in optimization_opportunities:
-                        opportunities_dict.append({
-                            'category': opp.category.value if hasattr(opp.category, 'value') else str(opp.category),
-                            'confidence_score': opp.confidence_score,
-                            'impact_potential': opp.impact_potential,
-                            'current_performance': opp.current_performance,
-                            'target_performance': opp.target_performance,
-                            'affected_traits': opp.affected_traits,
-                            'evidence_metrics': opp.evidence_metrics,
-                            'recommendation': opp.recommendation,
-                            'priority': opp.priority
-                        })
-                
-                character_performance_data = {
-                    'performance_status': performance_status,
-                    'overall_score': round(overall_score, 3),
-                    'effectiveness_analysis': effectiveness_dict,
-                    'optimization_opportunities': opportunities_dict,
-                    'trait_correlations': trait_correlations or {},
-                    'bot_name': bot_name,
-                    'analysis_period_days': 14,
-                    'analysis_method': 'character_performance_intelligence'
-                }
-                
-                logger.debug(
-                    "Character performance analysis: %s performance (%.3f overall score, %d opportunities)",
-                    character_performance_data['performance_status'],
-                    character_performance_data['overall_score'],
-                    len(character_performance_data['optimization_opportunities'])
-                )
-                return character_performance_data
-                
-        except Exception as e:
-            logger.debug("Character performance intelligence analysis failed: %s", str(e))
-        
+        logger.debug("Character performance intelligence disabled - Memory Boost feature needs protocol fixes")
         return None
 
     async def _analyze_bot_emotional_trajectory(self, message_context: MessageContext) -> Optional[Dict[str, Any]]:

@@ -111,7 +111,7 @@ class IntelligentRetrievalMonitor:
         
         try:
             # Get bot name for tagging
-            from src.utils.helpers import get_normalized_bot_name_from_env
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
             
             # Build tags
@@ -137,11 +137,21 @@ class IntelligentRetrievalMonitor:
                 fields["classification_time_ms"] = classification_time_ms
             
             # Write to InfluxDB
-            await self.temporal_client.write_point(
-                measurement="query_classification",
-                tags=tags,
-                fields=fields
-            )
+            try:
+                from influxdb_client.client.write.point import Point
+                point = Point("query_classification")
+                
+                # Add tags
+                for key, value in tags.items():
+                    point = point.tag(key, value)
+                
+                # Add fields  
+                for key, value in fields.items():
+                    point = point.field(key, value)
+                
+                await self.temporal_client.record_point(point)
+            except ImportError:
+                logger.debug("InfluxDB not available for query classification tracking")
             
             logger.debug(
                 "📊 Tracked classification: category=%s, pattern=%s",
@@ -191,7 +201,7 @@ class IntelligentRetrievalMonitor:
         
         try:
             # Get bot name for tagging
-            from src.utils.helpers import get_normalized_bot_name_from_env
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
             
             # Build tags
@@ -222,11 +232,21 @@ class IntelligentRetrievalMonitor:
                 fields["avg_retrieval_score"] = retrieval_score
             
             # Write to InfluxDB
-            await self.temporal_client.write_point(
-                measurement="phase2_vector_routing",
-                tags=tags,
-                fields=fields
-            )
+            try:
+                from influxdb_client.client.write.point import Point
+                point = Point("phase2_vector_routing")
+                
+                # Add tags
+                for key, value in tags.items():
+                    point = point.tag(key, value)
+                
+                # Add fields  
+                for key, value in fields.items():
+                    point = point.field(key, value)
+                
+                await self.temporal_client.record_point(point)
+            except ImportError:
+                logger.debug("InfluxDB not available for routing tracking")
             
             logger.debug(
                 "📊 Tracked routing: category=%s, search_type=%s, vectors=%s, time=%.1fms",
@@ -271,7 +291,7 @@ class IntelligentRetrievalMonitor:
         
         try:
             # Get bot name for tagging
-            from src.utils.helpers import get_normalized_bot_name_from_env
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
             
             # Build tags
@@ -300,11 +320,21 @@ class IntelligentRetrievalMonitor:
                 fields["overhead_percentage"] = overhead_pct
             
             # Write to InfluxDB
-            await self.temporal_client.write_point(
-                measurement="intelligent_retrieval_performance",
-                tags=tags,
-                fields=fields
-            )
+            try:
+                from influxdb_client.client.write.point import Point
+                point = Point("intelligent_retrieval_performance")
+                
+                # Add tags
+                for key, value in tags.items():
+                    point = point.tag(key, value)
+                
+                # Add fields  
+                for key, value in fields.items():
+                    point = point.field(key, value)
+                
+                await self.temporal_client.record_point(point)
+            except ImportError:
+                logger.debug("InfluxDB not available for performance tracking")
             
             logger.debug(
                 "📊 Tracked performance: total=%.1fms, classification=%.1fms, search=%.1fms",
@@ -352,7 +382,7 @@ class IntelligentRetrievalMonitor:
         
         try:
             # Get bot name for tagging
-            from src.utils.helpers import get_normalized_bot_name_from_env
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
             
             # Build tags
@@ -388,11 +418,21 @@ class IntelligentRetrievalMonitor:
                 fields["user_satisfaction"] = 0.5
             
             # Write to InfluxDB
-            await self.temporal_client.write_point(
-                measurement="retrieval_method_comparison",
-                tags=tags,
-                fields=fields
-            )
+            try:
+                from influxdb_client.client.write.point import Point
+                point = Point("retrieval_method_comparison")
+                
+                # Add tags
+                for key, value in tags.items():
+                    point = point.tag(key, value)
+                
+                # Add fields  
+                for key, value in fields.items():
+                    point = point.field(key, value)
+                
+                await self.temporal_client.record_point(point)
+            except ImportError:
+                logger.debug("InfluxDB not available for A/B test tracking")
             
             logger.debug(
                 "📊 Tracked A/B test: variant=%s, category=%s, reaction=%s",

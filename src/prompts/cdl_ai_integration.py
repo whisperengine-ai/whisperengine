@@ -3633,81 +3633,81 @@ Stay authentic to {character.identity.name}'s personality while being transparen
         try:
             from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
             from src.memory.vector_memory_system import get_normalized_bot_name_from_env
-            import asyncpg
+            from src.database.postgres_pool_manager import get_postgres_pool
             
-            # Create database connection
-            DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER', 'whisperengine')}:{os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5433')}/{os.getenv('POSTGRES_DB', 'whisperengine')}"
-            pool = await asyncpg.create_pool(DATABASE_URL)
-            
-            try:
-                enhanced_manager = create_enhanced_cdl_manager(pool)
-                
-                # Get bot name from environment (e.g., "elena", "marcus") - this is the database key
-                bot_name = get_normalized_bot_name_from_env()
-                logger.info(f"🔍 _get_response_guidelines: bot_name={bot_name}")
-                
-                if not bot_name:
-                    logger.warning("⚠️ _get_response_guidelines: No bot name found")
-                    return ""
-                
-                # Get response guidelines from database using bot name as key
-                guidelines = await enhanced_manager.get_response_guidelines(bot_name)
-                logger.info(f"🔍 _get_response_guidelines: Retrieved {len(guidelines)} guidelines from database")
-                
-                if not guidelines:
-                    logger.debug(f"📝 _get_response_guidelines: No guidelines found for bot_name={bot_name} (guidelines are optional)")
-                    return ""
-                
-                # Format guidelines dynamically - character-agnostic approach
-                # Pull ALL guideline types from database, not just hardcoded ones
-                critical_guidelines = []
-                other_guidelines = []
-                
-                for guideline in guidelines:
-                    logger.info(f"🔍 Processing guideline: type={guideline.guideline_type}, critical={guideline.is_critical}, content={guideline.guideline_content[:50]}...")
-                    
-                    # Add emoji prefix based on type for readability
-                    type_emoji = {
-                        'response_length': '📏',
-                        'core_principle': '🎯',
-                        'formatting_rule': '📝',
-                        'formatting': '📝',
-                        'emotional_tone': '💝',
-                        'style': '🎨',
-                    }.get(guideline.guideline_type, '▪️')
-                    
-                    formatted_guideline = f"{type_emoji} {guideline.guideline_content}"
-                    
-                    # Separate critical vs non-critical for prioritization
-                    if guideline.is_critical:
-                        critical_guidelines.append(formatted_guideline)
-                    else:
-                        other_guidelines.append(formatted_guideline)
-                
-                # Build response guidelines section with critical guidelines first
-                guidelines_text = []
-                
-                logger.info(f"🔍 DEBUG: critical_guidelines count={len(critical_guidelines)}, other_guidelines count={len(other_guidelines)}")
-                
-                # Add all critical guidelines (these are most important)
-                if critical_guidelines:
-                    guidelines_text.extend(critical_guidelines)
-                    logger.info(f"✅ Added {len(critical_guidelines)} critical guidelines to prompt")
-                
-                # Add up to 5 non-critical guidelines (to avoid prompt bloat)
-                if other_guidelines:
-                    guidelines_text.extend(other_guidelines[:5])
-                    logger.info(f"✅ Added {len(other_guidelines[:5])} additional guidelines to prompt")
-                
-                logger.info(f"🔍 DEBUG: Final guidelines_text length={len(guidelines_text)}")
-                
-                if guidelines_text:
-                    return "\n" + "\n".join(guidelines_text)
-                
+            # Use cached connection pool from centralized manager
+            pool = await get_postgres_pool()
+            if not pool:
+                logger.warning("⚠️ CDL AI Integration: No cached connection pool available")
                 return ""
+            
+            enhanced_manager = create_enhanced_cdl_manager(pool)
+            
+            # Get bot name from environment (e.g., "elena", "marcus") - this is the database key
+            bot_name = get_normalized_bot_name_from_env()
+            logger.info(f"🔍 _get_response_guidelines: bot_name={bot_name}")
+            
+            if not bot_name:
+                logger.warning("⚠️ _get_response_guidelines: No bot name found")
+                return ""
+            
+            # Get response guidelines from database using bot name as key
+            guidelines = await enhanced_manager.get_response_guidelines(bot_name)
+            logger.info(f"🔍 _get_response_guidelines: Retrieved {len(guidelines)} guidelines from database")
+            
+            if not guidelines:
+                logger.debug(f"📝 _get_response_guidelines: No guidelines found for bot_name={bot_name} (guidelines are optional)")
+                return ""
+            
+            # Format guidelines dynamically - character-agnostic approach
+            # Pull ALL guideline types from database, not just hardcoded ones
+            critical_guidelines = []
+            other_guidelines = []
+            
+            for guideline in guidelines:
+                logger.info(f"🔍 Processing guideline: type={guideline.guideline_type}, critical={guideline.is_critical}, content={guideline.guideline_content[:50]}...")
                 
-            finally:
-                await pool.close()
+                # Add emoji prefix based on type for readability
+                type_emoji = {
+                    'response_length': '📏',
+                    'core_principle': '🎯',
+                    'formatting_rule': '📝',
+                    'formatting': '📝',
+                    'emotional_tone': '💝',
+                    'style': '🎨',
+                }.get(guideline.guideline_type, '▪️')
+                
+                formatted_guideline = f"{type_emoji} {guideline.guideline_content}"
+                
+                # Separate critical vs non-critical for prioritization
+                if guideline.is_critical:
+                    critical_guidelines.append(formatted_guideline)
+                else:
+                    other_guidelines.append(formatted_guideline)
+            
+            # Build response guidelines section with critical guidelines first
+            guidelines_text = []
+            
+            logger.info(f"🔍 DEBUG: critical_guidelines count={len(critical_guidelines)}, other_guidelines count={len(other_guidelines)}")
+            
+            # Add all critical guidelines (these are most important)
+            if critical_guidelines:
+                guidelines_text.extend(critical_guidelines)
+                logger.info(f"✅ Added {len(critical_guidelines)} critical guidelines to prompt")
+            
+            # Add up to 5 non-critical guidelines (to avoid prompt bloat)
+            if other_guidelines:
+                guidelines_text.extend(other_guidelines[:5])
+                logger.info(f"✅ Added {len(other_guidelines[:5])} additional guidelines to prompt")
+            
+            logger.info(f"🔍 DEBUG: Final guidelines_text length={len(guidelines_text)}")
+            
+            if guidelines_text:
+                return "\n" + "\n".join(guidelines_text)
+            
+            return ""
+            
+            # Note: No pool.close() needed - using shared cached pool
                 
         except Exception as e:
             logger.debug("Could not load response guidelines: %s", e)

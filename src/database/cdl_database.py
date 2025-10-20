@@ -10,6 +10,7 @@ import asyncpg
 from typing import Dict, List, Optional, Any
 import json
 import logging
+from src.utils.bot_name_utils import get_normalized_bot_name_from_env
 
 logger = logging.getLogger(__name__)
 
@@ -86,38 +87,47 @@ class CDLDatabaseManager:
             return False
     
     async def get_character_by_name(self, name: str) -> Optional[Dict[str, Any]]:
-        """Get character by normalized name"""
+        """Get character by normalized name (searches nickname and full_name)"""
         try:
             if self.pool is None:
                 raise RuntimeError("Database pool not initialized")
+            
+            # Import the normalize function to properly normalize the passed name
+            from src.utils.bot_name_utils import normalize_bot_name
+            
+            # Normalize the passed name parameter - this is the ONLY primary key!
+            normalized_name = normalize_bot_name(name)
                 
             async with self.pool.acquire() as conn:
+                # Look for character in characters table by normalized_name (the PRIMARY KEY!)
                 row = await conn.fetchrow("""
-                    SELECT * FROM cdl_character_profiles 
+                    SELECT * FROM characters 
                     WHERE normalized_name = $1
-                """, name.lower())
+                """, normalized_name)
                 
                 if row:
                     result = dict(row)
                     
-                    # Parse JSON fields that come as strings from the view
-                    json_fields = ['personality_traits', 'communication_styles', 'values_and_beliefs']
-                    
-                    for field in json_fields:
-                        if field in result and isinstance(result[field], str):
-                            try:
-                                if result[field].strip():  # Check if not empty
-                                    result[field] = json.loads(result[field])
-                                else:
-                                    result[field] = {}
-                            except json.JSONDecodeError as e:
-                                logger.warning("Failed to parse JSON field %s: %s", field, e)
-                                result[field] = {}
+                    # Add normalized name for compatibility with existing code
+                    result['normalized_name'] = normalized_name
+                    result['character_name'] = row.get('nickname') or row.get('full_name', 'Unknown')
                     
                     return result
                 return None
+                
         except (RuntimeError, asyncpg.PostgresError) as e:
-            logger.error("Error fetching character %s: %s", name, e)
+            logger.error("Error getting character %s: %s", name, e)
+            return None
+    
+    async def get_current_bot_character(self) -> Optional[Dict[str, Any]]:
+        """Get current bot's character data using normalized name from environment"""
+        try:
+            # Use the normalized bot name from environment for current bot
+            normalized_name = get_normalized_bot_name_from_env()
+            return await self.get_character_by_name(normalized_name)
+            
+        except (RuntimeError, asyncpg.PostgresError) as e:
+            logger.error("Error getting current bot character: %s", e)
             return None
     
     async def list_all_characters(self) -> List[Dict[str, Any]]:

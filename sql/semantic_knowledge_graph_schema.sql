@@ -1,12 +1,24 @@
 -- ============================================================================
 -- WhisperEngine Semantic Knowledge Graph Schema
 -- ============================================================================
--- Purpose: Enhanced PostgreSQL schema for factual relationship management
--- Consolidates graph functionality into PostgreSQL for operational simplicity
--- Supports personality-first character responses with structured intelligence
+-- PURPOSE: Enrichment system database schema for factual relationship management
+-- ARCHITECTURE: Part of WhisperEngine's hybrid migration system
+-- 
+-- DEPLOYMENT: Run AFTER Alembic migrations in fresh database setup:
+--   1. alembic upgrade head                           # Core CDL tables
+--   2. psql -f sql/semantic_knowledge_graph_schema.sql # This file (3 tables)
+--   3. psql -f sql/00_init.sql                       # Advanced features (optional)
+--
+-- TABLES CREATED:
+--   - fact_entities: Semantic knowledge entities with full-text search
+--   - user_fact_relationships: Knowledge graph relationships  
+--   - entity_relationships: Entity-to-entity connections
+--
+-- ALEMBIC INTEGRATION: These tables are documented in Alembic migration
+--   20251019_1858_*_document_enrichment_semantic_knowledge_.py (documentation-only)
 --
 -- Date: October 4, 2025
--- Status: Phase 1 Implementation
+-- Status: Production - Used by enrichment worker and inline fact extraction
 -- ============================================================================
 
 -- Enable required extensions

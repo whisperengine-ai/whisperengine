@@ -225,17 +225,22 @@ class EnhancedCDLManager:
         """Get complete character data (backward compatible with CDL AI Integration)"""
         try:
             logger.info("🔍 ENHANCED CDL: get_character_by_name called with: '%s'", character_name)
+            
+            # Import and use proper normalization function
+            from src.utils.bot_name_utils import normalize_bot_name
+            normalized_name = normalize_bot_name(character_name)
+            
             async with self.pool.acquire() as conn:
-                # Core character data - search by normalized name (bot_name) or full name (case insensitive)
+                # Core character data - search by normalized name ONLY (the primary key)
                 core_query = """
                     SELECT c.*, 
                            COALESCE(c.created_date, CURRENT_TIMESTAMP) as created_date,
                            COALESCE(c.updated_date, CURRENT_TIMESTAMP) as updated_date
                     FROM characters c 
-                    WHERE LOWER(c.normalized_name) = LOWER($1) OR LOWER(c.name) = LOWER($1)
+                    WHERE c.normalized_name = $1
                 """
-                logger.info("🔍 ENHANCED CDL: Executing query for character: '%s'", character_name)
-                character_row = await conn.fetchrow(core_query, character_name)
+                logger.info("🔍 ENHANCED CDL: Executing query for character: '%s' (normalized: '%s')", character_name, normalized_name)
+                character_row = await conn.fetchrow(core_query, normalized_name)
                 logger.info("🔍 ENHANCED CDL: Query result: %s", character_row)
                 
                 if not character_row:
@@ -1072,13 +1077,13 @@ class EnhancedCDLManager:
             return False
     
     async def _get_character_id(self, conn: asyncpg.Connection, character_name: str) -> Optional[int]:
-        """Helper to get character ID by name or normalized name (bot_name)"""
-        # Try normalized_name first (for bot_name lookups like "elena")
-        row = await conn.fetchrow("SELECT id FROM characters WHERE LOWER(normalized_name) = LOWER($1)", character_name)
-        if row:
-            return row['id']
-        # Fallback to full name match for backward compatibility
-        row = await conn.fetchrow("SELECT id FROM characters WHERE LOWER(name) = LOWER($1)", character_name)
+        """Helper to get character ID by normalized name (the primary key)"""
+        # Import and use proper normalization function
+        from src.utils.bot_name_utils import normalize_bot_name
+        normalized_name = normalize_bot_name(character_name)
+        
+        # Use normalized name only - it's the primary key
+        row = await conn.fetchrow("SELECT id FROM characters WHERE normalized_name = $1", normalized_name)
         return row['id'] if row else None
     
     # ========================================================================================

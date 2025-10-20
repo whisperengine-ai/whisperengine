@@ -334,6 +334,10 @@ class CharacterGraphKnowledgeBuilder:
             return 0
         
         try:
+            # Import and use proper normalization function
+            from src.utils.bot_name_utils import normalize_bot_name
+            normalized_name = normalize_bot_name(character_name)
+            
             async with self.postgres_pool.acquire() as conn:
                 # Create table if not exists
                 await conn.execute("""
@@ -364,7 +368,7 @@ class CharacterGraphKnowledgeBuilder:
                         (character_name, source_trait, target_trait, relationship_type, strength, context)
                         VALUES ($1, $2, $3, $4, $5, $6)
                         ON CONFLICT DO NOTHING
-                    """, character_name, relationship.source_trait, relationship.target_trait,
+                    """, normalized_name, relationship.source_trait, relationship.target_trait,
                          relationship.relationship_type, relationship.strength, relationship.context)
                     stored_count += 1
                 
@@ -412,6 +416,10 @@ class CharacterGraphKnowledgeBuilder:
             return []
         
         try:
+            # Import and use proper normalization function
+            from src.utils.bot_name_utils import normalize_bot_name
+            normalized_name = normalize_bot_name(character_name)
+            
             async with self.postgres_pool.acquire() as conn:
                 if trait_type:
                     # Query specific trait type relationships
@@ -420,7 +428,7 @@ class CharacterGraphKnowledgeBuilder:
                         FROM character_trait_relationships 
                         WHERE character_name = $1 AND (source_trait LIKE $2 OR target_trait LIKE $2)
                         ORDER BY strength DESC
-                    """, character_name, f"{trait_type}:%")
+                    """, normalized_name, f"{trait_type}:%")
                 else:
                     # Query all relationships for character
                     rows = await conn.fetch("""
@@ -428,7 +436,7 @@ class CharacterGraphKnowledgeBuilder:
                         FROM character_trait_relationships 
                         WHERE character_name = $1
                         ORDER BY strength DESC
-                    """, character_name)
+                    """, normalized_name)
                 
                 relationships = []
                 for row in rows:
@@ -453,13 +461,17 @@ class CharacterGraphKnowledgeBuilder:
             return []
         
         try:
+            # Import and use proper normalization function
+            from src.utils.bot_name_utils import normalize_bot_name
+            normalized_name = normalize_bot_name(character_name)
+            
             async with self.postgres_pool.acquire() as conn:
                 rows = await conn.fetch("""
                     SELECT source_trait, relationship_type, strength, context
                     FROM character_trait_relationships 
                     WHERE character_name = $1 AND target_trait = $2
                     ORDER BY strength DESC
-                """, character_name, target_trait)
+                """, normalized_name, target_trait)
                 
                 influences = []
                 for row in rows:

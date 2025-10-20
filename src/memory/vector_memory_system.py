@@ -65,6 +65,14 @@ from src.memory.query_classifier import (
     QueryCategory
 )
 
+# Import bot name utilities (centralized for consistency across all systems)
+from src.utils.bot_name_utils import (
+    normalize_bot_name,
+    get_normalized_bot_name_from_env,
+    get_collection_name_for_bot,
+    extract_bot_name_from_collection
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,56 +93,7 @@ class MemoryTier(Enum):
     LONG_TERM = "long_term"        # Highly significant memories, core relationships (permanent)
 
 
-def normalize_bot_name(bot_name: str) -> str:
-    """
-    Normalize bot name for consistent memory storage and retrieval.
-    
-    CRITICAL: This function prevents memory isolation failures due to:
-    - Case sensitivity: "Elena" vs "elena" 
-    - Space handling: "Marcus Chen" vs "marcus_chen"
-    - Special characters and inconsistent formatting
-    
-    Rules:
-    - Convert to lowercase for case-insensitive matching
-    - Replace spaces with underscores for system compatibility
-    - Remove special characters except underscore/hyphen/alphanumeric
-    - Handle empty/None values gracefully
-    
-    Examples:
-    - "Elena" -> "elena"
-    - "Marcus Chen" -> "marcus_chen" 
-    - "Dream of the Endless" -> "dream_of_the_endless"
-    - None -> "unknown"
-    """
-    if not bot_name or not isinstance(bot_name, str):
-        return "unknown"
-    
-    # Step 1: Trim and lowercase
-    normalized = bot_name.strip().lower()
-    
-    # Step 2: Replace spaces with underscores
-    normalized = re.sub(r'\s+', '_', normalized)
-    
-    # Step 3: Remove special characters except underscore/hyphen/alphanumeric
-    normalized = re.sub(r'[^a-z0-9_-]', '', normalized)
-    
-    # Step 4: Collapse multiple underscores/hyphens
-    normalized = re.sub(r'[_-]+', '_', normalized)
-    
-    # Step 5: Remove leading/trailing underscores
-    normalized = normalized.strip('_-')
-    
-    return normalized if normalized else "unknown"
 
-
-def get_normalized_bot_name_from_env() -> str:
-    """Get normalized bot name from environment variables with fallback"""
-    raw_bot_name = (
-        os.getenv("DISCORD_BOT_NAME") or 
-        os.getenv("BOT_NAME") or 
-        "unknown"
-    )
-    return normalize_bot_name(raw_bot_name.strip())
 
 
 @dataclass
@@ -6045,7 +6004,6 @@ class VectorMemoryManager:
     def _get_bot_name(self) -> str:
         """Get bot name from environment for MemoryBoost operations."""
         try:
-            from src.utils.helpers import get_normalized_bot_name_from_env
             return get_normalized_bot_name_from_env()
         except Exception:
             # Fallback to environment variable

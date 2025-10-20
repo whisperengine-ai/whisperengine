@@ -1,29 +1,38 @@
 -- ============================================================================
--- WhisperEngine Database Schema - AUTHORITATIVE INITIALIZATION SCRIPT
+-- WhisperEngine Database Schema - ADVANCED FEATURES INITIALIZATION
 -- ============================================================================
 -- 
--- This is the SINGLE SOURCE OF TRUTH for WhisperEngine database schema.
+-- IMPORTANT: This is PART OF A HYBRID SCHEMA SYSTEM alongside Alembic migrations.
 -- Generated from production database on: October 12, 2025
 -- 
+-- HYBRID ARCHITECTURE:
+--   - Core CDL tables (25 tables): Managed by Alembic migrations in alembic/versions/
+--   - Advanced features (40+ tables): Managed by this SQL file
+--   - Total system: ~65 tables across both migration systems
+--
 -- PURPOSE:
---   - Fresh database initialization for development and quickstart setups
---   - Complete schema including all 73 production tables
---   - All extensions, functions, types, indexes, and constraints
+--   - Advanced character intelligence features (character_insights, abilities, etc.)
+--   - Extended memory and conversation systems (universal_users, memory_entries)
+--   - Research and experimental features (personality evolution, optimization)
+--   - Legacy tables maintained for compatibility
 -- 
 -- INCLUDES:
---   - Core tables: characters, universal_users, user_profiles, conversations
---   - 40+ CDL character tables (identity, personality, voice, expertise, etc.)
---   - Semantic knowledge graph: fact_entities, entity_relationships
+--   - Advanced character tables: character_insights, abilities, trait_relationships
+--   - Universal identity: universal_users, platform_identities  
 --   - Memory systems: memory_entries, conversations, relationship_scores
 --   - Dynamic personality: personality_evolution_timeline, optimization tables
 --   - Roleplay systems: roleplay_transactions, role_transactions
---   - Platform integrations: platform_identities, banned_users
+--   - Research features: character intelligence and learning systems
 -- 
--- USAGE:
---   psql -U whisperengine -d whisperengine -f sql/00_init.sql
+-- DEPLOYMENT ORDER (for fresh databases):
+--   1. alembic upgrade head                    # Core CDL tables (25 tables)
+--   2. psql -f sql/semantic_knowledge_graph_schema.sql  # Enrichment (3 tables)
+--   3. psql -f sql/00_init.sql                # Advanced features (40+ tables)
 -- 
--- NOTE: This replaces all migration-based initialization. For schema changes,
---       update this file directly or regenerate from production database.
+-- SCHEMA CHANGES:
+--   - Core CDL changes: Use Alembic migrations (alembic revision -m "description")
+--   - Advanced features: Update this file or create new SQL files
+--   - See docs/schema/ for complete migration system documentation
 -- 
 -- ============================================================================
 

@@ -982,7 +982,9 @@ class DynamicPersonalityProfiler:
     # Database Persistence Methods
 
     def _get_db_connection(self):
-        """Get database connection for personality data persistence"""
+        """Get database connection for personality data persistence - BYPASSES CONNECTION POOL!"""
+        # TODO: Replace with proper connection pool usage
+        logger.warning("⚠️ DynamicPersonalityProfiler bypassing connection pool - needs refactor")
         if not POSTGRES_AVAILABLE:
             logger.warning("PostgreSQL not available - personality data will not persist")
             return None

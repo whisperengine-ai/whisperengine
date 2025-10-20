@@ -104,6 +104,12 @@ class MemoryManagerProtocol(Protocol):
         """Get emotional context for a user."""
         ...
     
+    # === EMBEDDING OPERATIONS ===
+    
+    async def generate_embedding(self, text: str) -> List[float]:
+        """Generate embedding vector for given text."""
+        ...
+    
     # === HEALTH & STATUS ===
     
     async def health_check(self) -> Dict[str, Any]:
@@ -179,6 +185,19 @@ def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManage
             
             async def get_emotional_context(self, user_id: str) -> Dict[str, Any]:
                 return {}
+            
+            async def retrieve_context_aware_memories(self, user_id: str, query: Optional[str] = None,
+                                            current_query: Optional[str] = None, max_memories: int = 10,
+                                            limit: Optional[int] = None, context: Optional[Dict[str, Any]] = None,
+                                            **kwargs) -> List[Dict[str, Any]]:
+                return []
+            
+            async def get_emotion_context(self, user_id: str) -> Union[str, Dict[str, Any]]:
+                return {}
+                
+            async def generate_embedding(self, text: str) -> List[float]:
+                # Return a mock 384-dimensional embedding vector
+                return [0.0] * 384
             
             async def health_check(self) -> Dict[str, Any]:
                 return {"status": "healthy", "type": "mock"}
