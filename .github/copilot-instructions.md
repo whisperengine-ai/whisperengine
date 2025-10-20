@@ -448,6 +448,12 @@ Each bot uses its own dedicated Qdrant collection for complete memory isolation:
 - Example: `whisperengine_memory_elena_7d` → `elena`
 - No environment variable mapping needed (e.g., NO `BOT_COLLECTION_MAPPING`)
 
+**Collection Maintenance History:**
+- **October 19, 2025**: Cleanup removed 10 orphaned collections (7,084 points)
+- **Current State**: 10 active collections with 67,515 total memory points
+- **Cleanup Script**: `scripts/delete_orphaned_collections.py` (dry-run mode available)
+- **Alias Setup**: `scripts/setup_collection_aliases.py` (creates/manages aliases)
+
 
 ## 🔧 INFRASTRUCTURE DETAILS
 
