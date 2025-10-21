@@ -936,7 +936,7 @@ class EnrichmentWorker:
                             if related_entity_id:
                                 related_entities_array.append({
                                     'entity_id': str(related_entity_id),
-                                    'relation': 'semantic_link',
+                                    'relation': 'related_to',  # Changed from 'semantic_link' - this is metadata, not DB constraint
                                     'weight': 0.8
                                 })
                         

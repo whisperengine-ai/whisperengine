@@ -522,10 +522,22 @@ Be conservative - only extract clear, unambiguous facts."""
             for fact_data in facts_list:
                 # Use simpler structure matching inline extraction
                 # Optional fields get sensible defaults
+                
+                # CRITICAL: relationship_type MUST NOT be empty (DB CHECK constraint)
+                relationship_type = fact_data.get('relationship_type', '').strip()
+                if not relationship_type:
+                    # Provide sensible default based on entity_type
+                    entity_type = fact_data.get('entity_type', 'other')
+                    relationship_type = 'related_to'  # Safe default that works for all entity types
+                    logger.warning(
+                        "Empty relationship_type for entity '%s' - defaulting to '%s'",
+                        fact_data.get('entity_name', 'unknown'), relationship_type
+                    )
+                
                 fact = ExtractedFact(
                     entity_name=fact_data.get('entity_name', ''),
                     entity_type=fact_data.get('entity_type', 'other'),
-                    relationship_type=fact_data.get('relationship_type', ''),
+                    relationship_type=relationship_type,  # Now guaranteed to be non-empty
                     confidence=float(fact_data.get('confidence', 0.8)),
                     confirmation_count=1,  # Enrichment sees full conversation, count as confirmed
                     related_facts=[],  # Can be enriched later if needed
@@ -616,7 +628,7 @@ Be conservative - only extract clear, unambiguous facts."""
         if fact1.entity_name.lower() in fact2.entity_name.lower() or \
            fact2.entity_name.lower() in fact1.entity_name.lower():
             return {
-                'type': 'semantic_link',
+                'type': 'related_to',  # Changed from 'semantic_link' to match DB constraint
                 'confidence': 0.8,
                 'reasoning': f"Related entities: {fact1.entity_name} and {fact2.entity_name}"
             }
