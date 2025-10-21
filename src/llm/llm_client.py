@@ -816,6 +816,13 @@ class LLMClient:
             "repetition_penalty": 1.1, # Additional repetition penalty (if supported)
         }
 
+        # OLLAMA COMPATIBILITY: Add options.num_predict for native Ollama parameter
+        if self.is_ollama:
+            payload["options"] = {
+                "num_predict": max_tokens,
+                "temperature": temperature,
+            }
+
         try:
             self.logger.debug(f"Sending request to {self.chat_endpoint}")
 
@@ -917,6 +924,13 @@ class LLMClient:
                 "presence_penalty": 0.3,   # Penalize repeated content
                 "repetition_penalty": 1.1, # Additional repetition penalty (if supported)
             }
+            
+            # OLLAMA COMPATIBILITY: Add options.num_predict for native Ollama parameter
+            if self.is_ollama:
+                payload["options"] = {
+                    "num_predict": max_tokens,
+                    "temperature": temperature,
+                }
             
             headers = {"Content-Type": "application/json"}
             if self.api_key:

@@ -174,3 +174,4 @@ character_intelligence_validation_results.json
 # Validation report directories
 *_validation_report.json/
 .env.nottaylor
+.env.assistant
