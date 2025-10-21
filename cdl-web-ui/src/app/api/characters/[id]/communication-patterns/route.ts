@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Pool } from 'pg'
-import { getDatabaseConfig } from '@/lib/db'
+import { getPool, withClient, withTransaction } from '@/lib/db-pool'
 
-const pool = new Pool(getDatabaseConfig())
+const pool = getPool()
 
 export async function GET(
   request: Request,
@@ -12,18 +11,18 @@ export async function GET(
   const characterId = parseInt(resolvedParams.id)
   
   try {
-    const client = await pool.connect()
+    const rows = await withClient(pool, async (client) => {
+      const result = await client.query(`
+        SELECT id, pattern_type, pattern_name, pattern_value, context, frequency, description
+        FROM character_communication_patterns 
+        WHERE character_id = $1
+        ORDER BY pattern_type, pattern_name
+      `, [characterId])
+      
+      return result.rows
+    })
     
-    const result = await client.query(`
-      SELECT id, pattern_type, pattern_name, pattern_value, context, frequency, description
-      FROM character_communication_patterns 
-      WHERE character_id = $1
-      ORDER BY pattern_type, pattern_name
-    `, [characterId])
-    
-    client.release()
-    
-    return NextResponse.json(result.rows)
+    return NextResponse.json(rows)
   } catch (error) {
     console.error('Error fetching communication patterns:', error)
     return NextResponse.json({ error: 'Failed to fetch communication patterns' }, { status: 500 })
@@ -41,29 +40,24 @@ export async function POST(
     const body = await request.json()
     const { patterns } = body
     
-    const client = await pool.connect()
-    
-    // Start transaction
-    await client.query('BEGIN')
-    
-    // Delete existing patterns
-    await client.query('DELETE FROM character_communication_patterns WHERE character_id = $1', [characterId])
-    
-    // Insert new patterns
-    const insertedPatterns = []
-    for (const pattern of patterns) {
-      const result = await client.query(`
-        INSERT INTO character_communication_patterns (character_id, pattern_type, pattern_name, pattern_value, context, frequency)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, pattern_type, pattern_name, pattern_value, context, frequency
-      `, [characterId, pattern.pattern_type, pattern.pattern_name, pattern.pattern_value, pattern.context, pattern.frequency])
+    const insertedPatterns = await withTransaction(pool, async (client) => {
+      // Delete existing patterns
+      await client.query('DELETE FROM character_communication_patterns WHERE character_id = $1', [characterId])
       
-      insertedPatterns.push(result.rows[0])
-    }
-    
-    // Commit transaction
-    await client.query('COMMIT')
-    client.release()
+      // Insert new patterns
+      const results = []
+      for (const pattern of patterns) {
+        const result = await client.query(`
+          INSERT INTO character_communication_patterns (character_id, pattern_type, pattern_name, pattern_value, context, frequency)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id, pattern_type, pattern_name, pattern_value, context, frequency
+        `, [characterId, pattern.pattern_type, pattern.pattern_name, pattern.pattern_value, pattern.context, pattern.frequency])
+        
+        results.push(result.rows[0])
+      }
+      
+      return results
+    })
     
     return NextResponse.json(insertedPatterns)
   } catch (error) {

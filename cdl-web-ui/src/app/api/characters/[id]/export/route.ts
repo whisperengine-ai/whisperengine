@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCharacterById, getDatabaseConfig } from '@/lib/db'
-import { Pool } from 'pg'
+import { getCharacterById } from '@/lib/db'
+import { getPool, withClient } from '@/lib/db-pool'
 import * as yaml from 'js-yaml'
 
-const pool = new Pool(getDatabaseConfig())
+const pool = getPool()
 
 interface PageProps {
   params: Promise<{
@@ -32,19 +32,18 @@ export async function GET(request: NextRequest, { params }: PageProps) {
       }, { status: 404 })
     }
 
-    const client = await pool.connect()
-
-    try {
-      // Fetch all related data from different tables
-      const [
-        backgroundRows,
-        interestsRows,
-        communicationRows,
-        speechRows,
-        responseStyleRows,
-        personalityRows,
-        valuesRows
-      ] = await Promise.all([
+    // Fetch all related data from different tables
+    const [
+      backgroundRows,
+      interestsRows,
+      communicationRows,
+      speechRows,
+      responseGuidelinesRows,
+      responseModesRows,
+      personalityRows,
+      valuesRows
+    ] = await withClient(pool, async (client) => {
+      return await Promise.all([
         // Background data
         client.query(`
           SELECT id, category, period, title, description, date_range, importance_level
@@ -76,13 +75,20 @@ export async function GET(request: NextRequest, { params }: PageProps) {
           ORDER BY priority DESC
         `, [characterId]),
         
-        // Response style guidelines
+        // Response style guidelines (NEW FORMAT)
         client.query(`
-          SELECT crg.id, crg.guideline_type as item_type, crg.guideline_content as item_text, 
-                 crg.priority as sort_order
-          FROM character_response_guidelines crg
-          WHERE crg.character_id = $1
-          ORDER BY crg.priority DESC
+          SELECT id, guideline_type, guideline_name, guideline_content, priority, context, is_critical, created_date
+          FROM character_response_guidelines
+          WHERE character_id = $1
+          ORDER BY priority ASC
+        `, [characterId]),
+        
+        // Response style modes (NEW - was missing!)
+        client.query(`
+          SELECT id, mode_name, mode_description, response_style, length_guideline, tone_adjustment, conflict_resolution_priority, examples
+          FROM character_response_modes
+          WHERE character_id = $1
+          ORDER BY conflict_resolution_priority ASC
         `, [characterId]),
         
         // Personality traits (for Big Five)
@@ -100,6 +106,7 @@ export async function GET(request: NextRequest, { params }: PageProps) {
           ORDER BY importance_level DESC
         `, [characterId])
       ])
+    })
 
       // Build comprehensive YAML structure matching form fields
       const yamlStructure: any = {
@@ -204,16 +211,37 @@ export async function GET(request: NextRequest, { params }: PageProps) {
         }
       }
 
-      // Add response style
-      if (responseStyleRows.rows.length > 0) {
-        yamlStructure.response_style = {
-          items: responseStyleRows.rows.map(row => ({
-            id: row.id,
-            item_type: row.item_type,
-            item_text: row.item_text,
-            sort_order: row.sort_order
-          }))
-        }
+      // Add response style (NEW FORMAT with guidelines AND modes)
+      yamlStructure.response_style = {}
+      
+      if (responseGuidelinesRows.rows.length > 0) {
+        yamlStructure.response_style.guidelines = responseGuidelinesRows.rows.map(row => ({
+          id: row.id,
+          guideline_type: row.guideline_type,
+          guideline_name: row.guideline_name,
+          guideline_content: row.guideline_content,
+          priority: row.priority,
+          context: row.context,
+          is_critical: row.is_critical
+        }))
+      }
+      
+      if (responseModesRows.rows.length > 0) {
+        yamlStructure.response_style.modes = responseModesRows.rows.map(row => ({
+          id: row.id,
+          mode_name: row.mode_name,
+          mode_description: row.mode_description,
+          response_style: row.response_style,
+          length_guideline: row.length_guideline,
+          tone_adjustment: row.tone_adjustment,
+          conflict_resolution_priority: row.conflict_resolution_priority,
+          examples: row.examples
+        }))
+      }
+      
+      // Remove response_style if empty
+      if (Object.keys(yamlStructure.response_style).length === 0) {
+        delete yamlStructure.response_style
       }
 
       // Add any existing CDL data for backward compatibility
@@ -245,10 +273,6 @@ export async function GET(request: NextRequest, { params }: PageProps) {
           'Cache-Control': 'no-cache'
         }
       })
-
-    } finally {
-      client.release()
-    }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'

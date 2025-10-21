@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createCharacter, getDatabaseConfig } from '@/lib/db'
+import { createCharacter } from '@/lib/db'
 import * as yaml from 'js-yaml'
-import { Pool } from 'pg'
+import { getPool, withTransaction } from '@/lib/db-pool'
 
-const pool = new Pool(getDatabaseConfig())
+const pool = getPool()
 
 // Helper function to create character within existing transaction
 async function createCharacterWithinTransaction(client: any, characterData: any) {
@@ -157,15 +157,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Start a single transaction for entire import operation
-    const client = await pool.connect()
-    let character: any = null
-    
-    try {
-      await client.query('BEGIN')
-      
+    // Use transaction helper for entire import operation
+    const result = await withTransaction(pool, async (client) => {
       // Create character in database within the transaction
-      character = await createCharacterWithinTransaction(client, characterData)
+      const character = await createCharacterWithinTransaction(client, characterData)
       
       // Import background entries
       const backgroundData = yamlData.background as Record<string, unknown> | undefined
@@ -230,31 +225,155 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      await client.query('COMMIT')
-      
-      return NextResponse.json({
-        success: true,
-        message: `Character "${nameVal}" imported successfully`,
-        character: {
-          id: character.id,
-          name: character.name,
-          normalized_name: character.normalized_name,
-          occupation: character.occupation,
-          description: character.description
+      // Import communication patterns (was MISSING!)
+      const communicationData = yamlData.communication_patterns as Record<string, unknown> | undefined
+      if (communicationData && Array.isArray(communicationData.patterns)) {
+        for (const pattern of communicationData.patterns) {
+          if (typeof pattern === 'object' && pattern !== null) {
+            const commPattern = pattern as Record<string, unknown>
+            await client.query(`
+              INSERT INTO character_communication_patterns 
+              (character_id, pattern_type, pattern_name, pattern_value, context, frequency)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [
+              character.id,
+              getString(commPattern, 'pattern_type') || 'General',
+              getString(commPattern, 'pattern_name') || null,
+              getString(commPattern, 'pattern_value') || null,
+              getString(commPattern, 'context') || null,
+              getString(commPattern, 'frequency') || 'Medium'
+            ])
+          }
         }
-      }, { status: 201 })
-
-    } catch (importError) {
-      await client.query('ROLLBACK')
-      console.error('Error during complete import operation:', importError)
+      }
       
-      return NextResponse.json({
-        success: false,
-        error: `Import failed: ${importError instanceof Error ? importError.message : 'Unknown error'}`
-      }, { status: 500 })
-    } finally {
-      client.release()
-    }
+      // Import response style (guidelines and modes - was MISSING!)
+      const responseStyleData = yamlData.response_style as Record<string, unknown> | undefined
+      if (responseStyleData) {
+        // Import guidelines
+        if (Array.isArray(responseStyleData.guidelines)) {
+          for (const guideline of responseStyleData.guidelines) {
+            if (typeof guideline === 'object' && guideline !== null) {
+              const guidelineEntry = guideline as Record<string, unknown>
+              await client.query(`
+                INSERT INTO character_response_guidelines 
+                (character_id, guideline_type, guideline_name, guideline_content, priority, context, is_critical)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+              `, [
+                character.id,
+                getString(guidelineEntry, 'guideline_type') || 'general',
+                getString(guidelineEntry, 'guideline_name') || null,
+                getString(guidelineEntry, 'guideline_content') || null,
+                typeof guidelineEntry.priority === 'number' ? guidelineEntry.priority : 1,
+                getString(guidelineEntry, 'context') || null,
+                getBoolean(guidelineEntry, 'is_critical') ?? false
+              ])
+            }
+          }
+        }
+        
+        // Import modes
+        if (Array.isArray(responseStyleData.modes)) {
+          for (const mode of responseStyleData.modes) {
+            if (typeof mode === 'object' && mode !== null) {
+              const modeEntry = mode as Record<string, unknown>
+              await client.query(`
+                INSERT INTO character_response_modes
+                (character_id, mode_name, mode_description, response_style, length_guideline, tone_adjustment, conflict_resolution_priority, examples)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              `, [
+                character.id,
+                getString(modeEntry, 'mode_name') || null,
+                getString(modeEntry, 'mode_description') || null,
+                getString(modeEntry, 'response_style') || null,
+                getString(modeEntry, 'length_guideline') || null,
+                getString(modeEntry, 'tone_adjustment') || null,
+                typeof modeEntry.conflict_resolution_priority === 'number' ? modeEntry.conflict_resolution_priority : 1,
+                getString(modeEntry, 'examples') || null
+              ])
+            }
+          }
+        }
+        
+        // BACKWARD COMPATIBILITY: Handle legacy 'items' format
+        if (Array.isArray(responseStyleData.items) && !responseStyleData.guidelines) {
+          for (const item of responseStyleData.items) {
+            if (typeof item === 'object' && item !== null) {
+              const itemEntry = item as Record<string, unknown>
+              await client.query(`
+                INSERT INTO character_response_guidelines 
+                (character_id, guideline_type, guideline_name, guideline_content, priority, is_critical)
+                VALUES ($1, $2, $3, $4, $5, $6)
+              `, [
+                character.id,
+                getString(itemEntry, 'item_type') || 'general',
+                'Imported Guideline',
+                getString(itemEntry, 'item_text') || null,
+                typeof itemEntry.sort_order === 'number' ? itemEntry.sort_order : 1,
+                false
+              ])
+            }
+          }
+        }
+      }
+      
+      // Import personality traits (Big Five - was MISSING!)
+      const personalityData = yamlData.personality as Record<string, unknown> | undefined
+      if (personalityData && typeof personalityData.big_five === 'object' && personalityData.big_five !== null) {
+        const bigFive = personalityData.big_five as Record<string, unknown>
+        const traits = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']
+        
+        for (const trait of traits) {
+          const value = bigFive[trait]
+          if (typeof value === 'number') {
+            await client.query(`
+              INSERT INTO personality_traits (character_id, trait_name, trait_value, intensity)
+              VALUES ($1, $2, $3, $4)
+            `, [
+              character.id, 
+              trait, 
+              value, 
+              Math.abs(value - 0.5) * 2  // intensity based on distance from neutral
+            ])
+          }
+        }
+      }
+      
+      // Import character values (was MISSING!)
+      if (personalityData && Array.isArray(personalityData.values)) {
+        for (let i = 0; i < personalityData.values.length; i++) {
+          const value = personalityData.values[i]
+          if (typeof value === 'string') {
+            await client.query(`
+              INSERT INTO character_values (character_id, value_key, value_description, importance_level, category)
+              VALUES ($1, $2, $3, $4, $5)
+            `, [
+              character.id, 
+              value.toLowerCase().replace(/\s+/g, '_'), 
+              value, 
+              personalityData.values.length - i,  // Higher index = higher importance
+              'core'
+            ])
+          }
+        }
+      }
+      
+      // Return character data (transaction auto-commits)
+      return character
+    })
+    
+    // Success response
+    return NextResponse.json({
+      success: true,
+      message: `Character "${nameVal}" imported successfully`,
+      character: {
+        id: result.id,
+        name: result.name,
+        normalized_name: result.normalized_name,
+        occupation: result.occupation,
+        description: result.description
+      }
+    }, { status: 201 })
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
