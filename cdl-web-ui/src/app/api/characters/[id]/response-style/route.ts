@@ -61,7 +61,20 @@ export async function PUT(
   
   try {
     const body = await request.json()
-    const { guidelines, modes } = body
+    let { guidelines, modes } = body
+    
+    // BACKWARD COMPATIBILITY: Handle legacy 'items' format from older UI versions
+    if (body.items && !guidelines) {
+      console.log('Converting legacy items format to guidelines format')
+      guidelines = body.items.map((item: any) => ({
+        guideline_type: item.item_type || 'general',
+        guideline_name: `Guideline ${item.sort_order || 1}`,
+        guideline_content: item.item_text,
+        priority: item.sort_order || 1,
+        context: null,
+        is_critical: false
+      }))
+    }
     
     const client = await pool.connect()
     
@@ -69,7 +82,7 @@ export async function PUT(
     await client.query('BEGIN')
     
     // Update guidelines if provided
-    if (guidelines) {
+    if (guidelines && guidelines.length > 0) {
       // Delete existing guidelines
       await client.query('DELETE FROM character_response_guidelines WHERE character_id = $1', [characterId])
       
@@ -92,7 +105,7 @@ export async function PUT(
     }
     
     // Update modes if provided  
-    if (modes) {
+    if (modes && modes.length > 0) {
       // Delete existing modes
       await client.query('DELETE FROM character_response_modes WHERE character_id = $1', [characterId])
       

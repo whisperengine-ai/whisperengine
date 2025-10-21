@@ -295,16 +295,16 @@ class DatabaseAdapter {
         
         // Save identity details
         if (cdl.identity) {
-          await this.saveCharacterIdentityDetails(id, cdl.identity);
+          await this.saveCharacterIdentityDetails(id, cdl.identity, client);
         }
         
         // Save personality data
         if (cdl.personality) {
           if (cdl.personality.big_five) {
-            await this.saveCharacterPersonalityTraits(id, cdl.personality.big_five);
+            await this.saveCharacterPersonalityTraits(id, cdl.personality.big_five, client);
           }
           if (cdl.personality.values) {
-            await this.saveCharacterValues(id, cdl.personality.values);
+            await this.saveCharacterValues(id, cdl.personality.values, client);
           }
         }
       }

@@ -14,19 +14,23 @@ export default function SimpleCharacterEditForm({ character }: SimpleCharacterEd
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   
-  // Field limits for validation
+  // Field limits for validation (updated to match database schema - Oct 2025)
   const FIELD_LIMITS = {
-    name: 100,
-    occupation: 150,
-    description: 1000,
-    location: 100,
-    backgroundTitle: 200,
-    backgroundDescription: 2000,
-    interestText: 1500,
-    communicationPattern: 1500,
-    speechPattern: 800,
-    responseStyle: 2000,
-    period: 100
+    name: 500,                    // Updated: DB allows 500, was 100
+    occupation: 500,              // Updated: DB allows 500, was 150
+    description: 1000,            // OK: TEXT field, reasonable user limit
+    location: 200,                // Updated: TEXT field, reasonable user limit (was 100)
+    backgroundTitle: 500,         // Updated: TEXT field, increased for better UX (was 200)
+    backgroundDescription: 2000,  // OK: TEXT field
+    backgroundPeriod: 100,        // OK: Matches DB VARCHAR(100)
+    interestText: 1500,           // OK: TEXT field, reasonable user limit
+    communicationPatternValue: 1500,  // OK: TEXT field, reasonable user limit
+    communicationPatternName: 100,    // New: Matches DB VARCHAR(100)
+    communicationContext: 100,        // New: Matches DB VARCHAR(100)
+    speechPatternValue: 800,      // OK: TEXT field, reasonable user limit
+    speechPatternType: 100,       // New: Matches DB VARCHAR(100)
+    speechContext: 100,           // New: Matches DB VARCHAR(100)
+    responseStyle: 2000,          // OK: TEXT field, reasonable user limit
   }
   
   // Basic character data
@@ -44,16 +48,23 @@ export default function SimpleCharacterEditForm({ character }: SimpleCharacterEd
     }
   })
 
-  // Personality data
-  const [personalityData, setPersonalityData] = useState({
-    big_five: {
-      openness: 0.5,
-      conscientiousness: 0.5,
-      extraversion: 0.5,
-      agreeableness: 0.5,
-      neuroticism: 0.5
-    },
-    values: [] as string[]
+  // Personality data - Initialize from character prop
+  const [personalityData, setPersonalityData] = useState(() => {
+    const cdl = character.cdl_data as Record<string, unknown>
+    const personality = cdl?.personality as Record<string, unknown> | undefined
+    const bigFive = personality?.big_five as Record<string, number> | undefined
+    const values = personality?.values as string[] | undefined
+    
+    return {
+      big_five: {
+        openness: bigFive?.openness ?? 0.5,
+        conscientiousness: bigFive?.conscientiousness ?? 0.5,
+        extraversion: bigFive?.extraversion ?? 0.5,
+        agreeableness: bigFive?.agreeableness ?? 0.5,
+        neuroticism: bigFive?.neuroticism ?? 0.5
+      },
+      values: values || []
+    }
   })
   
   // Background data
@@ -132,6 +143,27 @@ export default function SimpleCharacterEditForm({ character }: SimpleCharacterEd
       character_archetype: character.archetype,
       allow_full_roleplay_immersion: character.allow_full_roleplay
     })
+  }, [character])
+
+  // Update personalityData when character prop changes
+  useEffect(() => {
+    const cdl = character.cdl_data as Record<string, unknown>
+    const personality = cdl?.personality as Record<string, unknown> | undefined
+    const bigFive = personality?.big_five as Record<string, number> | undefined
+    const values = personality?.values as string[] | undefined
+    
+    if (bigFive || values) {
+      setPersonalityData({
+        big_five: {
+          openness: bigFive?.openness ?? 0.5,
+          conscientiousness: bigFive?.conscientiousness ?? 0.5,
+          extraversion: bigFive?.extraversion ?? 0.5,
+          agreeableness: bigFive?.agreeableness ?? 0.5,
+          neuroticism: bigFive?.neuroticism ?? 0.5
+        },
+        values: values || []
+      })
+    }
   }, [character])
 
   const loadCharacterData = async () => {

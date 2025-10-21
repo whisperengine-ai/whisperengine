@@ -39,13 +39,23 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
 
     const body = await request.json()
-    const { name, occupation, location, description, cdl_data } = body
+    const { 
+      name, 
+      occupation, 
+      location, 
+      description, 
+      character_archetype, 
+      allow_full_roleplay_immersion,
+      cdl_data 
+    } = body
 
     const updatedCharacter = await updateCharacter(characterId, {
       name,
       occupation,
       location,
       description,
+      archetype: character_archetype,
+      allow_full_roleplay: allow_full_roleplay_immersion,
       cdl_data
     })
 
