@@ -1659,14 +1659,15 @@ class MessageProcessor:
                     # Build conversation context for MemoryBoost optimization
                     conversation_context = self._build_conversation_context_for_memoryboost(message_context)
                     
-                    # Use MemoryBoost enhanced retrieval
+                    # Use MemoryBoost enhanced retrieval with channel privacy filtering
                     memoryboost_result = await self.memory_manager.retrieve_relevant_memories_with_memoryboost(
                         user_id=message_context.user_id,
                         query=message_context.content,
                         limit=20,
                         conversation_context=conversation_context,
                         apply_quality_scoring=True,
-                        apply_optimizations=True
+                        apply_optimizations=True,
+                        channel_type=message_context.channel_type  # 🔒 PRIVACY: Pass channel type for filtering
                     )
                     
                     relevant_memories = memoryboost_result.get('memories', [])
@@ -1756,13 +1757,14 @@ class MessageProcessor:
                 except (AttributeError, ValueError, TypeError) as e:
                     logger.warning("Optimized memory retrieval failed, using fallback: %s", str(e))
             
-            # Fallback to context-aware retrieval
+            # Fallback to context-aware retrieval with channel privacy filtering
             relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
                 user_id=message_context.user_id,
                 query=message_context.content,
                 max_memories=20,
                 context=classified_context,
-                emotional_context="general conversation"
+                emotional_context="general conversation",
+                channel_type=message_context.channel_type  # 🔒 PRIVACY: Pass channel type for filtering
             )
             
             logger.info("🔍 MEMORY: Retrieved %d memories via context-aware fallback", len(relevant_memories))
@@ -2264,6 +2266,18 @@ class MessageProcessor:
         
         # Build lean system message - memory/summary moved to bridge position for better flow
         system_prompt_content = f"CURRENT DATE & TIME: {time_context}"
+        
+        # 🔒 PRIVACY CONTEXT: Add channel awareness so bot knows if conversation is private or public
+        # Default to private for safety - only mark as public if explicitly guild channel
+        if message_context.channel_type == "guild":
+            channel_context = " CONVERSATION SETTING: This is a public server channel. Others are watching/reading this conversation."
+            logger.info("🔒 PRIVACY: Adding server context hint to system prompt (public conversation)")
+        else:
+            # Default to private (includes DM and unknown/None channel types)
+            channel_context = " CONVERSATION SETTING: This is a private 1-on-1 direct message. Just you and them."
+            logger.info("🔒 PRIVACY: Adding private context hint (channel_type=%s)", message_context.channel_type or "unknown")
+        
+        system_prompt_content += channel_context
         
         # Log what will become bridge messages
         if memory_narrative:
@@ -5338,10 +5352,12 @@ class MessageProcessor:
             if not recent_emotions:
                 bot_memory_query = f"emotional responses by {bot_name}"
                 
+                # 🔒 PRIVACY: Retrieve bot emotions from channel-scoped memories only
                 recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
                     user_id=message_context.user_id,
                     query=bot_memory_query,
-                    limit=10
+                    limit=10,
+                    channel_type=message_context.channel_type  # 🔒 Respect channel privacy boundaries
                 )
                 
                 if not recent_bot_memories:

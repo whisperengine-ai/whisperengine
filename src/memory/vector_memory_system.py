@@ -2283,7 +2283,8 @@ class VectorMemoryStore:
                                                       top_k: int = 10,
                                                       min_score: float = 0.1,  # 🔧 TUNING: Lowered from 0.3 to 0.1 - short queries like "aethys" have low scores (~0.12)
                                                       emotional_context: Optional[str] = None,
-                                                      prefer_recent: bool = True) -> List[Dict[str, Any]]:
+                                                      prefer_recent: bool = True,
+                                                      channel_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         🚀 QDRANT-NATIVE: Use Qdrant's advanced features for role-playing AI
         
@@ -2292,6 +2293,21 @@ class VectorMemoryStore:
         - Use scroll API for chronological recent context
         - Use search_batch for parallel temporal + semantic queries
         - Use payload-based temporal boosting
+        
+        🔒 PRIVACY: Channel-based memory filtering
+        - DM channels: Only retrieve DM memories (private context)
+        - Server channels: Retrieve all non-DM memories (shared context)
+        - None: Retrieve all memories (backward compatible)
+        
+        Args:
+            query: Search query text
+            user_id: User identifier for scoping
+            memory_types: Optional filter by memory type
+            top_k: Maximum results to return
+            min_score: Minimum similarity score threshold
+            emotional_context: Optional emotional context for filtering
+            prefer_recent: Whether to prefer recent memories
+            channel_type: Channel type for privacy filtering (dm/guild/None)
         """
         try:
             query_embedding = await self.generate_embedding(query)
@@ -2301,7 +2317,7 @@ class VectorMemoryStore:
             
             if is_temporal_query:
                 logger.info(f"🎯 TEMPORAL QUERY DETECTED: '{query}' - Using Qdrant chronological retrieval")
-                return await self._handle_temporal_query_with_qdrant(query, user_id, top_k)
+                return await self._handle_temporal_query_with_qdrant(query, user_id, top_k, channel_type=channel_type)
             
             # Regular semantic search continues below...
             # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
@@ -2309,6 +2325,25 @@ class VectorMemoryStore:
                 models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
                 # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
             ]
+            
+            # 🔒 PRIVACY: Apply channel-based memory filtering
+            if channel_type:
+                if channel_type == "dm":
+                    # DM context: Only show DM memories (private)
+                    must_conditions.append(
+                        models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm"))
+                    )
+                elif channel_type == "guild":
+                    # Server context: Only show non-DM memories (shared)
+                    # Use must_not to exclude DM memories
+                    pass  # Will be added to must_not conditions below
+            
+            # Build must_not conditions for server privacy filtering
+            must_not_conditions = []
+            if channel_type == "guild":
+                must_not_conditions.append(
+                    models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm"))
+                )
             
             if memory_types:
                 must_conditions.append(
@@ -2328,11 +2363,17 @@ class VectorMemoryStore:
                     )
                 )
             
-            # Regular search for non-temporal queries using named vectors  
+            # Regular search for non-temporal queries using named vectors
+            query_filter = models.Filter(
+                must=must_conditions, 
+                should=should_conditions,
+                must_not=must_not_conditions if must_not_conditions else None
+            )
+            
             search_results = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR: Use content vector
-                query_filter=models.Filter(must=must_conditions, should=should_conditions),
+                query_filter=query_filter,
                 limit=top_k,
                 score_threshold=min_score,
                 with_payload=True
@@ -2392,11 +2433,16 @@ class VectorMemoryStore:
         
         return is_temporal
 
-    async def _handle_temporal_query_with_qdrant(self, query: str, user_id: str, limit: int) -> List[Dict[str, Any]]:
+    async def _handle_temporal_query_with_qdrant(self, query: str, user_id: str, limit: int, channel_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         🎯 QDRANT-NATIVE: Handle temporal queries using scroll API for chronological context
         
         ENHANCED (Bug Fix #2): Now detects "first" vs "last" queries and orders accordingly
+        
+        🔒 PRIVACY: Channel-based memory filtering
+        - DM channels: Only retrieve DM memories
+        - Server channels: Exclude DM memories
+        - None: No channel filtering (backward compatible)
         """
         try:
             # 🎯 NEW: Detect query direction (first/earliest vs last/recent)
@@ -2433,18 +2479,37 @@ class VectorMemoryStore:
             
             recent_cutoff_timestamp = recent_cutoff_dt.timestamp()
             
+            # Build channel privacy filters
+            must_conditions = [
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
+                models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
+                models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_cutoff_timestamp))
+            ]
+            
+            # 🔒 PRIVACY: Apply channel filtering
+            must_not_conditions = []
+            if channel_type == "dm":
+                # DM context: Only DM memories
+                must_conditions.append(
+                    models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm"))
+                )
+            elif channel_type == "guild":
+                # Server context: Exclude DM memories
+                must_not_conditions.append(
+                    models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm"))
+                )
+            
+            # Build scroll filter
+            scroll_filter = models.Filter(must=must_conditions)
+            if must_not_conditions:
+                scroll_filter.must_not = must_not_conditions
+            
             # Get recent conversation messages in chronological order
             # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
             scroll_result = self.client.scroll(
                 collection_name=self.collection_name,
-                scroll_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                        # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
-                        models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
-                        models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_cutoff_timestamp))
-                    ]
-                ),
+                scroll_filter=scroll_filter,
                 limit=50,  # 🔧 INCREASED: Get more context for rich conversations (was 20)
                 with_payload=True,
                 with_vectors=False,  # Don't need vectors for temporal queries
@@ -2456,6 +2521,15 @@ class VectorMemoryStore:
             if not recent_messages:
                 logger.info("🎯 TEMPORAL: No recent conversation found, trying broader semantic search")
                 # Instead of returning empty, do a semantic search for the temporal query
+                # Build semantic search filter with channel privacy
+                semantic_must = [models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                if channel_type == "dm":
+                    semantic_must.append(models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm")))
+                
+                semantic_filter = models.Filter(must=semantic_must)
+                if channel_type == "guild":
+                    semantic_filter.must_not = [models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm"))]
+                
                 semantic_results = self.client.search(
                     collection_name=self.collection_name,
                     query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
@@ -4168,12 +4242,68 @@ class VectorMemoryManager:
             logger.error(f"Failed to store conversation: {e}")
             return False
     
+    def _build_channel_privacy_filter(self, user_id: str, channel_type: Optional[str]) -> Dict[str, List[models.FieldCondition]]:
+        """
+        Build Qdrant filter conditions for channel privacy.
+        
+        🔒 PRIVACY RULES:
+        - DM channels: Only retrieve DM memories (private context)
+        - Server channels: Retrieve all non-DM memories (public/guild context)
+        - Unknown/None: Retrieve all memories (backward compatibility for API/testing)
+        
+        Args:
+            user_id: User ID to filter by
+            channel_type: Channel type ('dm', 'guild', 'text', etc. or None)
+            
+        Returns:
+            Dict with 'must' and 'must_not' lists of FieldCondition objects
+        """
+        must_conditions = [
+            models.FieldCondition(
+                key="user_id",
+                match=models.MatchValue(value=user_id)
+            )
+        ]
+        must_not_conditions = []
+        
+        if channel_type:
+            channel_type_lower = channel_type.lower()
+            
+            if channel_type_lower == "dm":
+                # In DM: Only show DM memories (private)
+                must_conditions.append(
+                    models.FieldCondition(
+                        key="metadata.channel_type",
+                        match=models.MatchValue(value="dm")
+                    )
+                )
+                logger.debug(f"🔒 PRIVACY: DM channel detected - filtering to DM memories only for user {user_id}")
+            else:
+                # In server: Show all non-DM memories (public guild context)
+                # Use must_not to exclude DMs
+                must_not_conditions.append(
+                    models.FieldCondition(
+                        key="metadata.channel_type",
+                        match=models.MatchValue(value="dm")
+                    )
+                )
+                logger.debug(f"🔒 PRIVACY: Server channel detected - excluding DM memories for user {user_id}")
+        else:
+            # No channel type: Allow all (backward compatibility)
+            logger.debug(f"🔒 PRIVACY: No channel type specified - retrieving all memories for user {user_id}")
+        
+        return {
+            "must": must_conditions,
+            "must_not": must_not_conditions
+        }
+    
     async def retrieve_relevant_memories(
         self,
         user_id: str,
         query: str,
         limit: int = 25,
-        emotion_data: Optional[Dict[str, Any]] = None
+        emotion_data: Optional[Dict[str, Any]] = None,
+        channel_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieve memories using intelligent query classification and vector routing.
@@ -4185,6 +4315,11 @@ class VectorMemoryManager:
         - CONVERSATIONAL queries → content + semantic vector fusion (relationship patterns)
         - GENERAL queries → content vector (default fallback)
         
+        🔒 PRIVACY FILTERING: Respects channel privacy boundaries:
+        - DM channels: Only retrieve DM memories (private context)
+        - Server channels: Retrieve all server memories (exclude DMs)
+        - Unknown/API: Retrieve all memories (backward compatibility)
+        
         This method now delegates to retrieve_relevant_memories_with_classification()
         which provides superior query understanding compared to the old keyword-based approach.
         
@@ -4194,6 +4329,7 @@ class VectorMemoryManager:
             limit: Maximum number of memories to retrieve
             emotion_data: Optional pre-analyzed emotion from RoBERTa (avoids re-analysis)
                          Expected keys: emotional_intensity, dominant_emotion, etc.
+            channel_type: Channel type for privacy filtering ('dm', 'guild', None)
         
         Returns:
             List of relevant memories with routing metadata
@@ -4204,7 +4340,8 @@ class VectorMemoryManager:
                 user_id=user_id,
                 query=query,
                 limit=limit,
-                emotion_data=emotion_data
+                emotion_data=emotion_data,
+                channel_type=channel_type
             )
         except Exception as e:
             logger.error(
@@ -4217,7 +4354,8 @@ class VectorMemoryManager:
                 user_id=user_id,
                 query=query,
                 limit=limit,
-                emotion_data=emotion_data
+                emotion_data=emotion_data,
+                channel_type=channel_type
             )
     
     async def _legacy_retrieve_relevant_memories(
@@ -4225,18 +4363,24 @@ class VectorMemoryManager:
         user_id: str,
         query: str,
         limit: int = 25,
-        emotion_data: Optional[Dict[str, Any]] = None
+        emotion_data: Optional[Dict[str, Any]] = None,
+        channel_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         LEGACY METHOD: Old keyword-based routing (kept as fallback).
         
         This method uses brittle keyword matching for emotion detection.
         Only used if intelligent routing fails.
+        
+        🔒 PRIVACY: Applies channel-based filtering to respect DM privacy.
         """
         import time
         
         start_time = time.time()
         try:
+            # 🔒 PRIVACY: Build channel privacy filter
+            privacy_filter = self._build_channel_privacy_filter(user_id, channel_type)
+            
             # 🎯 CRITICAL FIX: Add temporal query detection BEFORE semantic search
             # This fixes Test 5 temporal intelligence where "first question today" was failing
             is_temporal_query = await self.vector_store._detect_temporal_query_with_qdrant(query, user_id)
@@ -4576,16 +4720,23 @@ class VectorMemoryManager:
         vector_name: str,
         query: str,
         user_id: str,
-        limit: int
+        limit: int,
+        channel_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Search a single named vector (Phase 2 helper method).
+        
+        🔒 PRIVACY: Channel-based memory filtering
+        - DM channels: Only retrieve DM memories
+        - Server channels: Exclude DM memories
+        - None: No channel filtering (backward compatible)
         
         Args:
             vector_name: Name of vector to search ('content', 'emotion', 'semantic')
             query: Search query
             user_id: User identifier
             limit: Maximum results
+            channel_type: Channel type for privacy filtering ('dm', 'guild', None)
             
         Returns:
             List of memory dictionaries with search metadata
@@ -4595,12 +4746,30 @@ class VectorMemoryManager:
             # Handle both numpy arrays and plain lists
             query_embedding = embedding_result.tolist() if hasattr(embedding_result, 'tolist') else embedding_result
             
+            # Build channel privacy filter
+            must_conditions = [models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+            must_not_conditions = []
+            
+            if channel_type == "dm":
+                # DM context: Only DM memories
+                must_conditions.append(
+                    models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm"))
+                )
+            elif channel_type == "guild":
+                # Server context: Exclude DM memories
+                must_not_conditions.append(
+                    models.FieldCondition(key="channel_type", match=models.MatchValue(value="dm"))
+                )
+            
+            # Build query filter
+            query_filter = models.Filter(must=must_conditions)
+            if must_not_conditions:
+                query_filter.must_not = must_not_conditions
+            
             search_result = self.vector_store.client.search(
                 collection_name=self.vector_store.collection_name,
                 query_vector=(vector_name, query_embedding),
-                query_filter=models.Filter(
-                    must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
-                ),
+                query_filter=query_filter,
                 limit=limit,
                 with_payload=True,
                 score_threshold=0.1  # Low threshold for broad recall
@@ -4634,10 +4803,13 @@ class VectorMemoryManager:
         weights: List[float],
         query: str,
         user_id: str,
-        limit: int
+        limit: int,
+        channel_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Search multiple vectors and fuse results with RRF (Phase 2 helper method).
+        
+        🔒 PRIVACY: Channel-based memory filtering applied to all vector searches.
         
         Args:
             vectors: List of vector names to search
@@ -4645,12 +4817,13 @@ class VectorMemoryManager:
             query: Search query
             user_id: User identifier
             limit: Maximum results
+            channel_type: Channel type for privacy filtering ('dm', 'guild', None)
             
         Returns:
             Fused and ranked memory list
         """
         try:
-            # Search each vector
+            # Search each vector with channel privacy filtering
             results_by_vector = {}
             
             for vector_name in vectors:
@@ -4658,7 +4831,8 @@ class VectorMemoryManager:
                     vector_name=vector_name,
                     query=query,
                     user_id=user_id,
-                    limit=limit
+                    limit=limit,
+                    channel_type=channel_type
                 )
                 results_by_vector[vector_name] = vector_results
             
@@ -4687,7 +4861,8 @@ class VectorMemoryManager:
         user_id: str,
         query: str,
         limit: int = 25,
-        emotion_data: Optional[Dict[str, Any]] = None
+        emotion_data: Optional[Dict[str, Any]] = None,
+        channel_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         🎯 Query-classifier-based intelligent vector routing.
@@ -4699,12 +4874,18 @@ class VectorMemoryManager:
         - Temporal queries → chronological scroll
         - General queries → content vector (default)
         
+        🔒 PRIVACY: Channel-based memory filtering
+        - DM channels: Only retrieve DM memories
+        - Server channels: Exclude DM memories  
+        - None: No channel filtering (backward compatible)
+        
         Args:
             user_id: User identifier
             query: Search query
             limit: Maximum results
             emotion_data: Pre-analyzed RoBERTa emotion data (optional)
                          Expected keys: emotional_intensity, dominant_emotion
+            channel_type: Channel type for privacy filtering ('dm', 'guild', None)
         
         Returns:
             List of relevant memories with routing metadata
@@ -4750,9 +4931,9 @@ class VectorMemoryManager:
                 
                 # Step 3: Route based on category
                 if category == QueryCategory.TEMPORAL:
-                    # Use existing temporal logic
+                    # Use existing temporal logic with channel privacy filtering
                     results = await self.vector_store._handle_temporal_query_with_qdrant(
-                        query, user_id, limit
+                        query, user_id, limit, channel_type=channel_type
                     )
                     # Format results
                     formatted_results = []
@@ -4794,13 +4975,14 @@ class VectorMemoryManager:
                     return formatted_results
                 
                 elif category == QueryCategory.FACTUAL:
-                    # Single content vector (fast path)
+                    # Single content vector (fast path) with channel privacy
                     search_start = time.time()
                     results = await self._search_single_vector(
                         vector_name="content",
                         query=query,
                         user_id=user_id,
-                        limit=limit
+                        limit=limit,
+                        channel_type=channel_type
                     )
                     search_time_ms = (time.time() - search_start) * 1000
                     
@@ -4834,14 +5016,15 @@ class VectorMemoryManager:
                     return results
                 
                 elif category == QueryCategory.EMOTIONAL:
-                    # Multi-vector fusion: content + emotion
+                    # Multi-vector fusion: content + emotion with channel privacy
                     search_start = time.time()
                     results = await self._search_multi_vector_fusion(
                         vectors=strategy['vectors'],
                         weights=strategy['weights'],
                         query=query,
                         user_id=user_id,
-                        limit=limit
+                        limit=limit,
+                        channel_type=channel_type
                     )
                     search_time_ms = (time.time() - search_start) * 1000
                     
@@ -4877,14 +5060,15 @@ class VectorMemoryManager:
                     return results
                 
                 elif category == QueryCategory.CONVERSATIONAL:
-                    # Multi-vector fusion: content + semantic
+                    # Multi-vector fusion: content + semantic with channel privacy
                     search_start = time.time()
                     results = await self._search_multi_vector_fusion(
                         vectors=strategy['vectors'],
                         weights=strategy['weights'],
                         query=query,
                         user_id=user_id,
-                        limit=limit
+                        limit=limit,
+                        channel_type=channel_type
                     )
                     search_time_ms = (time.time() - search_start) * 1000
                     
@@ -4920,13 +5104,14 @@ class VectorMemoryManager:
                     return results
                 
                 else:  # GENERAL
-                    # Single content vector (default)
+                    # Single content vector (default) with channel privacy
                     search_start = time.time()
                     results = await self._search_single_vector(
                         vector_name="content",
                         query=query,
                         user_id=user_id,
-                        limit=limit
+                        limit=limit,
+                        channel_type=channel_type
                     )
                     search_time_ms = (time.time() - search_start) * 1000
                     
