@@ -8,6 +8,7 @@
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
 - **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
 - **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
+- **CDL DATABASE CHANGES DO NOT REQUIRE RESTARTS**: Character data (personalities, relationships, speech patterns) is pulled fresh from PostgreSQL on every message - changes take effect immediately without bot restart
 
 ## 🛠️ MULTI-BOT.SH SCRIPT COMMANDS (CRITICAL - USE THESE CORRECTLY!)
 

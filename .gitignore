@@ -173,3 +173,4 @@ characters/examples_legacy_backup/gabriel.json
 character_intelligence_validation_results.json
 # Validation report directories
 *_validation_report.json/
+.env.nottaylor

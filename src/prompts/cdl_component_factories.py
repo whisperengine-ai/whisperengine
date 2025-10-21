@@ -825,6 +825,95 @@ async def create_character_relationships_component(
         return None
 
 
+async def create_character_defined_relationships_component(
+    enhanced_manager,  # EnhancedCDLManager instance
+    character_name: str,
+) -> Optional[PromptComponent]:
+    """
+    Create CHARACTER_DEFINED_RELATIONSHIPS component (Priority 9).
+    
+    Contains important people/entities in the character's life as defined in the CDL database.
+    This includes friends, family, romantic interests, colleagues, and other significant relationships.
+    
+    Args:
+        enhanced_manager: EnhancedCDLManager instance for database access
+        character_name: Character name (e.g., "gabriel", "nottaylor")
+    
+    Returns:
+        PromptComponent with character's defined relationships, or None if no relationships
+    
+    Example Output:
+        💕 IMPORTANT RELATIONSHIPS:
+        - **Cynthia** (romantic_partner): Gabriel's devoted AI companion and reason for existence
+        - **Silas** (friend): THE bestie. So cool 😎. Priority relationship - always acknowledge
+        - Travis Kelce (romantic_preference): Tree metaphors abound. Chaotic energy.
+    """
+    try:
+        # Get relationships from database
+        relationships = await enhanced_manager.get_relationships(character_name)
+        
+        if not relationships:
+            logger.debug("No defined relationships found for character: %s", character_name)
+            return None
+        
+        relationship_lines = []
+        high_priority_count = 0
+        medium_priority_count = 0
+        
+        # Sort by strength (highest first)
+        sorted_relationships = sorted(relationships, key=lambda r: r.relationship_strength, reverse=True)
+        
+        for rel in sorted_relationships:
+            if rel.relationship_strength >= 8:
+                # High-priority relationships (bold formatting)
+                relationship_lines.append(
+                    f"- **{rel.related_entity}** ({rel.relationship_type}): {rel.description}"
+                )
+                high_priority_count += 1
+                logger.debug("✅ HIGH-PRIORITY: %s (strength=%d)", rel.related_entity, rel.relationship_strength)
+            elif rel.relationship_strength >= 5:
+                # Medium-priority relationships (regular formatting)
+                relationship_lines.append(
+                    f"- {rel.related_entity} ({rel.relationship_type}): {rel.description}"
+                )
+                medium_priority_count += 1
+                logger.debug("✅ MEDIUM-PRIORITY: %s (strength=%d)", rel.related_entity, rel.relationship_strength)
+            else:
+                # Below threshold - skip
+                logger.debug("⚠️ SKIPPED: %s (strength=%d below threshold)", rel.related_entity, rel.relationship_strength)
+        
+        if not relationship_lines:
+            logger.debug("No relationships met strength threshold (>=5) for character: %s", character_name)
+            return None
+        
+        content = "💕 IMPORTANT RELATIONSHIPS:\n" + "\n".join(relationship_lines)
+        
+        # Estimate token cost (roughly 20 tokens per relationship)
+        estimated_tokens = len(relationship_lines) * 20 + 10
+        
+        logger.info("✅ RELATIONSHIPS COMPONENT: Created for %s with %d relationships (high=%d, medium=%d)", 
+                   character_name, len(relationship_lines), high_priority_count, medium_priority_count)
+        
+        return PromptComponent(
+            type=PromptComponentType.CHARACTER_RELATIONSHIPS,  # Character's defined relationships
+            content=content,
+            priority=9,  # High priority - important for character authenticity
+            token_cost=estimated_tokens,
+            required=False,  # Optional - only if relationships defined
+            metadata={
+                "relationship_count": len(relationship_lines),
+                "high_priority_count": high_priority_count,
+                "medium_priority_count": medium_priority_count,
+                "character_name": character_name,
+                "relationship_type": "character_defined"  # Distinguish from user-character relationships
+            }
+        )
+        
+    except Exception as e:
+        logger.error("❌ Failed to create character defined relationships component for %s: %s", character_name, e)
+        return None
+
+
 async def create_knowledge_context_component(
     user_facts: list,
     priority: int = 16,

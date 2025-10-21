@@ -2477,6 +2477,7 @@ class MessageProcessor:
             create_ai_identity_guidance_component,
             create_character_personality_component,
             create_character_voice_component,
+            create_character_defined_relationships_component,
             create_final_response_guidance_component,
         )
         from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
@@ -2556,7 +2557,21 @@ class MessageProcessor:
                 else:
                     logger.warning(f"⚠️ STRUCTURED CONTEXT: No character voice found for {bot_name}")
                 
-                # TODO: Component 11: Character Relationships (Priority 11) - NOT IMPLEMENTED
+                # Component 9: Character Defined Relationships (Priority 9) - Important people in character's life
+                # This component surfaces relationships defined in the CDL database (character_relationships table)
+                # Examples: Gabriel's Cynthia, NotTaylor's Silas, etc.
+                relationships_component = await create_character_defined_relationships_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name
+                )
+                if relationships_component:
+                    assembler.add_component(relationships_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character defined relationships for {bot_name}")
+                else:
+                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No defined relationships found for {bot_name}")
+                
+                # TODO: Component 11: User-Character Relationship Dynamics (Priority 11) - NOT IMPLEMENTED
+                # Note: This is DIFFERENT from character_defined_relationships above
                 # Reason: Requires relationship tracking system for user-character dynamics
                 # Complexity: High - needs relationship state management, key moments, interaction patterns
                 # Requires: Relationship data from PostgreSQL (relationship_type, connection_strength, key_moments)
