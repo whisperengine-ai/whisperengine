@@ -2703,21 +2703,91 @@ class MessageProcessor:
         # ================================
         # COMPONENT 7: Memory Narrative (or anti-hallucination warning)
         # ================================
+        # COMPONENT 13: Memory Context (Structured vs Enriched)
+        # ================================
         # Note: Uses legacy MEMORY type at priority 13 (CDL EPISODIC_MEMORIES priority)
-        memory_narrative = await self._build_memory_narrative_structured(
-            message_context.user_id, 
-            relevant_memories
-        )
         
-        if memory_narrative:
-            assembler.add_component(create_memory_component(
-                f"RELEVANT MEMORIES: {memory_narrative}",
-                priority=13  # Priority 13: Episodic memories from CDL mapping
-            ))
-            logger.info(f"✅ STRUCTURED CONTEXT: Added memory narrative ({len(memory_narrative)} chars)")
+        logger.info("🔍 DEBUG: Entering memory context section - checking enriched summaries flag")
+        
+        # Check if enriched summaries are enabled - if so, skip choppy memory narrative
+        if os.getenv('ENABLE_ENRICHED_SUMMARIES', 'false').lower() == 'true':
+            logger.debug("📚 Using enriched summaries instead of choppy memory narrative")
+            
+            # Still add semantic memories directly (without choppy narrative formatting)
+            if relevant_memories:
+                logger.debug(f"Found {len(relevant_memories)} relevant memories to format")
+                # Format semantic memories cleanly with structure
+                conversation_memories = []
+                user_facts = []
+                
+                # Get character name for personalized conversation turn labels
+                character_display_name = self.character_name.capitalize() if self.character_name else "Bot"
+                
+                for memory in relevant_memories[:10]:  # Top 10 semantic memories
+                    content = memory.get('content', '').strip()
+                    metadata = memory.get('metadata', {})
+                    
+                    if not content:
+                        continue
+                        
+                    # Separate user facts from conversation memories
+                    if metadata.get("type") == "user_fact":
+                        fact = metadata.get("fact", content)[:300]
+                        if fact:
+                            user_facts.append(fact)
+                    else:
+                        # Format conversation memories with structure
+                        bot_response = metadata.get('bot_response', '') if isinstance(metadata, dict) else ''
+                        
+                        if bot_response:
+                            # Full conversation turn format
+                            conversation_turn = f"User: {content[:300]}\n{character_display_name}: {bot_response[:300]}"
+                        else:
+                            # Check if already formatted, otherwise use content as-is
+                            if "User:" in content and (character_display_name in content or "Bot:" in content):
+                                conversation_turn = content[:500]
+                            else:
+                                conversation_turn = content[:500]
+                        
+                        conversation_memories.append(conversation_turn)
+                
+                # Build RELEVANT MEMORIES section
+                memory_parts = []
+                if user_facts:
+                    memory_parts.append(f"USER FACTS: {'; '.join(user_facts)}")
+                
+                if conversation_memories:
+                    memory_parts.append(f"PAST CONVERSATIONS:\n🕐 RECENT (Last 24 hours):\n" + "\n\n".join(conversation_memories))
+                
+                if memory_parts:
+                    semantic_memories_text = "RELEVANT MEMORIES: " + "\n\n".join(memory_parts)
+                    assembler.add_component(create_memory_component(
+                        semantic_memories_text,
+                        priority=13  # Priority 13: Episodic memories from CDL mapping
+                    ))
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added {len(conversation_memories)} conversations + {len(user_facts)} facts (enriched mode)")
+                else:
+                    assembler.add_component(create_anti_hallucination_component(priority=13))
+                    logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no valid memories)")
+            else:
+                assembler.add_component(create_anti_hallucination_component(priority=13))
+                logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories found)")
         else:
-            assembler.add_component(create_anti_hallucination_component(priority=13))
-            logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories)")
+            # Use traditional choppy memory narrative system
+            memory_narrative = await self._build_memory_narrative_structured(
+                message_context.user_id, 
+                relevant_memories
+            )
+            
+            if memory_narrative:
+                assembler.add_component(create_memory_component(
+                    f"RELEVANT MEMORIES: {memory_narrative}",
+                    priority=13  # Priority 13: Episodic memories from CDL mapping
+                ))
+                logger.info(f"✅ STRUCTURED CONTEXT: Added memory narrative ({len(memory_narrative)} chars)")
+            else:
+                assembler.add_component(create_anti_hallucination_component(priority=13))
+                logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories)")
         
         # ================================
         # COMPONENT 8: Conversation Summary - REMOVED (October 2025)
@@ -2739,6 +2809,52 @@ class MessageProcessor:
         # - ✅ RECENT HISTORY: 15 message pairs (immediate conversation continuity)
         #
         # This provides complete context without vague summaries that add no value.
+        
+        # ================================
+        # COMPONENT 8B: Enriched Conversation Summaries (EXPERIMENTAL - October 2025)
+        # ================================
+        # NEW: High-quality LLM-generated summaries from enrichment worker
+        # These replace the removed inline summarization with proper background summaries
+        # Feature flagged for testing and gradual rollout
+        
+        if os.getenv('ENABLE_ENRICHED_SUMMARIES', 'false').lower() == 'true':
+            try:
+                from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                bot_name = get_normalized_bot_name_from_env()
+                enriched_summaries = await self._retrieve_enriched_summaries(
+                    user_id=message_context.user_id,
+                    bot_name=bot_name,
+                    days_back=7,   # Only recent week
+                    limit=1        # Usually just the most recent summary
+                )
+                
+                if enriched_summaries:
+                    # Use only the most recent summary for context
+                    summary = enriched_summaries[0]  # Most recent
+                    start_date = summary['start_timestamp'].strftime('%Y-%m-%d')
+                    end_date = summary['end_timestamp'].strftime('%Y-%m-%d')
+                    timeframe = f"{start_date}" if start_date == end_date else f"{start_date} to {end_date}"
+                    
+                    summary_text = f"RECENT CONVERSATION SUMMARY:\n"
+                    summary_text += f"[{timeframe}] ({summary['message_count']} messages)\n"
+                    summary_text += f"{summary['summary_text']}\n"
+                    
+                    if summary.get('key_topics'):
+                        topics = ', '.join(summary['key_topics'][:3])  # Top 3 topics
+                        summary_text += f"Key topics: {topics}\n"
+                    
+                    assembler.add_component(create_memory_component(
+                        summary_text,
+                        priority=14  # Priority 14: Between memories (13) and knowledge context (16)
+                    ))
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added most recent enriched summary ({timeframe})")
+                else:
+                    logger.debug("📚 No recent enriched summaries available for context")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to add enriched summaries to context: {e}")
+        else:
+            logger.debug("📚 Enriched summaries disabled (ENABLE_ENRICHED_SUMMARIES=false)")
         
         # ================================
         # COMPONENT 8: Communication Style Guidance
@@ -3439,6 +3555,10 @@ class MessageProcessor:
         🚨 FIX: Memories are stored as individual messages, not structured "User: X Bot: Y" format.
         We now work with the actual stored content format.
         """
+        # Check if memory summarization is disabled
+        if not os.getenv('ENABLE_MEMORY_SUMMARIZATION', 'true').lower() == 'true':
+            return ""
+            
         # Clean up memory formatting
         clean_content = memory_part.replace('[Memory:', '').replace('[Previous conversation:', '').replace(']', '').strip()
         
@@ -6815,6 +6935,82 @@ class MessageProcessor:
                     
         except Exception as e:
             logger.error("Sprint 6 IntelligenceOrchestrator coordination failed: %s", str(e))
+
+    async def _retrieve_enriched_summaries(
+        self, 
+        user_id: str, 
+        bot_name: str, 
+        days_back: int = 7,  # Reduced from 30 - only recent summaries
+        limit: int = 2       # Reduced from 10 - most recent 1-2 summaries max
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve enriched conversation summaries from PostgreSQL.
+        
+        These are high-quality LLM-generated summaries created by the enrichment worker
+        in 24-hour windows. Strategy: retrieve only the most recent 1-2 summaries
+        to provide background context without overwhelming the prompt.
+        
+        Args:
+            user_id: User identifier
+            bot_name: Bot name for filtering summaries
+            days_back: How many days back to look (default 7 for recent context)
+            limit: Maximum summaries (default 2 - usually just 1 latest)
+            
+        Returns:
+            List of summary dictionaries with text, topics, timeframe, etc.
+        """
+        postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+        if not postgres_pool:
+            logger.debug("PostgreSQL pool not available - no enriched summaries")
+            return []
+        
+        try:
+            from datetime import datetime, timedelta
+            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            
+            async with postgres_pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT 
+                        summary_text,
+                        start_timestamp,
+                        end_timestamp,
+                        message_count,
+                        key_topics,
+                        emotional_tone,
+                        confidence_score,
+                        created_at
+                    FROM conversation_summaries
+                    WHERE user_id = $1 
+                      AND bot_name = $2
+                      AND start_timestamp >= $3
+                      AND confidence_score >= 0.3  -- Only high-confidence summaries
+                    ORDER BY start_timestamp DESC
+                    LIMIT $4
+                """, user_id, bot_name, cutoff_date, limit)
+                
+                summaries = []
+                for row in rows:
+                    summaries.append({
+                        'summary_text': row['summary_text'],
+                        'start_timestamp': row['start_timestamp'],
+                        'end_timestamp': row['end_timestamp'],
+                        'message_count': row['message_count'],
+                        'key_topics': row['key_topics'] or [],
+                        'emotional_tone': row['emotional_tone'],
+                        'confidence_score': row['confidence_score'],
+                        'created_at': row['created_at']
+                    })
+                
+                if summaries:
+                    logger.info(f"📚 Retrieved {len(summaries)} high-confidence enriched summaries for {user_id}")
+                else:
+                    logger.debug(f"📚 No enriched summaries found for {user_id} and {bot_name}")
+                
+                return summaries
+                
+        except Exception as e:
+            logger.error(f"Failed to retrieve enriched summaries: {e}")
+            return []
 
 
 def create_message_processor(bot_core, memory_manager, llm_client, **kwargs) -> MessageProcessor:

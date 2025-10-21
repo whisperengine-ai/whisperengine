@@ -2850,6 +2850,15 @@ class VectorMemoryStore:
         Returns:
             Dict with 'topic_summary', 'conversation_themes', and metadata
         """
+        # Check if memory summarization is enabled
+        enable_summarization = os.getenv("ENABLE_MEMORY_SUMMARIZATION", "true").lower() in ("true", "1", "yes", "on")
+        if not enable_summarization:
+            return {
+                "topic_summary": "",
+                "conversation_themes": "",
+                "recommendation_method": "disabled"
+            }
+        
         try:
             if not conversation_history:
                 return {

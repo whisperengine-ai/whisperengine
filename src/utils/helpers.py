@@ -157,6 +157,11 @@ def generate_conversation_summary(recent_messages, user_id: str, max_length: int
     Returns:
         Concise conversation summary string, or empty string if no meaningful content
     """
+    # Check if memory summarization is enabled
+    enable_summarization = os.getenv("ENABLE_MEMORY_SUMMARIZATION", "true").lower() in ("true", "1", "yes", "on")
+    if not enable_summarization:
+        return ""
+    
     try:
         if not recent_messages or len(recent_messages) < 2:
             return ""

@@ -30,16 +30,27 @@ print_error() {
 # Get parameters
 DOCKERHUB_USERNAME="${1}"
 VERSION="${2:-latest}"
+NO_CACHE_FLAG=""
+
+# Check for --no-cache flag in any position
+for arg in "$@"; do
+    if [[ "$arg" == "--no-cache" ]]; then
+        NO_CACHE_FLAG="--no-cache"
+        print_warning "Building with --no-cache (fresh build, slower but ensures latest changes)"
+        break
+    fi
+done
 
 # Validate username
 if [[ -z "$DOCKERHUB_USERNAME" ]]; then
     print_error "DockerHub username is required"
     echo ""
-    echo "Usage: $0 [DOCKERHUB_USERNAME] [VERSION]"
+    echo "Usage: $0 [DOCKERHUB_USERNAME] [VERSION] [--no-cache]"
     echo ""
     echo "Examples:"
     echo "  $0 myusername                    # Push with 'latest' tag"
     echo "  $0 myusername v1.0.0            # Push with version tag"
+    echo "  $0 myusername v1.0.0 --no-cache # Fresh build without cache"
     echo "  $0 whisperengine-ai v1.0.0      # Push to whisperengine-ai org"
     echo ""
     exit 1
@@ -89,11 +100,16 @@ echo ""
 
 # Build and push multi-platform image
 print_status "Building and pushing multi-platform image..."
+if [[ -n "$NO_CACHE_FLAG" ]]; then
+    print_warning "Using --no-cache: This will be slower but ensures fresh build"
+fi
+
 if docker buildx build \
     --platform linux/amd64,linux/arm64 \
     -t ${DOCKERHUB_USERNAME}/whisperengine:${VERSION} \
     -t ${DOCKERHUB_USERNAME}/whisperengine:latest \
     -f Dockerfile \
+    ${NO_CACHE_FLAG} \
     --push \
     .; then
     print_success "WhisperEngine Assistant container built and pushed successfully (multi-platform)"
@@ -117,6 +133,7 @@ if docker buildx build \
     -t ${DOCKERHUB_USERNAME}/whisperengine-ui:${VERSION} \
     -t ${DOCKERHUB_USERNAME}/whisperengine-ui:latest \
     -f cdl-web-ui/Dockerfile \
+    ${NO_CACHE_FLAG} \
     --push \
     ./cdl-web-ui; then
     print_success "CDL Web UI container built and pushed successfully (multi-platform)"

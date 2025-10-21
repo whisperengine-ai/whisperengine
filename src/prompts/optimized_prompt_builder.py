@@ -4,6 +4,7 @@ Creates focused prompts that adapt to context while staying under token limits
 """
 
 import logging
+import os
 from typing import Dict, List, Optional, Any
 from src.memory.conversation_summarizer import AdvancedConversationSummarizer
 
@@ -497,6 +498,11 @@ class OptimizedPromptBuilder:
         WHEN TO RECONSIDER: If conversation quality suffers for very long histories (>50 messages),
         implement caching strategy to use LLM summarization once per conversation session.
         """
+        # Check if memory summarization is enabled
+        enable_summarization = os.getenv("ENABLE_MEMORY_SUMMARIZATION", "true").lower() in ("true", "1", "yes", "on")
+        if not enable_summarization:
+            return ""
+        
         try:
             # Base topic extraction
             topics = set()
