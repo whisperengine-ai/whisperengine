@@ -494,6 +494,8 @@ class VectorMemoryStore:
             ("semantic_key", models.PayloadSchemaType.KEYWORD, "Semantic grouping"),
             ("emotional_context", models.PayloadSchemaType.KEYWORD, "Emotional context"),
             ("content_hash", models.PayloadSchemaType.INTEGER, "Content hash (deduplication)"),
+            ("channel_id", models.PayloadSchemaType.KEYWORD, "Channel-based filtering"),
+            ("channel_type", models.PayloadSchemaType.KEYWORD, "Channel privacy filtering (dm/guild)"),
             # 🎯 REMOVED: bot_name index - collection isolation makes this redundant
         ]
         
@@ -4170,6 +4172,7 @@ class VectorMemoryManager:
         user_message: str,
         bot_response: str,
         channel_id: Optional[str] = None,
+        channel_type: Optional[str] = None,
         pre_analyzed_emotion_data: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         **kwargs
@@ -4207,6 +4210,7 @@ class VectorMemoryManager:
                 timestamp=base_timestamp,
                 metadata={
                     "channel_id": channel_id,
+                    "channel_type": channel_type,
                     "emotion_data": pre_analyzed_emotion_data,
                     "role": "user",
                     **(metadata or {})
@@ -4224,6 +4228,7 @@ class VectorMemoryManager:
                 timestamp=bot_timestamp,
                 metadata={
                     "channel_id": channel_id,
+                    "channel_type": channel_type,
                     "role": "assistant",
                     **(metadata or {})
                 }

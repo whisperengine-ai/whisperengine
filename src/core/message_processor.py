@@ -6322,6 +6322,8 @@ class MessageProcessor:
                     user_id=message_context.user_id,
                     user_message=message_context.content,
                     bot_response=clean_response,  # Use clean_response without footer
+                    channel_id=message_context.channel_id,
+                    channel_type=message_context.channel_type,
                     pre_analyzed_emotion_data=ai_components.get('emotion_data'),  # User emotion
                     metadata=bot_metadata  # Bot emotion in metadata
                 )
