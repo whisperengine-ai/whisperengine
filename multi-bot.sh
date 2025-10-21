@@ -31,6 +31,7 @@ AVAILABLE_BOTS=(
     "dotty:9098:Character Bot"
     "aetheris:9099:Conscious AI"
     "nottaylor:9100:Taylor Swift Parody"
+    "assistant:9101:AI Assistant"
     "aethys:3007:Omnipotent Entity"
 )
 
