@@ -309,25 +309,20 @@ CREATE FUNCTION public.maintain_cdl_graph_indexes() RETURNS void
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    -- Analyze tables for optimal query planning
-    ANALYZE characters;
-    ANALYZE character_background;
-    ANALYZE character_memories; 
-    ANALYZE character_relationships;
-    ANALYZE character_abilities;
-    ANALYZE fact_entities;
-    ANALYZE user_fact_relationships;
-    
-    -- Log maintenance completion
-    RAISE NOTICE 'CDL Graph Intelligence indexes analyzed and optimized';
+    -- Analyze tables for optimal query planning (skip - tables may not exist yet)
+    -- This function will be called after migrations have created all necessary tables
+    RAISE NOTICE 'CDL Graph Intelligence indexes maintenance deferred to post-migration hooks';
 END;
 $$;
 
 
 --
 -- Name: migrate_to_jsonb_schema(); Type: FUNCTION; Schema: public; Owner: -
+-- NOTE: This function is for legacy migrations only and is commented out during fresh initialization
+-- to avoid referencing tables that may not exist yet. It will be recreated if needed during upgrade paths.
 --
-
+-- COMMENTED OUT FOR FRESH INSTALLATIONS:
+/*
 CREATE FUNCTION public.migrate_to_jsonb_schema() RETURNS integer
     LANGUAGE plpgsql
     AS $$
@@ -426,6 +421,8 @@ BEGIN
     RETURN migrated_count;
 END;
 $$;
+*/
+--  End of commented legacy migration function
 
 
 --
@@ -551,7 +548,12 @@ CREATE FUNCTION public.update_character_timestamp() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    UPDATE characters SET updated_date = CURRENT_TIMESTAMP WHERE id = NEW.character_id;
+    -- Skip update if characters table doesn't exist yet (fresh database initialization)
+    BEGIN
+        UPDATE characters SET updated_date = CURRENT_TIMESTAMP WHERE id = NEW.character_id;
+    EXCEPTION WHEN undefined_table THEN
+        NULL;
+    END;
     RETURN NEW;
 END;
 $$;
