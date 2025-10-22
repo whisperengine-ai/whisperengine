@@ -33,7 +33,6 @@ CDL_TABLES = [
     'character_relationships',
     'character_conversation_modes',
     'character_response_modes',
-    'character_emotional_states',
     'character_communication_patterns',
     'character_response_patterns',
     'character_context_guidance',

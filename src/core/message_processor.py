@@ -409,14 +409,8 @@ class MessageProcessor:
             try:
                 from src.intelligence.character_emotional_state import create_character_emotional_state_manager
                 
-                # Check if postgres_pool is now available
-                postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
-                if postgres_pool:
-                    self.character_state_manager = create_character_emotional_state_manager(postgres_pool)
-                    logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (lazy)")
-                else:
-                    logger.debug("🎭 CHARACTER STATE: PostgreSQL pool still not available - state tracking disabled")
-                    self.character_state_manager = None
+                self.character_state_manager = create_character_emotional_state_manager()
+                logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (in-memory)")
             
             except ImportError as e:
                 logger.warning("🎭 CHARACTER STATE: Tracking not available: %s", e)

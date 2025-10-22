@@ -176,7 +176,7 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f en
 - ✅ **JSON character files are DEPRECATED** - database is the single source of truth
 
 ### **Current CDL Database Tables** (50+ tables as of Oct 2025)
-Tables include: `character_identity_details`, `character_attributes`, `character_communication_patterns`, `character_response_modes`, `character_conversation_modes`, `character_emotional_states`, `character_background`, `character_interests`, `character_relationships`, `character_memories`, `character_question_templates`, `character_entity_categories`, `character_learning_timeline`, and 35+ more. Run `\dt character_*` in PostgreSQL to see full list.
+Tables include: `character_identity_details`, `character_attributes`, `character_communication_patterns`, `character_response_modes`, `character_conversation_modes`, `character_background`, `character_interests`, `character_relationships`, `character_memories`, `character_question_templates`, `character_entity_categories`, `character_learning_timeline`, and 35+ more. Run `\dt character_*` in PostgreSQL to see full list.
 
 ### **Character Archetypes**
 1. **Real-World** (Elena, Marcus, Jake) - Honest AI disclosure when asked directly

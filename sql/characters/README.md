@@ -133,7 +133,6 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml exec -T po
 ## 🔍 Skipped Tables (No character_id column)
 
 These tables exist in the database but don't have a `character_id` foreign key:
-- `character_emotional_states`
 - `character_response_patterns`
 - `character_context_guidance`
 - `character_conversation_directives`

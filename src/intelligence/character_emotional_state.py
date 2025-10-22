@@ -22,10 +22,9 @@ Like humans, character emotional states gradually return to baseline (homeostasi
 but recent experiences create temporary shifts that affect current responses.
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Dict, Optional, Any, List
 from enum import Enum
 
@@ -351,23 +350,19 @@ class CharacterEmotionalState:
 
 class CharacterEmotionalStateManager:
     """
-    Manages character emotional states across all users and persists to PostgreSQL.
+    Manages character emotional states across conversations in memory.
     
     Handles:
-    - Loading/saving emotional states from database
     - Applying time decay (homeostasis)
     - Updating states based on conversations
     - Generating prompt guidance for current states
+    
+    Note: States are stored in memory per session. For persistence across sessions,
+    use InfluxDB temporal analysis via TemporalIntelligenceClient.
     """
     
-    def __init__(self, db_pool):
-        """
-        Initialize manager with database connection pool.
-        
-        Args:
-            db_pool: PostgreSQL connection pool (asyncpg)
-        """
-        self.db_pool = db_pool
+    def __init__(self):
+        """Initialize manager with in-memory cache."""
         self._state_cache: Dict[str, CharacterEmotionalState] = {}
         logger.info("🎭 CHARACTER STATE MANAGER: Initialized")
     
@@ -380,7 +375,7 @@ class CharacterEmotionalStateManager:
         """
         Get character's emotional state for a specific user.
         
-        Loads from database if available, otherwise creates new state with baseline traits.
+        Returns cached state if available, otherwise creates new state with baseline traits.
         
         Args:
             character_name: Name of the character
@@ -397,14 +392,6 @@ class CharacterEmotionalStateManager:
             state = self._state_cache[cache_key]
             # Apply time decay before returning
             state.apply_time_decay()
-            return state
-        
-        # Try to load from database
-        state = await self._load_from_database(character_name, user_id)
-        
-        if state:
-            state.apply_time_decay()
-            self._state_cache[cache_key] = state
             return state
         
         # Create new state with baseline traits
@@ -449,59 +436,9 @@ class CharacterEmotionalStateManager:
         state = await self.get_character_state(character_name, user_id)
         state.update_from_bot_emotion(bot_emotion_data, user_emotion_data, interaction_quality)
         
-        # Save to database asynchronously (don't block)
-        asyncio.create_task(self._save_to_database(state))
-        
         return state
-    
-    async def _load_from_database(self, character_name: str, user_id: str) -> Optional[CharacterEmotionalState]:
-        """Load character state from PostgreSQL."""
-        if not self.db_pool:
-            return None
-        
-        try:
-            async with self.db_pool.acquire() as conn:
-                row = await conn.fetchrow("""
-                    SELECT state_data, last_updated
-                    FROM character_emotional_states
-                    WHERE character_name = $1 AND user_id = $2
-                """, character_name, user_id)
-                
-                if row:
-                    import json
-                    state_data = json.loads(row['state_data'])
-                    state = CharacterEmotionalState.from_dict(state_data)
-                    logger.debug("📥 Loaded character state for %s from database", character_name)
-                    return state
-                    
-        except Exception as e:
-            logger.warning("Failed to load character state from database: %s", e)
-        
-        return None
-    
-    async def _save_to_database(self, state: CharacterEmotionalState):
-        """Save character state to PostgreSQL."""
-        if not self.db_pool:
-            return
-        
-        try:
-            import json
-            state_json = json.dumps(state.to_dict())
-            
-            async with self.db_pool.acquire() as conn:
-                await conn.execute("""
-                    INSERT INTO character_emotional_states (character_name, user_id, state_data, last_updated)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (character_name, user_id)
-                    DO UPDATE SET state_data = $3, last_updated = $4
-                """, state.character_name, state.user_id, state_json, state.last_updated)
-                
-                logger.debug("💾 Saved character state for %s to database", state.character_name)
-                
-        except Exception as e:
-            logger.warning("Failed to save character state to database: %s", e)
 
 
-def create_character_emotional_state_manager(db_pool) -> CharacterEmotionalStateManager:
+def create_character_emotional_state_manager() -> CharacterEmotionalStateManager:
     """Factory function for creating character emotional state manager."""
-    return CharacterEmotionalStateManager(db_pool)
+    return CharacterEmotionalStateManager()
