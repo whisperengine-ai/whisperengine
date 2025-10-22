@@ -184,7 +184,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -281,7 +281,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> last()",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> last()",
           "refId": "A"
         }
       ],
@@ -305,32 +305,32 @@
                 "calm_and_balanced": {
                   "color": "green",
                   "index": 0,
-                  "text": "😌 Calm & Balanced"
+                  "text": "\ud83d\ude0c Calm & Balanced"
                 },
                 "enthusiastic": {
                   "color": "orange",
                   "index": 1,
-                  "text": "🔥 Enthusiastic"
+                  "text": "\ud83d\udd25 Enthusiastic"
                 },
                 "stressed": {
                   "color": "red",
                   "index": 2,
-                  "text": "😰 Stressed"
+                  "text": "\ud83d\ude30 Stressed"
                 },
                 "content": {
                   "color": "light-green",
                   "index": 3,
-                  "text": "😊 Content"
+                  "text": "\ud83d\ude0a Content"
                 },
                 "empathetic": {
                   "color": "blue",
                   "index": 4,
-                  "text": "💙 Empathetic"
+                  "text": "\ud83d\udc99 Empathetic"
                 },
                 "confident": {
                   "color": "purple",
                   "index": 5,
-                  "text": "💪 Confident"
+                  "text": "\ud83d\udcaa Confident"
                 }
               },
               "type": "value"
@@ -376,7 +376,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"dominant_state\")\n  |> last()\n  |> map(fn: (r) => ({ r with _value: r.dominant_state }))",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"dominant_state\")\n  |> last()\n  |> map(fn: (r) => ({ r with _value: r.dominant_state }))",
           "refId": "A"
         }
       ],
@@ -532,7 +532,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bot_emotion\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"intensity\")\n  |> group(columns: [\"emotion\"])\n  |> count()",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bot_emotion\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"intensity\")\n  |> group(columns: [\"emotion\"])\n  |> count()",
           "refId": "A"
         }
       ],
@@ -657,7 +657,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bot_emotion\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r.emotion == \"joy\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bot_emotion\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r.emotion == \"joy\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -797,7 +797,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -890,7 +890,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> last()",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> last()",
           "refId": "A"
         }
       ],
@@ -958,7 +958,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\")\n  |> count()",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\")\n  |> count()",
           "refId": "A"
         }
       ],
@@ -1028,7 +1028,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"emotional_resonance\")\n  |> mean()",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"emotional_resonance\")\n  |> mean()",
           "refId": "A"
         }
       ],
@@ -1098,7 +1098,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"empathy\")\n  |> last()",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"empathy\")\n  |> last()",
           "refId": "A"
         }
       ],
@@ -1168,7 +1168,7 @@
             "type": "influxdb",
             "uid": "influxdb-whisperengine"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"stress\")\n  |> last()",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"stress\")\n  |> last()",
           "refId": "A"
         }
       ],
@@ -1187,12 +1187,17 @@
   "templating": {
     "list": [
       {
+        "allValue": null,
         "current": {
           "selected": false,
-          "text": "elena",
-          "value": "elena"
+          "text": "assistant",
+          "value": "assistant"
         },
+        "description": "Select a bot character. Add new ones by including them in the CSV list.",
+        "error": null,
+        "filters": [],
         "hide": 0,
+        "hideLabel": false,
         "includeAll": false,
         "label": "Bot Character",
         "multi": false,
@@ -1200,78 +1205,42 @@
         "options": [
           {
             "selected": true,
-            "text": "elena",
-            "value": "elena"
-          },
-          {
-            "selected": false,
-            "text": "marcus",
-            "value": "marcus"
-          },
-          {
-            "selected": false,
-            "text": "gabriel",
-            "value": "gabriel"
-          },
-          {
-            "selected": false,
-            "text": "sophia",
-            "value": "sophia"
-          },
-          {
-            "selected": false,
-            "text": "jake",
-            "value": "jake"
-          },
-          {
-            "selected": false,
-            "text": "ryan",
-            "value": "ryan"
-          },
-          {
-            "selected": false,
-            "text": "dream",
-            "value": "dream"
-          },
-          {
-            "selected": false,
-            "text": "aethys",
-            "value": "aethys"
-          },
-          {
-            "selected": false,
-            "text": "aetheris",
-            "value": "aetheris"
-          },
-          {
-            "selected": false,
-            "text": "dotty",
-            "value": "dotty"
+            "text": "assistant",
+            "value": "assistant"
           }
         ],
-        "query": "elena,marcus,gabriel,sophia,jake,ryan,dream,aethys,aetheris,dotty",
+        "query": "assistant,aetheris,aethys,dotty,dream,elena,gabriel,jake,marcus,nottaylor,ryan,sophia",
         "queryValue": "",
         "skipUrlSync": false,
+        "sort": 1,
         "type": "custom"
       },
       {
+        "allValue": null,
         "current": {
           "selected": false,
-          "text": "672814231002939413",
-          "value": "672814231002939413"
+          "text": "",
+          "value": ""
         },
+        "description": "Enter a User ID to view their conversation data with the selected bot. Leave empty to see all users.",
+        "error": null,
+        "filters": [],
         "hide": 0,
-        "label": "User ID",
+        "hideLabel": false,
+        "label": "User ID (optional)",
+        "multi": false,
         "name": "user_id",
         "options": [
           {
             "selected": true,
-            "text": "672814231002939413",
-            "value": "672814231002939413"
+            "text": "",
+            "value": ""
           }
         ],
-        "query": "672814231002939413",
+        "query": "",
+        "queryValue": "",
         "skipUrlSync": false,
+        "sort": 1,
         "type": "textbox"
       }
     ]
