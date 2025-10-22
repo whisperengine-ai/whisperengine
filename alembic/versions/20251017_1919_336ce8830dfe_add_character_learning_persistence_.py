@@ -1,7 +1,7 @@
 """add_character_learning_persistence_tables
 
 Revision ID: 336ce8830dfe
-Revises: 1200_add_cdl_table_and_column_comments
+Revises: a1b2c3d4e5f6
 Create Date: 2025-10-17 19:19:40.290194+00:00
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '336ce8830dfe'
-down_revision: Union[str, None] = '1200_add_cdl_table_and_column_comments'
+down_revision: Union[str, None] = 'a1b2c3d4e5f6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
