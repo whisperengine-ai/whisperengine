@@ -685,10 +685,12 @@ class BotEventHandlers:
                         logger.info("🎯 FOOTER DEBUG: conversation_intelligence content: %s", ai_components['conversation_intelligence'])
                     logger.info("🎯 FOOTER DEBUG: memory_count: %d", memory_count)
                     logger.info("🎯 FOOTER DEBUG: processing_time_ms: %d", result.processing_time_ms or 0)
+                    logger.info("🎯 FOOTER DEBUG: llm_time_ms: %d", result.llm_time_ms or 0)
                     
                     status_footer = generate_discord_status_footer(
                         ai_components=ai_components,
                         processing_time_ms=result.processing_time_ms,
+                        llm_time_ms=result.llm_time_ms,
                         memory_count=memory_count
                     )
                     
@@ -927,6 +929,7 @@ class BotEventHandlers:
                     status_footer = generate_discord_status_footer(
                         ai_components=ai_components_debug,
                         processing_time_ms=result.processing_time_ms,
+                        llm_time_ms=result.llm_time_ms,
                         memory_count=result.metadata.get('memory_count', 0) if result.metadata else 0
                     )
                     

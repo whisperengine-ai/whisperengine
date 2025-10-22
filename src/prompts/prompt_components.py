@@ -55,6 +55,9 @@ class PromptComponentType(Enum):
     CONVERSATION_SUMMARY = "conversation_summary"       # Priority 14: Long-term conversation themes
     UNIFIED_INTELLIGENCE = "unified_intelligence"       # Priority 15: Coordinated AI intelligence
     
+    # Emotional intelligence (Priority 9 - NEW)
+    EMOTIONAL_CONTEXT = "emotional_context"             # Priority 9: User/bot emotional state + InfluxDB trajectory
+    
     # Context and style (Priority 16-17)
     KNOWLEDGE_CONTEXT = "knowledge_context"             # Priority 16: Intent-based facts
     RESPONSE_STYLE = "response_style"                   # Priority 17: Final style reminder

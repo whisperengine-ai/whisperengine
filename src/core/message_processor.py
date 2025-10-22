@@ -81,6 +81,7 @@ class ProcessingResult:
     success: bool = True
     error_message: Optional[str] = None
     processing_time_ms: Optional[int] = None
+    llm_time_ms: Optional[int] = None  # LLM-specific processing time
     memory_stored: bool = False
     metadata: Optional[Dict[str, Any]] = None
 
@@ -886,6 +887,10 @@ class MessageProcessor:
             end_time = datetime.now()
             processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
+            # Extract LLM timing from ai_components
+            llm_time_ms = ai_components.get('llm_time_ms', 0)
+            overhead_ms = processing_time_ms - llm_time_ms if llm_time_ms else processing_time_ms
+            
             # Record per-message performance metrics to InfluxDB
             if self.fidelity_metrics:
                 self.fidelity_metrics.record_performance_metric(
@@ -900,7 +905,11 @@ class MessageProcessor:
                         "knowledge_stored": bool(knowledge_stored),
                         "response_length": int(len(response) if response else 0),
                         "has_attachments": bool(message_context.attachments),
-                        "channel_type": str(message_context.channel_type or "unknown")
+                        "channel_type": str(message_context.channel_type or "unknown"),
+                        # NEW: Separate LLM timing tracking
+                        "llm_time_ms": int(llm_time_ms),
+                        "overhead_ms": int(overhead_ms),
+                        "llm_percentage": float(round((llm_time_ms / processing_time_ms * 100), 1)) if processing_time_ms > 0 else 0.0
                     }
                 )
             
@@ -927,10 +936,14 @@ class MessageProcessor:
                 processing_time_ms=processing_time_ms
             )
             
+            # Extract LLM timing from ai_components
+            llm_time_ms = ai_components.get('llm_time_ms')
+            
             return ProcessingResult(
                 response=response,
                 success=True,
                 processing_time_ms=processing_time_ms,
+                llm_time_ms=llm_time_ms,
                 memory_stored=memory_stored,
                 metadata=enriched_metadata
             )
@@ -1013,17 +1026,18 @@ class MessageProcessor:
             if user_emotion and isinstance(user_emotion, dict):
                 try:
                     # Record user emotion for temporal tracking and character tuning
+                    # FIX: Use 'emotional_intensity' field (RoBERTa standard), not 'intensity'
                     await self.temporal_client.record_user_emotion(
                         bot_name=bot_name,
                         user_id=message_context.user_id,
                         primary_emotion=user_emotion.get('primary_emotion', 'neutral'),
-                        intensity=user_emotion.get('intensity', 0.0),
-                        confidence=user_emotion.get('confidence', 0.0)
+                        intensity=user_emotion.get('emotional_intensity', user_emotion.get('intensity', 0.0)),  # Try emotional_intensity first, fallback to intensity
+                        confidence=user_emotion.get('roberta_confidence', user_emotion.get('confidence', 0.0))  # Try roberta_confidence first
                     )
                     logger.debug(
                         "📊 TEMPORAL: Recorded user emotion '%s' to InfluxDB (intensity: %.2f)",
                         user_emotion.get('primary_emotion', 'neutral'),
-                        user_emotion.get('intensity', 0.0)
+                        user_emotion.get('emotional_intensity', user_emotion.get('intensity', 0.0))
                     )
                 except AttributeError:
                     # record_user_emotion method doesn't exist yet - log for now
@@ -2571,6 +2585,22 @@ class MessageProcessor:
                 else:
                     logger.warning(f"⚠️ STRUCTURED CONTEXT: No character voice found for {bot_name}")
                 
+                # ================================
+                # COMPONENT 9: Emotional Intelligence Context (Priority 9)
+                # ================================
+                # 🎭 EMOTIONAL INTELLIGENCE: Unified user + bot emotional state with InfluxDB trajectory
+                # This replaces the hackish Qdrant keyword search trajectory with proper time-series analysis
+                try:
+                    from src.prompts.emotional_intelligence_component import create_emotional_intelligence_component
+                    
+                    # Get ai_components to access emotion data (passed via closure or retrieve from context)
+                    # Note: ai_components is generated in parallel processing phase AFTER this function
+                    # For now, we'll need to add this component AFTER ai_components are available
+                    # TODO: Move emotional intelligence component to _build_conversation_context_with_ai_intelligence
+                    logger.debug("ℹ️ STRUCTURED CONTEXT: Emotional intelligence component requires ai_components (added later)")
+                except ImportError as import_err:
+                    logger.warning(f"⚠️ STRUCTURED CONTEXT: Could not import emotional intelligence component: {import_err}")
+                
                 # Component 9: Character Defined Relationships (Priority 9) - Important people in character's life
                 # This component surfaces relationships defined in the CDL database (character_relationships table)
                 # Examples: Gabriel's Cynthia, NotTaylor's Silas, etc.
@@ -3490,6 +3520,53 @@ class MessageProcessor:
                 
             except Exception as e:
                 logger.warning("TrendWise adaptation failed: %s", e)
+        
+        # 🎭 EMOTIONAL INTELLIGENCE COMPONENT: Add user/bot emotional trajectory from InfluxDB
+        try:
+            from src.prompts.emotional_intelligence_component import create_emotional_intelligence_component
+            
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Create emotional intelligence component with InfluxDB trajectory data
+            emotional_component, trajectory_metadata = await create_emotional_intelligence_component(
+                user_id=message_context.user_id,
+                bot_name=bot_name,
+                current_user_emotion=ai_components.get('emotion_data'),
+                current_bot_emotion=ai_components.get('bot_emotion'),
+                character_emotional_state=ai_components.get('character_emotional_state'),
+                temporal_client=self.temporal_client,
+                priority=9,  # After personality/voice, before knowledge
+                confidence_threshold=0.7,
+                intensity_threshold=0.5,
+                trajectory_window_minutes=60,  # Last hour
+                return_metadata=True  # Get trajectory data for footer display
+            )
+            
+            if emotional_component:
+                # Add to system message (first message with role="system")
+                for i, msg in enumerate(conversation_context):
+                    if msg.get("role") == "system":
+                        conversation_context[i]["content"] += f"\n\n{emotional_component.content}"
+                        logger.info(
+                            "🎭 EMOTIONAL INTELLIGENCE: Added component to prompt (user=%s, bot=%s, trajectory=%dm)",
+                            ai_components.get('emotion_data', {}).get('primary_emotion') if ai_components.get('emotion_data') else None,
+                            ai_components.get('bot_emotion', {}).get('primary_emotion') if ai_components.get('bot_emotion') else None,
+                            60
+                        )
+                        break
+            
+            # Store trajectory metadata for footer display (even if component wasn't significant enough for prompt)
+            if trajectory_metadata:
+                ai_components['emotional_trajectory_data'] = trajectory_metadata
+                logger.debug("🎭 EMOTIONAL TRAJECTORY: Stored metadata for footer display")
+            
+            if not emotional_component:
+                logger.debug("🎭 EMOTIONAL INTELLIGENCE: No significant emotions - component skipped")
+                
+        except ImportError as import_err:
+            logger.warning("Could not import emotional intelligence component: %s", import_err)
+        except (AttributeError, TypeError, KeyError) as component_err:
+            logger.warning("Failed to create emotional intelligence component: %s", component_err)
         
         # Add AI intelligence guidance to system messages
         ai_guidance = self._build_ai_intelligence_guidance(ai_components)
@@ -5705,18 +5782,26 @@ class MessageProcessor:
             # �📝 COMPREHENSIVE PROMPT LOGGING: Log full prompts to file for review
             await self._log_full_prompt_to_file(final_context, message_context.user_id, ai_components)
             
-            # Generate response using LLM
+            # Generate response using LLM (with timing)
             logger.info("🎯 GENERATING: Sending %d messages (~%d tokens) to LLM", 
                        len(final_context), count_context_tokens(final_context))
             
             from src.llm.llm_client import LLMClient
+            from datetime import datetime
             llm_client = LLMClient()
             
+            # Track LLM call time separately
+            llm_start = datetime.now()
             response = await asyncio.to_thread(
                 llm_client.get_chat_response, final_context
             )
+            llm_end = datetime.now()
+            llm_time_ms = int((llm_end - llm_start).total_seconds() * 1000)
             
-            logger.info("✅ GENERATED: Response with %d characters", len(response))
+            # Store LLM timing in ai_components for footer display
+            ai_components['llm_time_ms'] = llm_time_ms
+            
+            logger.info("✅ GENERATED: Response with %d characters (LLM took %dms)", len(response), llm_time_ms)
             
             # 📝 LOG LLM RESPONSE: Add response to the prompt log for complete picture
             await self._log_llm_response_to_file(response, message_context.user_id)

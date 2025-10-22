@@ -1258,6 +1258,154 @@ class TemporalIntelligenceClient:
             logger.error("Failed to get conversation quality overall trend: %s", e)
             return []
 
+    async def get_user_emotion_trajectory(
+        self,
+        user_id: str,
+        bot_name: str,
+        window_minutes: int = 60,
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """
+        Get user's emotional trajectory from InfluxDB for prompt context.
+        
+        Retrieves recent user emotions in temporal order for emotional intelligence
+        prompt components. Returns emotions with timestamps for trajectory analysis.
+        
+        Args:
+            user_id: User identifier
+            bot_name: Bot name for filtering
+            window_minutes: Time window in minutes (default: 60 = last hour)
+            limit: Maximum number of emotions to return (default: 20)
+            
+        Returns:
+            List of emotion measurements ordered by time (oldest to newest):
+            [
+                {
+                    'emotion': str,        # Primary emotion label
+                    'intensity': float,    # 0.0-1.0
+                    'confidence': float,   # 0.0-1.0
+                    'timestamp': datetime  # When emotion was recorded
+                },
+                ...
+            ]
+            
+        Example:
+            >>> trajectory = await client.get_user_emotion_trajectory(
+            ...     user_id="user123",
+            ...     bot_name="elena",
+            ...     window_minutes=60
+            ... )
+            >>> # Returns: [{'emotion': 'neutral', ...}, {'emotion': 'joy', ...}, ...]
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                |> range(start: -{window_minutes}m)
+                |> filter(fn: (r) => r._measurement == "user_emotion")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> filter(fn: (r) => r.user_id == "{user_id}")
+                |> filter(fn: (r) => r._field == "intensity" or r._field == "confidence")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+                |> limit(n: {limit})
+            '''
+            
+            result = self.query_api.query(query)
+            
+            trajectory = []
+            for table in result:
+                for record in table.records:
+                    trajectory.append({
+                        'emotion': record.values.get('emotion', 'neutral'),  # From tag
+                        'intensity': record.values.get('intensity', 0.0),
+                        'confidence': record.values.get('confidence', 0.0),
+                        'timestamp': record.get_time()
+                    })
+            
+            # Sort by timestamp to ensure temporal ordering
+            return sorted(trajectory, key=lambda x: x['timestamp'])
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to get user emotion trajectory: %s", e)
+            return []
+
+    async def get_bot_emotion_trajectory(
+        self,
+        user_id: str,
+        bot_name: str,
+        window_minutes: int = 60,
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """
+        Get bot's emotional trajectory from InfluxDB for prompt context.
+        
+        Retrieves recent bot emotions in temporal order for emotional intelligence
+        prompt components. Returns bot's emotional responses over time.
+        
+        Args:
+            user_id: User identifier (bot emotions are per-user)
+            bot_name: Bot name
+            window_minutes: Time window in minutes (default: 60 = last hour)
+            limit: Maximum number of emotions to return (default: 20)
+            
+        Returns:
+            List of emotion measurements ordered by time (oldest to newest):
+            [
+                {
+                    'emotion': str,        # Primary emotion label
+                    'intensity': float,    # 0.0-1.0
+                    'confidence': float,   # 0.0-1.0
+                    'timestamp': datetime  # When emotion was recorded
+                },
+                ...
+            ]
+            
+        Example:
+            >>> trajectory = await client.get_bot_emotion_trajectory(
+            ...     user_id="user123",
+            ...     bot_name="elena",
+            ...     window_minutes=60
+            ... )
+            >>> # Returns: [{'emotion': 'content', ...}, {'emotion': 'joy', ...}, ...]
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET')}")
+                |> range(start: -{window_minutes}m)
+                |> filter(fn: (r) => r._measurement == "bot_emotion")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> filter(fn: (r) => r.user_id == "{user_id}")
+                |> filter(fn: (r) => r._field == "intensity" or r._field == "confidence")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+                |> limit(n: {limit})
+            '''
+            
+            result = self.query_api.query(query)
+            
+            trajectory = []
+            for table in result:
+                for record in table.records:
+                    trajectory.append({
+                        'emotion': record.values.get('emotion', 'neutral'),  # From tag
+                        'intensity': record.values.get('intensity', 0.0),
+                        'confidence': record.values.get('confidence', 0.0),
+                        'timestamp': record.get_time()
+                    })
+            
+            # Sort by timestamp to ensure temporal ordering
+            return sorted(trajectory, key=lambda x: x['timestamp'])
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to get bot emotion trajectory: %s", e)
+            return []
+
     async def query_data(
         self,
         flux_query: str

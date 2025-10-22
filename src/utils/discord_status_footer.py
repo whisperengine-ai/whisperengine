@@ -27,6 +27,7 @@ def is_footer_enabled() -> bool:
 def generate_discord_status_footer(
     ai_components: Dict[str, Any],
     processing_time_ms: Optional[int] = None,
+    llm_time_ms: Optional[int] = None,
     memory_count: int = 0
 ) -> str:
     """
@@ -37,11 +38,12 @@ def generate_discord_status_footer(
     - Memory context
     - Relationship status
     - Emotional state
-    - Processing time
+    - Processing time (total and LLM-specific)
     
     Args:
         ai_components: AI intelligence data from message processing
         processing_time_ms: Total processing time in milliseconds
+        llm_time_ms: LLM-specific processing time in milliseconds
         memory_count: Number of relevant memories retrieved
         
     Returns:
@@ -176,13 +178,13 @@ def generate_discord_status_footer(
     except (KeyError, TypeError, AttributeError) as e:
         logger.warning("Could not extract relationship status for footer: %s", str(e), exc_info=True)
     
-    # 4. 🔥 Emotional State (Bot Emotion)
+    # 4. 🔥 Emotional State (Bot Emotion + Trajectory)
     try:
         bot_emotion = ai_components.get('bot_emotion', {})
         if bot_emotion:
-            # Try new field names first, fall back to legacy names
+            # Get emotion label and intensity (use intensity, not confidence for display)
             emotion_label = bot_emotion.get('primary_emotion') or bot_emotion.get('emotion', 'neutral')
-            emotion_confidence = bot_emotion.get('confidence') or bot_emotion.get('roberta_confidence', 0.0)
+            emotion_intensity = bot_emotion.get('intensity', 0.0)
             
             # Emotion emoji mapping
             emotion_emoji = {
@@ -208,7 +210,10 @@ def generate_discord_status_footer(
             }
             
             emoji = emotion_emoji.get(emotion_label, '💭')
-            confidence_pct = int(emotion_confidence * 100)
+            intensity_pct = int(emotion_intensity * 100)
+            
+            # Build emotion display (show intensity, not confidence)
+            emotion_parts = [f"{emoji} **Bot Emotion**: {emotion_label.title()} ({intensity_pct}%)"]
             
             # Check for mixed emotions
             mixed_emotions = bot_emotion.get('mixed_emotions', [])
@@ -220,24 +225,34 @@ def generate_discord_status_footer(
                 # Only show mixed if secondary emotion is significant (>30%)
                 if secondary_pct >= 30:
                     secondary_emoji = emotion_emoji.get(secondary_emotion, '💭')
-                    footer_parts.append(
-                        f"{emoji} **Bot Emotion**: {emotion_label.title()} ({confidence_pct}%) "
-                        f"+ {secondary_emoji} {secondary_emotion.title()} ({secondary_pct}%)"
-                    )
-                else:
-                    footer_parts.append(f"{emoji} **Bot Emotion**: {emotion_label.title()} ({confidence_pct}%)")
-            else:
-                footer_parts.append(f"{emoji} **Bot Emotion**: {emotion_label.title()} ({confidence_pct}%)")
+                    emotion_parts[0] += f" + {secondary_emoji} {secondary_emotion.title()} ({secondary_pct}%)"
+            
+            # Add trajectory if available
+            trajectory_data = ai_components.get('emotional_trajectory_data', {})
+            bot_trajectory = trajectory_data.get('bot_trajectory', [])
+            if bot_trajectory and len(bot_trajectory) > 1:
+                # Show last 3-4 emotions as compact trajectory
+                trajectory_emotions = [e.get('emotion', 'neutral') for e in bot_trajectory[-4:]]
+                trajectory_text = " → ".join(trajectory_emotions)
+                emotion_parts.append(f"  📊 Bot Trajectory: {trajectory_text}")
+                
+                # Show pattern if available (show all patterns including stable)
+                bot_pattern = trajectory_data.get('bot_trajectory_pattern')
+                if bot_pattern:
+                    emotion_parts.append(f"  📈 Bot Pattern: {bot_pattern}")
+            
+            footer_parts.append("\n".join(emotion_parts))
     except (KeyError, TypeError, AttributeError) as e:
         logger.debug("Could not extract bot emotion for footer: %s", str(e))
     
-    # 5. 💬 User Emotion (from RoBERTa analysis)
+    # 5. 💬 User Emotion (from RoBERTa analysis + Trajectory)
     try:
         user_emotion = ai_components.get('emotion_data', {})
         if user_emotion:
             user_emotion_label = user_emotion.get('primary_emotion', 'neutral')
-            # Try intensity first, fall back to confidence
-            user_emotion_intensity = user_emotion.get('intensity') or user_emotion.get('confidence', 0.0)
+            # Use intensity field (standard from EmotionAnalysisResult dataclass)
+            user_emotion_intensity = user_emotion.get('intensity', 0.0)
+            user_emotion_confidence = user_emotion.get('confidence', 0.0)
             
             # Same emotion emoji mapping (with expanded emotions)
             emotion_emoji = {
@@ -265,6 +280,9 @@ def generate_discord_status_footer(
             emoji = emotion_emoji.get(user_emotion_label, '💭')
             intensity_pct = int(user_emotion_intensity * 100)
             
+            # Build emotion display
+            emotion_parts = [f"{emoji} **User Emotion**: {user_emotion_label.title()} ({intensity_pct}%)"]
+            
             # Check for mixed emotions
             mixed_emotions = user_emotion.get('mixed_emotions', [])
             if mixed_emotions and len(mixed_emotions) > 1:
@@ -275,45 +293,46 @@ def generate_discord_status_footer(
                 # Only show mixed if secondary emotion is significant (>30%)
                 if secondary_pct >= 30:
                     secondary_emoji = emotion_emoji.get(secondary_emotion, '💭')
-                    footer_parts.append(
-                        f"{emoji} **User Emotion**: {user_emotion_label.title()} ({intensity_pct}%) "
-                        f"+ {secondary_emoji} {secondary_emotion.title()} ({secondary_pct}%)"
-                    )
-                else:
-                    footer_parts.append(f"{emoji} **User Emotion**: {user_emotion_label.title()} ({intensity_pct}%)")
-            else:
-                footer_parts.append(f"{emoji} **User Emotion**: {user_emotion_label.title()} ({intensity_pct}%)")
+                    emotion_parts[0] += f" + {secondary_emoji} {secondary_emotion.title()} ({secondary_pct}%)"
+            
+            # Add trajectory if available
+            trajectory_data = ai_components.get('emotional_trajectory_data', {})
+            user_trajectory = trajectory_data.get('user_trajectory', [])
+            if user_trajectory and len(user_trajectory) > 1:
+                # Show last 3-4 emotions as compact trajectory
+                trajectory_emotions = [e.get('emotion', 'neutral') for e in user_trajectory[-4:]]
+                trajectory_text = " → ".join(trajectory_emotions)
+                emotion_parts.append(f"  📊 User Trajectory: {trajectory_text}")
+                
+                # Show pattern if available (show all patterns including stable)
+                user_pattern = trajectory_data.get('user_trajectory_pattern')
+                if user_pattern:
+                    emotion_parts.append(f"  📈 User Pattern: {user_pattern}")
+            
+            footer_parts.append("\n".join(emotion_parts))
     except (KeyError, TypeError, AttributeError) as e:
         logger.debug("Could not extract user emotion for footer: %s", str(e))
     
-    # 6. 📈 Emotional Trajectory (Bot emotional state over time)
-    try:
-        bot_emotional_state = ai_components.get('bot_emotional_state', {})
-        if bot_emotional_state:
-            trajectory_direction = bot_emotional_state.get('trajectory_direction', 'stable')
-            current_emotion = bot_emotional_state.get('current_emotion', 'neutral')
+    # 6. ⚡ Processing Metrics
+    if processing_time_ms or llm_time_ms:
+        timing_parts = []
+        
+        if processing_time_ms:
+            timing_parts.append(f"Total: {processing_time_ms}ms")
+        
+        if llm_time_ms:
+            timing_parts.append(f"LLM: {llm_time_ms}ms")
             
-            # Trajectory emoji mapping
-            trajectory_emoji = {
-                'improving': '📈',
-                'stable': '➡️',
-                'declining': '📉',
-                'volatile': '📊',
-                'positive': '✨',
-                'negative': '⚠️'
-            }
-            
-            emoji = trajectory_emoji.get(trajectory_direction, '➡️')
-            
-            footer_parts.append(f"{emoji} **Emotional Trajectory**: {trajectory_direction.title()} ({current_emotion.title()})")
-    except (KeyError, TypeError, AttributeError) as e:
-        logger.debug("Could not extract emotional trajectory for footer: %s", str(e))
+            # Calculate non-LLM processing time (overhead)
+            if processing_time_ms:
+                overhead_ms = processing_time_ms - llm_time_ms
+                if overhead_ms > 0:
+                    timing_parts.append(f"Overhead: {overhead_ms}ms")
+        
+        if timing_parts:
+            footer_parts.append(f"⚡ **Performance**: {' | '.join(timing_parts)}")
     
-    # 7. ⚡ Processing Metrics
-    if processing_time_ms:
-        footer_parts.append(f"⚡ **Processed**: {processing_time_ms}ms")
-    
-    # 8. 🎯 Workflow/Mode Detection
+    # 7. 🎯 Workflow/Mode Detection
     try:
         # Check for workflow triggers or mode switches
         workflow_data = ai_components.get('workflow_result')
@@ -335,7 +354,7 @@ def generate_discord_status_footer(
     except (KeyError, TypeError, AttributeError) as e:
         logger.debug("Could not extract workflow data for footer: %s", str(e))
     
-    # 9. 💬 Conversation Mode & Interaction Type Detection
+    # 8. 💬 Conversation Mode & Interaction Type Detection
     try:
         conv_analysis = ai_components.get('conversation_analysis', {})
         conv_intelligence = ai_components.get('conversation_intelligence', {})
