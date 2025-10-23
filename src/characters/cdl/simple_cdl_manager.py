@@ -2,16 +2,33 @@
 Simple CDL Manager - Clean RDBMS Approach
 WhisperEngine Character Definition Language Manager for pure relational schema
 
-This replaces the complex normalized manager with a simple, direct approach
-that works with our clean RDBMS schema (no JSON/JSONB).
+⚠️ DEPRECATED: This module is deprecated and will be removed in a future version.
+Use EnhancedCDLManager from src.characters.cdl.enhanced_cdl_manager instead.
+
+SimpleCDLManager provides backward compatibility with legacy JSON-based character loading.
+All new code should use EnhancedCDLManager which provides PostgreSQL-backed character data
+with full CDL system support.
+
+Deprecation Timeline:
+- October 22, 2025: Deprecated, warning added
+- November 22, 2025: Planned removal (30 days)
 """
 
 import logging
 import os
 import asyncio
+import warnings
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
+
+# Issue deprecation warning when module is imported
+warnings.warn(
+    "SimpleCDLManager is deprecated and will be removed in November 2025. "
+    "Use EnhancedCDLManager from src.characters.cdl.enhanced_cdl_manager instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 class SimpleCDLManager:
     """Simple CDL manager for character data access
@@ -595,7 +612,29 @@ class SimpleCDLManager:
 _simple_cdl_manager = None
 
 def get_simple_cdl_manager() -> SimpleCDLManager:
-    """Get the simple CDL manager instance"""
+    """
+    Get the simple CDL manager instance.
+    
+    ⚠️ DEPRECATED: Use EnhancedCDLManager instead.
+    
+    This function is deprecated and will be removed in November 2025.
+    Use get_enhanced_cdl_manager() from src.characters.cdl.enhanced_cdl_manager.
+    
+    Returns:
+        SimpleCDLManager: Legacy CDL manager instance
+    """
+    warnings.warn(
+        "get_simple_cdl_manager() is deprecated. "
+        "Use get_enhanced_cdl_manager() from src.characters.cdl.enhanced_cdl_manager instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    logger.warning(
+        "⚠️ DEPRECATED: get_simple_cdl_manager() called. "
+        "This function will be removed in November 2025. "
+        "Use EnhancedCDLManager instead."
+    )
+    
     # pylint: disable=global-statement
     global _simple_cdl_manager
     if _simple_cdl_manager is None:
