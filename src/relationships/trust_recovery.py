@@ -128,6 +128,32 @@ class TrustRecoverySystem:
             'initialization_time': datetime.utcnow()
         }
     
+    async def _flush_telemetry_to_influxdb(self):
+        """Write current telemetry counters to InfluxDB for Grafana visualization."""
+        if not self.temporal_client:
+            return
+        
+        try:
+            from influxdb_client import Point
+            
+            point = Point("trust_recovery_telemetry") \
+                .tag("component", "TrustRecoverySystem") \
+                .field("detect_trust_decline_count", self._telemetry['detect_trust_decline_count']) \
+                .field("activate_recovery_count", self._telemetry['activate_recovery_count']) \
+                .field("assess_recovery_progress_count", self._telemetry['assess_recovery_progress_count']) \
+                .field("declines_detected", self._telemetry['declines_detected']) \
+                .field("recoveries_activated", self._telemetry['recoveries_activated'])
+            
+            await self.temporal_client.write_point(point)
+            logger.info("📊 TRUST RECOVERY TELEMETRY: Flushed to InfluxDB (detections: %d/%d, activations: %d/%d)",
+                       self._telemetry['declines_detected'],
+                       self._telemetry['detect_trust_decline_count'],
+                       self._telemetry['recoveries_activated'],
+                       self._telemetry['activate_recovery_count'])
+            
+        except Exception as e:
+            logger.error("Error flushing trust recovery telemetry to InfluxDB: %s", e)
+    
     async def detect_trust_decline(
         self,
         user_id: str,
@@ -151,6 +177,10 @@ class TrustRecoverySystem:
         self._telemetry['detect_trust_decline_count'] += 1
         logger.info("🔍 TRUST RECOVERY TELEMETRY: detect_trust_decline called (count: %d)", 
                    self._telemetry['detect_trust_decline_count'])
+        
+        # Flush telemetry to InfluxDB every 5 invocations
+        if self._telemetry['detect_trust_decline_count'] % 5 == 0:
+            await self._flush_telemetry_to_influxdb()
         
         try:
             # Get current relationship scores
@@ -242,6 +272,10 @@ class TrustRecoverySystem:
         self._telemetry['activate_recovery_count'] += 1
         logger.info("🔧 TRUST RECOVERY TELEMETRY: activate_recovery_mode called (count: %d)", 
                    self._telemetry['activate_recovery_count'])
+        
+        # Flush telemetry to InfluxDB every 3 activations
+        if self._telemetry['activate_recovery_count'] % 3 == 0:
+            await self._flush_telemetry_to_influxdb()
         
         try:
             user_id = detection.user_id

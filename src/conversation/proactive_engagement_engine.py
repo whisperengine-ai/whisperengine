@@ -212,6 +212,7 @@ class ProactiveConversationEngagementEngine:
         emotional_engine: Union[EmotionalContextEngine, EnhancedVectorEmotionAnalyzer, None] = None,
         personality_profiler: DynamicPersonalityProfiler | None = None,
         memory_manager: Any | None = None,
+        temporal_client=None,  # InfluxDB client for telemetry
         stagnation_threshold_minutes: int | None = None,
         engagement_check_interval_minutes: int | None = None,
         max_proactive_suggestions_per_hour: int | None = None,
@@ -225,6 +226,7 @@ class ProactiveConversationEngagementEngine:
             emotional_engine: Emotional context engine or Enhanced Vector Emotion Analyzer
             personality_profiler: Dynamic personality profiler
             memory_manager: Vector memory manager for conversation history and patterns
+            temporal_client: TemporalIntelligenceClient for InfluxDB telemetry
             stagnation_threshold_minutes: Minutes before considering conversation stagnant
             engagement_check_interval_minutes: How often to check engagement levels
             max_proactive_suggestions_per_hour: Limit proactive interventions
@@ -236,6 +238,7 @@ class ProactiveConversationEngagementEngine:
         self.emotional_engine = emotional_engine
         self.personality_profiler = personality_profiler
         self.memory_manager = memory_manager
+        self.temporal_client = temporal_client  # InfluxDB client for telemetry
 
         # Use environment variables with fallbacks
         stagnation_threshold_minutes = stagnation_threshold_minutes or int(
@@ -285,6 +288,30 @@ class ProactiveConversationEngagementEngine:
             stagnation_threshold_minutes,
         )
 
+    async def _flush_telemetry_to_influxdb(self):
+        """Write current telemetry counters to InfluxDB for Grafana visualization."""
+        if not self.temporal_client:
+            return
+        
+        try:
+            from influxdb_client import Point
+            
+            point = Point("engagement_engine_telemetry") \
+                .tag("component", "ProactiveConversationEngagementEngine") \
+                .field("analyze_engagement_potential_count", self._telemetry['analyze_engagement_potential_count']) \
+                .field("analyze_conversation_engagement_count", self._telemetry['analyze_conversation_engagement_count']) \
+                .field("interventions_generated", self._telemetry['interventions_generated']) \
+                .field("total_recommendations", self._telemetry['total_recommendations'])
+            
+            await self.temporal_client.write_point(point)
+            logger.info("📊 ENGAGEMENT TELEMETRY: Flushed to InfluxDB (analyze_potential: %d, analyze_conversation: %d, interventions: %d)",
+                       self._telemetry['analyze_engagement_potential_count'],
+                       self._telemetry['analyze_conversation_engagement_count'],
+                       self._telemetry['interventions_generated'])
+            
+        except Exception as e:
+            logger.error("Error flushing engagement telemetry to InfluxDB: %s", e)
+
     async def analyze_engagement_potential(
         self,
         user_id: str,
@@ -301,6 +328,10 @@ class ProactiveConversationEngagementEngine:
         self._telemetry['analyze_engagement_potential_count'] += 1
         engagement_logger.info("📊 ENGAGEMENT TELEMETRY: analyze_engagement_potential called (count: %d)", 
                               self._telemetry['analyze_engagement_potential_count'])
+        
+        # Flush telemetry to InfluxDB every 10 invocations
+        if self._telemetry['analyze_engagement_potential_count'] % 10 == 0:
+            await self._flush_telemetry_to_influxdb()
         
         try:
             # Convert message to content string
