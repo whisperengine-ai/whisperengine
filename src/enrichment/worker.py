@@ -898,6 +898,19 @@ class EnrichmentWorker:
                             )
                             continue
                         
+                        # Check for similar/redundant relationships and consolidate to highest confidence
+                        should_store = await self._consolidate_similar_relationships_enrichment(
+                            conn, user_id, entity_id, fact.relationship_type, fact.confidence
+                        )
+                        
+                        if not should_store:
+                            # Weaker similar relationship exists - skip storing this one
+                            logger.info(
+                                f"🔄 DEDUP: Skipped storing weaker '{fact.relationship_type}' for {fact.entity_name} - "
+                                f"stronger similar relationship exists"
+                            )
+                            continue
+                        
                         # Insert or update user-fact relationship with context_metadata
                         # Leverages PostgreSQL graph features: context_metadata JSONB for rich storage
                         await conn.execute("""
@@ -1110,6 +1123,100 @@ class EnrichmentWorker:
                 )
         
         return 'resolved'
+    
+    async def _consolidate_similar_relationships_enrichment(
+        self,
+        conn,
+        user_id: str,
+        entity_id: int,
+        new_relationship: str,
+        new_confidence: float
+    ) -> bool:
+        """
+        Consolidate similar/redundant relationships for the same entity (enrichment version).
+        
+        When storing extracted facts, check if similar relationships already exist (e.g., "likes" vs "enjoys").
+        Keep only the highest confidence relationship and remove duplicates.
+        
+        Returns:
+            True if should proceed with insert, False if insert should be skipped
+        """
+        # Similar relationship groups (from semantic_router.py)
+        similar_groups = {
+            # Positive preferences - all are similar positive expressions
+            'likes': ['likes', 'loves', 'enjoys', 'prefers'],
+            'loves': ['likes', 'loves', 'enjoys', 'prefers'],
+            'enjoys': ['likes', 'loves', 'enjoys', 'prefers'],
+            'prefers': ['likes', 'loves', 'enjoys', 'prefers'],
+            
+            # Negative preferences
+            'dislikes': ['dislikes', 'hates', 'avoids'],
+            'hates': ['dislikes', 'hates', 'avoids'],
+            'avoids': ['dislikes', 'hates', 'avoids'],
+            
+            # Action/activity relationships
+            'does': ['does', 'plays', 'practices'],
+            'plays': ['does', 'plays', 'practices'],
+            'practices': ['does', 'plays', 'practices'],
+            
+            # Possession relationships
+            'owns': ['owns', 'has'],
+            'has': ['owns', 'has'],
+        }
+        
+        if new_relationship not in similar_groups:
+            return True
+        
+        # Get similar relationships that already exist for this entity
+        similar_types = similar_groups[new_relationship]
+        existing = await conn.fetch("""
+            SELECT relationship_type, confidence, updated_at
+            FROM user_fact_relationships 
+            WHERE user_id = $1 AND entity_id = $2 
+            AND relationship_type = ANY($3)
+            ORDER BY confidence DESC, updated_at DESC
+        """, user_id, entity_id, similar_types)
+        
+        if not existing:
+            return True
+        
+        # Find if there's a stronger existing relationship
+        strongest_existing = existing[0]
+        existing_confidence = float(strongest_existing['confidence'])
+        existing_relationship = strongest_existing['relationship_type']
+        
+        # If we're trying to add a weaker relationship, skip it and remove duplicates
+        if new_confidence <= existing_confidence:
+            logger.debug(
+                f"🔄 DEDUP (enrichment): Skipping weaker '{new_relationship}' (confidence: {new_confidence:.2f}) "
+                f"for entity {entity_id} - stronger '{existing_relationship}' exists "
+                f"(confidence: {existing_confidence:.2f})"
+            )
+            
+            # Remove any other weaker similar relationships
+            for other in existing[1:]:
+                await conn.execute("""
+                    DELETE FROM user_fact_relationships 
+                    WHERE user_id = $1 AND entity_id = $2 AND relationship_type = $3
+                """, user_id, entity_id, other['relationship_type'])
+                logger.debug(f"🗑️ Removed redundant '{other['relationship_type']}' relationship")
+            
+            # Don't store the new weaker one
+            return False
+        else:
+            # New relationship is stronger - remove all existing weaker ones
+            logger.info(
+                f"🔄 DEDUP (enrichment): Replacing weaker '{existing_relationship}' (confidence: {existing_confidence:.2f}) "
+                f"with stronger '{new_relationship}' (confidence: {new_confidence:.2f}) for entity {entity_id}"
+            )
+            for other in existing:
+                await conn.execute("""
+                    DELETE FROM user_fact_relationships 
+                    WHERE user_id = $1 AND entity_id = $2 AND relationship_type = $3
+                """, user_id, entity_id, other['relationship_type'])
+                logger.debug(f"🗑️ Removed redundant '{other['relationship_type']}' relationship")
+            
+            return True
         
         return stored_count
 

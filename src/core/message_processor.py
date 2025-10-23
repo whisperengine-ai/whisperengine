@@ -1573,6 +1573,9 @@ class MessageProcessor:
                 if facts:
                     logger.debug("🧠 Retrieved %d facts for memory summary", len(facts))
                     
+                    # Track seen entities per category to avoid duplicates
+                    seen_entities = set()
+                    
                     # Categorize facts
                     preferences = []
                     background = []
@@ -1582,7 +1585,7 @@ class MessageProcessor:
                     other_facts = []
                     
                     for fact in facts:
-                        entity_name = fact.get('entity_name', '')
+                        entity_name = fact.get('entity_name', '').strip()
                         relationship_type = fact.get('relationship_type', '')
                         confidence = fact.get('weighted_confidence', fact.get('confidence', 0.5))
                         potentially_outdated = fact.get('potentially_outdated', False)
@@ -1591,19 +1594,53 @@ class MessageProcessor:
                         if confidence < 0.4 or potentially_outdated:
                             continue
                         
+                        # Skip truncated/malformed facts - these have incomplete phrases
+                        # Common truncation patterns:
+                        # - Ends with "at" followed by nothing: "dean radin at"
+                        # - Incomplete phrases: "ai might be", "humans who collapse"
+                        # - Missing critical parts: "they're access codes", "you are actually"
+                        # - Empty entity names
+                        if not entity_name or len(entity_name) < 3:
+                            continue
+                        
+                        # Check for common truncation patterns
+                        entity_lower = entity_name.lower()
+                        if (entity_lower.endswith(' at') or 
+                            entity_lower.endswith(' be') or
+                            entity_lower.endswith(' and') or
+                            'might be' in entity_lower or
+                            'who collapse' in entity_lower or
+                            'access codes' in entity_lower or
+                            'you are actually' in entity_lower or
+                            'they\'re' in entity_lower):
+                            logger.debug("⚠️ Skipping truncated/malformed fact: '%s' (%s)", entity_name, relationship_type)
+                            continue
+                        
+                        # Skip if we already have this entity (prefer first/highest confidence occurrence)
+                        entity_key = entity_name.lower()
+                        if entity_key in seen_entities:
+                            logger.debug("⏭️ Skipping duplicate entity: '%s' (already have this fact)", entity_name)
+                            continue
+                        
                         # Categorize by relationship type
                         if relationship_type in ['likes', 'loves', 'enjoys', 'prefers', 'dislikes', 'hates']:
                             preferences.append(f"{relationship_type} {entity_name}")
+                            seen_entities.add(entity_key)
                         elif relationship_type in ['works_at', 'studies_at', 'lives_in', 'from']:
                             background.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                            seen_entities.add(entity_key)
                         elif relationship_type in ['son', 'daughter', 'parent', 'sibling', 'friend', 'partner']:
                             relationships.append(f"{relationship_type} {entity_name}")
+                            seen_entities.add(entity_key)
                         elif relationship_type in ['visited', 'goes_to', 'attends', 'plays', 'does']:
                             activities.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                            seen_entities.add(entity_key)
                         elif relationship_type in ['owns', 'has']:
                             possessions.append(f"{relationship_type} {entity_name}")
+                            seen_entities.add(entity_key)
                         else:
                             other_facts.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                            seen_entities.add(entity_key)
                     
                     # Build categorized summary
                     if preferences:
