@@ -1648,7 +1648,7 @@ class MessageProcessor:
             return "I'm having trouble accessing my memory right now, but I'm still here to chat! Our conversation history helps me understand you better as we talk."
 
     async def _retrieve_relevant_memories(self, message_context: MessageContext) -> List[Dict[str, Any]]:
-        """Retrieve relevant memories with context-aware filtering and MemoryBoost optimization."""
+        """Retrieve relevant memories with multi-vector intelligence and MemoryBoost optimization."""
         if not self.memory_manager:
             logger.warning("Memory manager not available; skipping memory retrieval.")
             return []
@@ -1661,7 +1661,21 @@ class MessageProcessor:
             classified_context = self._classify_message_context(message_context)
             logger.debug("Message context classified: %s", classified_context.context_type.value)
 
-            # 🚀 MEMORYBOOST: Try enhanced memory retrieval first if available
+            # 🎯 MULTI-VECTOR INTELLIGENCE: Try intelligent vector routing first if available
+            if hasattr(self.memory_manager, '_multi_vector_coordinator') and self.memory_manager._multi_vector_coordinator:
+                try:
+                    relevant_memories = await self._retrieve_memories_with_multi_vector_intelligence(
+                        message_context,
+                        memory_start_time
+                    )
+                    if relevant_memories:
+                        return relevant_memories
+                    # If multi-vector returns empty, fall through to MemoryBoost
+                    logger.debug("Multi-vector intelligence returned no results, falling back to MemoryBoost")
+                except Exception as e:
+                    logger.warning("Multi-vector intelligence retrieval failed, falling back: %s", str(e))
+
+            # 🚀 MEMORYBOOST: Try enhanced memory retrieval as fallback
             if hasattr(self.memory_manager, 'retrieve_relevant_memories_with_memoryboost'):
                 try:
                     # Build conversation context for MemoryBoost optimization
@@ -1785,6 +1799,146 @@ class MessageProcessor:
         except (AttributeError, ValueError, TypeError) as e:
             logger.error("Memory retrieval failed: %s", str(e))
             return []
+
+    async def _retrieve_memories_with_multi_vector_intelligence(
+        self,
+        message_context: MessageContext,
+        start_time: datetime
+    ) -> List[Dict[str, Any]]:
+        """
+        🎯 MULTI-VECTOR INTELLIGENCE: Retrieve memories using intelligent vector routing.
+        
+        Routes queries through existing MultiVectorIntelligence system to leverage
+        emotion and semantic vectors based on query intent.
+        
+        Args:
+            message_context: Message context with user query
+            start_time: Start time for performance tracking
+            
+        Returns:
+            List of relevant memories from intelligent multi-vector search
+        """
+        try:
+            # Get recent conversation context for better classification
+            conversation_context = self._build_conversation_context_for_memoryboost(message_context)
+            
+            # Classify query using existing MultiVectorIntelligence
+            classification = await self.memory_manager._multi_vector_coordinator.intelligence.classify_query(
+                message_context.content,
+                user_context=conversation_context[:200] if conversation_context else None  # Limit context size
+            )
+            
+            logger.info("🎯 MULTI-VECTOR: Query classified as %s (primary: %s, strategy: %s, confidence: %.2f)",
+                       classification.query_type.value,
+                       classification.primary_vector,
+                       classification.strategy.value,
+                       classification.confidence)
+            
+            # Import VectorStrategy for comparison
+            from src.memory.multi_vector_intelligence import VectorStrategy
+            
+            # Route to appropriate search strategy based on classification
+            memories = []
+            
+            if classification.strategy == VectorStrategy.EMOTION_PRIMARY:
+                # Use existing search_with_multi_vectors for emotion-focused search
+                logger.info("🎭 MULTI-VECTOR: Using emotion-primary search")
+                memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                    content_query=message_context.content,
+                    emotional_query=message_context.content,  # Use full query for emotion embedding
+                    user_id=message_context.user_id,
+                    top_k=20
+                )
+                
+            elif classification.strategy == VectorStrategy.SEMANTIC_PRIMARY:
+                # Use existing search_with_multi_vectors for semantic-focused search
+                logger.info("🧠 MULTI-VECTOR: Using semantic-primary search")
+                memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                    content_query=message_context.content,
+                    personality_context=" ".join(classification.semantic_indicators[:5]),  # Top semantic indicators
+                    user_id=message_context.user_id,
+                    top_k=20
+                )
+                
+            elif classification.strategy == VectorStrategy.BALANCED_FUSION:
+                # Use triple-vector search for complex queries
+                logger.info("⚖️ MULTI-VECTOR: Using balanced fusion (all 3 vectors)")
+                memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                    content_query=message_context.content,
+                    emotional_query=message_context.content if classification.emotional_indicators else None,
+                    personality_context=" ".join(classification.semantic_indicators[:5]) if classification.semantic_indicators else None,
+                    user_id=message_context.user_id,
+                    top_k=20
+                )
+            else:
+                # Default to content-primary search (existing behavior)
+                logger.info("📄 MULTI-VECTOR: Using content-primary search (default)")
+                memories = await self.memory_manager.retrieve_relevant_memories(
+                    user_id=message_context.user_id,
+                    query=message_context.content,
+                    limit=20
+                )
+            
+            # Calculate retrieval time
+            end_time = datetime.now()
+            retrieval_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            logger.info("✅ MULTI-VECTOR: Retrieved %d memories in %dms using %s strategy",
+                       len(memories),
+                       retrieval_time_ms,
+                       classification.strategy.value)
+            
+            # Track vector strategy effectiveness in InfluxDB
+            await self._track_vector_strategy_effectiveness(
+                message_context=message_context,
+                classification=classification,
+                results_count=len(memories),
+                retrieval_time_ms=retrieval_time_ms
+            )
+            
+            return memories
+            
+        except Exception as e:
+            logger.error("Multi-vector intelligence retrieval failed: %s", str(e), exc_info=True)
+            return []
+
+    async def _track_vector_strategy_effectiveness(
+        self,
+        message_context: MessageContext,
+        classification: Any,  # QueryClassification
+        results_count: int,
+        retrieval_time_ms: int
+    ):
+        """
+        Track which vector strategies return useful results for learning optimization.
+        
+        Records to InfluxDB:
+        - Strategy used
+        - Primary vector selected
+        - Query type
+        - Results count
+        - Classification confidence
+        - Retrieval performance
+        """
+        if not self.fidelity_metrics:
+            return
+        
+        try:
+            # Record vector strategy usage
+            await self.fidelity_metrics.record_memory_quality(
+                user_id=message_context.user_id,
+                operation=f"multi_vector_{classification.strategy.value}",
+                relevance_score=classification.confidence,
+                retrieval_time_ms=retrieval_time_ms,
+                memory_count=results_count,
+                vector_similarity=0.0  # Not available in classification
+            )
+            
+            logger.debug("📊 TRACKING: Recorded vector strategy effectiveness - %s with %d results",
+                        classification.strategy.value, results_count)
+            
+        except Exception as e:
+            logger.warning("Failed to track vector strategy effectiveness: %s", str(e))
 
     def _classify_query_type(self, content: str) -> str:
         """Classify the type of query for memory optimization."""
