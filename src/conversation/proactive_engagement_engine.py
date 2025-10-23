@@ -271,6 +271,15 @@ class ProactiveConversationEngagementEngine:
         self.engagement_success_rates: dict[str, float] = {}
         self.intervention_effectiveness: dict[EngagementStrategy, float] = defaultdict(float)
 
+        # Telemetry: Usage tracking for evaluation
+        self._telemetry = {
+            'analyze_conversation_engagement_count': 0,
+            'analyze_engagement_potential_count': 0,
+            'interventions_generated': 0,
+            'total_recommendations': 0,
+            'initialization_time': datetime.utcnow()
+        }
+
         logger.info(
             "ProactiveConversationEngagementEngine initialized with %d minute stagnation threshold",
             stagnation_threshold_minutes,
@@ -288,6 +297,11 @@ class ProactiveConversationEngagementEngine:
         This method provides the interface expected by MessageProcessor while
         delegating to the main analyze_conversation_engagement method.
         """
+        # Telemetry: Track invocation
+        self._telemetry['analyze_engagement_potential_count'] += 1
+        engagement_logger.info("📊 ENGAGEMENT TELEMETRY: analyze_engagement_potential called (count: %d)", 
+                              self._telemetry['analyze_engagement_potential_count'])
+        
         try:
             # Convert message to content string
             content = getattr(message, 'content', str(message)) if hasattr(message, 'content') else str(message)
@@ -347,7 +361,12 @@ class ProactiveConversationEngagementEngine:
         Returns:
             Comprehensive engagement analysis with proactive recommendations
         """
+        # Telemetry: Track invocation
+        self._telemetry['analyze_conversation_engagement_count'] += 1
+        
         engagement_logger.info("🎯 ENGAGEMENT: Starting conversation analysis for user %s with %d recent messages", user_id, len(recent_messages))
+        engagement_logger.info("📊 ENGAGEMENT TELEMETRY: analyze_conversation_engagement called (count: %d)", 
+                              self._telemetry['analyze_conversation_engagement_count'])
         
         # Analyze conversation flow state
         flow_analysis = await self._analyze_conversation_flow(user_id, recent_messages)
@@ -367,11 +386,22 @@ class ProactiveConversationEngagementEngine:
         # Generate proactive recommendations if needed
         recommendations = []
         if intervention_needed:
+            # Telemetry: Track interventions
+            self._telemetry['interventions_generated'] += 1
+            
             engagement_logger.debug("🎯 ENGAGEMENT: Generating proactive recommendations...")
             recommendations = await self._generate_proactive_recommendations(
                 user_id, context_id, recent_messages, current_thread_info
             )
+            
+            # Telemetry: Track recommendations
+            self._telemetry['total_recommendations'] += len(recommendations)
+            
             engagement_logger.info("🎯 ENGAGEMENT: Generated %d proactive recommendations", len(recommendations))
+            engagement_logger.info("📊 ENGAGEMENT TELEMETRY: Total interventions: %d, Total recommendations: %d", 
+                                  self._telemetry['interventions_generated'], 
+                                  self._telemetry['total_recommendations'])
+            
             for i, rec in enumerate(recommendations):
                 engagement_logger.debug("🎯 ENGAGEMENT: Recommendation %d - Type: %s, Strategy: %s", 
                                        i+1, rec.get('type'), rec.get('strategy'))
