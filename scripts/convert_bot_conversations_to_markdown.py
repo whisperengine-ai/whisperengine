@@ -103,26 +103,8 @@ def create_markdown_conversation(json_file: Path, output_dir: Path) -> str:
     for i, exchange in enumerate(conversation, 1):
         timestamp = format_timestamp(exchange['timestamp'])
         
-        # The JSON structure is:
-        # - "message" field contains the PROMPT (what was said TO the speaker)
-        # - "response" field contains what the SPEAKER actually said
-        # - "speaker" field indicates who is responding (not who sent the message)
-        
-        if exchange['speaker'] == 'system':
-            # First exchange: system prompt goes to bot2
-            speaker1 = "System Prompt"
-            speaker2_name = participants['bot2']['full_name']
-        else:
-            # Find which bot is responding
-            speaker_name = exchange['speaker']
-            if speaker_name == participants['bot1']['name']:
-                # Bot1 is responding, so the message came from bot2
-                speaker1 = participants['bot2']['full_name']
-                speaker2_name = participants['bot1']['full_name']
-            else:
-                # Bot2 is responding, so the message came from bot1
-                speaker1 = participants['bot1']['full_name']
-                speaker2_name = participants['bot2']['full_name']
+        # Determine who is speaking in this exchange's response
+        speaker_name = exchange['speaker']
         
         # Add exchange header
         md_lines.append(f"### Exchange {i}")
@@ -131,20 +113,34 @@ def create_markdown_conversation(json_file: Path, output_dir: Path) -> str:
         md_lines.append("---")
         md_lines.append("")
         
-        # The "message" field is what was said TO the speaker
-        md_lines.append(f"## 💬 **{speaker1}**")
-        md_lines.append("")
-        # Format and add indentation to message content
-        formatted_message = format_dialogue_text(exchange['message'])
-        indented_message = '\n'.join('> ' + line if line.strip() else '>' 
-                                     for line in formatted_message.split('\n'))
-        md_lines.append(indented_message)
-        md_lines.append("")
+        # For the FIRST exchange only, show the initial message (prompt)
+        if i == 1:
+            md_lines.append("## 💬 **System Prompt**")
+            md_lines.append("")
+            formatted_message = format_dialogue_text(exchange['message'])
+            indented_message = '\n'.join('> ' + line if line.strip() else '>' 
+                                         for line in formatted_message.split('\n'))
+            md_lines.append(indented_message)
+            md_lines.append("")
+            
+            # Determine who responded to the system prompt
+            if speaker_name == 'system':
+                # Shouldn't happen, but handle it
+                current_speaker = participants['bot2']['full_name']
+            elif speaker_name == participants['bot1']['name']:
+                current_speaker = participants['bot1']['full_name']
+            else:
+                current_speaker = participants['bot2']['full_name']
+        else:
+            # For subsequent exchanges, determine speaker from the response
+            if speaker_name == participants['bot1']['name']:
+                current_speaker = participants['bot1']['full_name']
+            else:
+                current_speaker = participants['bot2']['full_name']
         
-        # The "response" field is what the speaker actually said
-        md_lines.append(f"## 💬 **{speaker2_name}**")
+        # Always show the response (this is the actual new content)
+        md_lines.append(f"## 💬 **{current_speaker}**")
         md_lines.append("")
-        # Format and add indentation to response content
         formatted_response = format_dialogue_text(exchange['response'])
         indented_response = '\n'.join('> ' + line if line.strip() else '>' 
                                       for line in formatted_response.split('\n'))
