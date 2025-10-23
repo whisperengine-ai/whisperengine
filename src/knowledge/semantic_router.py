@@ -19,6 +19,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
 
+# Import unified query classifier for intent analysis
+from src.memory.unified_query_classification import (
+    create_unified_query_classifier,
+    UnifiedQueryClassifier,
+    QueryIntent as UnifiedQueryIntent,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,7 +80,15 @@ class SemanticKnowledgeRouter:
         self.qdrant = qdrant_client
         self.influx = influx_client
         
-        # Intent patterns for analysis
+        # Phase 2b: Initialize unified query classifier for intent analysis
+        try:
+            self._unified_query_classifier = create_unified_query_classifier()
+            logger.info("✅ UNIFIED: SemanticKnowledgeRouter using UnifiedQueryClassifier for intent analysis")
+        except Exception as e:
+            logger.warning("⚠️  UNIFIED: Failed to initialize UnifiedQueryClassifier: %s", str(e))
+            self._unified_query_classifier = None
+        
+        # Intent patterns for analysis (fallback if unified classifier unavailable)
         self._intent_patterns = self._build_intent_patterns()
         
         logger.info("🎯 SemanticKnowledgeRouter initialized with multi-modal intelligence")
@@ -220,7 +235,10 @@ class SemanticKnowledgeRouter:
     
     async def analyze_query_intent(self, query: str) -> IntentAnalysisResult:
         """
-        Analyze query to determine intent and routing strategy with fuzzy matching.
+        Analyze query to determine intent and routing strategy using unified classifier.
+        
+        Phase 2b: Integrated UnifiedQueryClassifier for authoritative intent analysis.
+        Maps unified intents back to SemanticKnowledgeRouter's QueryIntent for backward compatibility.
         
         Args:
             query: User's natural language query
@@ -228,6 +246,55 @@ class SemanticKnowledgeRouter:
         Returns:
             IntentAnalysisResult with routing information
         """
+        # Phase 2b: Use unified classifier for intent analysis
+        if self._unified_query_classifier is not None:
+            try:
+                # Get unified classification result using async classify method
+                unified_result = await self._unified_query_classifier.classify(query)
+                
+                # Map UnifiedQueryIntent to SemanticKnowledgeRouter's QueryIntent (both have identical 7 values)
+                intent_mapping = {
+                    UnifiedQueryIntent.FACTUAL_RECALL: QueryIntent.FACTUAL_RECALL,
+                    UnifiedQueryIntent.CONVERSATION_STYLE: QueryIntent.CONVERSATION_STYLE,
+                    UnifiedQueryIntent.TEMPORAL_ANALYSIS: QueryIntent.TEMPORAL_ANALYSIS,
+                    UnifiedQueryIntent.PERSONALITY_KNOWLEDGE: QueryIntent.PERSONALITY_KNOWLEDGE,
+                    UnifiedQueryIntent.RELATIONSHIP_DISCOVERY: QueryIntent.RELATIONSHIP_DISCOVERY,
+                    UnifiedQueryIntent.ENTITY_SEARCH: QueryIntent.ENTITY_SEARCH,
+                    UnifiedQueryIntent.USER_ANALYTICS: QueryIntent.USER_ANALYTICS,
+                }
+                
+                mapped_intent = intent_mapping.get(
+                    unified_result.intent_type,
+                    QueryIntent.FACTUAL_RECALL
+                )
+                
+                # Extract entity and relationship types (fallback to old extractors for backward compat)
+                query_lower = query.lower()
+                entity_type = self._extract_entity_type(query_lower)
+                relationship_type = self._extract_relationship_type(query_lower)
+                
+                logger.debug(
+                    "✅ UNIFIED: SemanticRouter intent=%s (unified=%s, confidence=%.2f)",
+                    mapped_intent.value,
+                    unified_result.intent_type.value,
+                    unified_result.intent_confidence
+                )
+                
+                return IntentAnalysisResult(
+                    intent_type=mapped_intent,
+                    entity_type=entity_type,
+                    relationship_type=relationship_type,
+                    confidence=unified_result.intent_confidence,
+                    keywords=unified_result.keywords
+                )
+            except TypeError as e:
+                logger.warning(
+                    "⚠️  UNIFIED: analyze_query_intent failed: %s. Falling back to fuzzy matching.",
+                    str(e)
+                )
+                # Fall through to legacy implementation below
+        
+        # Fallback: Legacy fuzzy matching (used if unified classifier unavailable)
         query_lower = query.lower()
         
         # Score each intent type with fuzzy matching
@@ -288,7 +355,7 @@ class SemanticKnowledgeRouter:
         # Extract relationship type if present
         relationship_type = self._extract_relationship_type(query_lower)
         
-        logger.debug(f"🎯 Intent analysis: {intent_type.value} (confidence: {confidence:.2f})")
+        logger.debug("⚠️  FALLBACK: Intent analysis using fuzzy matching: %s (confidence: %.2f)", intent_type.value, confidence)
         
         return IntentAnalysisResult(
             intent_type=intent_type,

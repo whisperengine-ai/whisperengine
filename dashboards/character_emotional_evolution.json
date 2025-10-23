@@ -25,7 +25,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "5-dimensional character emotional state over time",
       "fieldConfig": {
@@ -182,7 +182,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
@@ -194,7 +194,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Current character state metrics",
       "fieldConfig": {
@@ -279,7 +279,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> last()",
           "refId": "A"
@@ -291,7 +291,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Most recent dominant character state",
       "fieldConfig": {
@@ -374,7 +374,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"dominant_state\")\n  |> last()\n  |> map(fn: (r) => ({ r with _value: r.dominant_state }))",
           "refId": "A"
@@ -386,7 +386,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Distribution of bot emotions from RoBERTa analysis",
       "fieldConfig": {
@@ -530,7 +530,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bot_emotion\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"intensity\")\n  |> group(columns: [\"emotion\"])\n  |> count()",
           "refId": "A"
@@ -542,7 +542,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Joy emotion intensity and confidence over time",
       "fieldConfig": {
@@ -655,7 +655,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bot_emotion\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r.emotion == \"joy\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
@@ -667,7 +667,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Conversation quality metrics over time",
       "fieldConfig": {
@@ -795,7 +795,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
@@ -807,7 +807,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Comparison of character state vs baseline (Oct 17, 2025)",
       "fieldConfig": {
@@ -888,7 +888,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\" or r._field == \"stress\" or r._field == \"contentment\" or r._field == \"empathy\" or r._field == \"confidence\")\n  |> last()",
           "refId": "A"
@@ -900,7 +900,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Total conversation count in time range",
       "fieldConfig": {
@@ -956,7 +956,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"enthusiasm\")\n  |> count()",
           "refId": "A"
@@ -968,7 +968,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Average emotional resonance in time range",
       "fieldConfig": {
@@ -1026,7 +1026,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"emotional_resonance\")\n  |> mean()",
           "refId": "A"
@@ -1038,7 +1038,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Latest empathy level (baseline: 0.83)",
       "fieldConfig": {
@@ -1096,7 +1096,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"empathy\")\n  |> last()",
           "refId": "A"
@@ -1108,7 +1108,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "influxdb-whisperengine"
+        "uid": "influxdb"
       },
       "description": "Latest stress level (baseline: 0.25)",
       "fieldConfig": {
@@ -1166,7 +1166,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "influxdb-whisperengine"
+            "uid": "influxdb"
           },
           "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"character_emotional_state\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"stress\")\n  |> last()",
           "refId": "A"

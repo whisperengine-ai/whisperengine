@@ -1,0 +1,202 @@
+{
+  "test_name": "Task #2: Temporal Query Direction Bug Fix Validation",
+  "timestamp": "2025-10-23T00:42:32.057331",
+  "overall_passed": true,
+  "test_summary": {
+    "passed": 5,
+    "total": 5
+  },
+  "detailed_results": [
+    {
+      "test": "TEST_1_First query",
+      "query": "What was the first thing we discussed?",
+      "expected": {
+        "first": true,
+        "last": false
+      },
+      "actual": {
+        "first": true,
+        "last": false
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_Earliest query",
+      "query": "What was the earliest thing?",
+      "expected": {
+        "first": true,
+        "last": false
+      },
+      "actual": {
+        "first": true,
+        "last": false
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_First start query",
+      "query": "When did we first start talking?",
+      "expected": {
+        "first": true,
+        "last": false
+      },
+      "actual": {
+        "first": true,
+        "last": false
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_Initial query",
+      "query": "What did we talk about initially?",
+      "expected": {
+        "first": true,
+        "last": false
+      },
+      "actual": {
+        "first": true,
+        "last": false
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_Last query",
+      "query": "What was the last thing we discussed?",
+      "expected": {
+        "first": false,
+        "last": true
+      },
+      "actual": {
+        "first": false,
+        "last": true
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_Recent query",
+      "query": "What was the most recent thing?",
+      "expected": {
+        "first": false,
+        "last": true
+      },
+      "actual": {
+        "first": false,
+        "last": true
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_Just now query",
+      "query": "What did we just talk about?",
+      "expected": {
+        "first": false,
+        "last": true
+      },
+      "actual": {
+        "first": false,
+        "last": true
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_Latest query",
+      "query": "What's the latest update?",
+      "expected": {
+        "first": false,
+        "last": true
+      },
+      "actual": {
+        "first": false,
+        "last": true
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_General conversation query",
+      "query": "Tell me about our conversations",
+      "expected": {
+        "first": false,
+        "last": false
+      },
+      "actual": {
+        "first": false,
+        "last": false
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_1_General recall query",
+      "query": "What do you remember?",
+      "expected": {
+        "first": false,
+        "last": false
+      },
+      "actual": {
+        "first": false,
+        "last": false
+      },
+      "passed": true
+    },
+    {
+      "test": "TEST_2_temporal_intent",
+      "query": "What was the first thing we discussed?",
+      "expected_intent": "temporal_analysis",
+      "actual_intent": "temporal_analysis",
+      "passed": true
+    },
+    {
+      "test": "TEST_2_temporal_intent",
+      "query": "What did we talk about recently?",
+      "expected_intent": "temporal_analysis",
+      "actual_intent": "temporal_analysis",
+      "passed": true
+    },
+    {
+      "test": "TEST_2_temporal_intent",
+      "query": "Tell me about our latest conversation",
+      "expected_intent": "temporal_analysis",
+      "actual_intent": "temporal_analysis",
+      "passed": true
+    },
+    {
+      "test": "TEST_2_temporal_intent",
+      "query": "When did we start talking about this?",
+      "expected_intent": "temporal_analysis",
+      "actual_intent": "temporal_analysis",
+      "passed": true
+    },
+    {
+      "test": "TEST_3_temporal_strategy",
+      "query": "What was the first thing?",
+      "expected_strategy": "TEMPORAL_CHRONOLOGICAL",
+      "actual_strategy": "temporal_chronological",
+      "passed": true
+    },
+    {
+      "test": "TEST_3_temporal_strategy",
+      "query": "What was the last thing?",
+      "expected_strategy": "TEMPORAL_CHRONOLOGICAL",
+      "actual_strategy": "temporal_chronological",
+      "passed": true
+    },
+    {
+      "test": "TEST_3_temporal_strategy",
+      "query": "What do you remember?",
+      "expected_strategy": "other",
+      "actual_strategy": "content_only",
+      "passed": true
+    },
+    {
+      "test": "TEST_4_fields_exist",
+      "has_is_temporal_first": true,
+      "has_is_temporal_last": true,
+      "passed": true
+    },
+    {
+      "test": "TEST_5_direction_enum",
+      "direction_asc": "Direction.ASC",
+      "direction_desc": "Direction.DESC",
+      "passed": true
+    }
+  ]
+}

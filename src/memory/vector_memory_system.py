@@ -58,12 +58,18 @@ from src.memory.multi_vector_intelligence import (
 # Import vector fusion for Phase 1 Task 3: Multi-Vector Fusion
 from src.memory.vector_fusion import create_vector_fusion_coordinator, VectorFusionCoordinator
 
-# Import query classifier for Phase 2 Task 2.2: Hybrid Vector Routing
-from src.memory.query_classifier import (
-    create_query_classifier,
-    QueryClassifier,
-    QueryCategory
+# Import unified query classifier (replaces old QueryClassifier + SemanticKnowledgeRouter)
+from src.memory.unified_query_classification import (
+    create_unified_query_classifier,
+    UnifiedQueryClassifier,
+    UnifiedClassification,
+    VectorStrategy as UnifiedVectorStrategy,
+    QueryIntent,
 )
+
+# Import query classifier adapter for backward compatibility
+from src.memory.query_classifier import QueryCategory
+from src.memory.query_classifier_adapter import QueryClassifierAdapter
 
 # Import bot name utilities (centralized for consistency across all systems)
 from src.utils.bot_name_utils import (
@@ -2435,11 +2441,21 @@ class VectorMemoryStore:
         
         return is_temporal
 
-    async def _handle_temporal_query_with_qdrant(self, query: str, user_id: str, limit: int, channel_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def _handle_temporal_query_with_qdrant(
+        self, 
+        query: str, 
+        user_id: str, 
+        limit: int, 
+        channel_type: Optional[str] = None,
+        is_temporal_first: bool = False,
+        is_temporal_last: bool = False
+    ) -> List[Dict[str, Any]]:
         """
         🎯 QDRANT-NATIVE: Handle temporal queries using scroll API for chronological context
         
-        ENHANCED (Bug Fix #2): Now detects "first" vs "last" queries and orders accordingly
+        ENHANCED (Task #2): Uses UnifiedQueryClassifier temporal direction flags
+        - is_temporal_first: Return oldest memories (sort ascending by timestamp)
+        - is_temporal_last: Return newest memories (sort descending by timestamp)
         
         🔒 PRIVACY: Channel-based memory filtering
         - DM channels: Only retrieve DM memories
@@ -2447,16 +2463,22 @@ class VectorMemoryStore:
         - None: No channel filtering (backward compatible)
         """
         try:
-            # 🎯 NEW: Detect query direction (first/earliest vs last/recent)
-            query_lower = query.lower()
-            first_keywords = ['first', 'earliest', 'initial', 'started', 'began', 'opening', 'very first']
-            is_first_query = any(keyword in query_lower for keyword in first_keywords)
+            # Task #2: Use unified classifier temporal direction flags (with fallback to query analysis)
+            if is_temporal_first or is_temporal_last:
+                # Trust the unified classifier determination
+                is_first_query = is_temporal_first
+                direction_label = "FIRST/EARLIEST" if is_first_query else "LAST/RECENT"
+                logger.info(f"✅ TEMPORAL DIRECTION (from UnifiedClassifier): '{direction_label}' query")
+            else:
+                # Fallback: Detect query direction from keyword analysis
+                query_lower = query.lower()
+                first_keywords = ['first', 'earliest', 'initial', 'started', 'began', 'opening', 'very first']
+                is_first_query = any(keyword in query_lower for keyword in first_keywords)
+                direction_label = "FIRST/EARLIEST" if is_first_query else "LAST/RECENT"
+                logger.info(f"🎯 TEMPORAL DIRECTION (fallback): Detected '{direction_label}' query pattern")
             
-            # Determine temporal direction
+            # Determine sort direction (Task #2: Uses unified classifier result)
             direction = Direction.ASC if is_first_query else Direction.DESC  # ASC = oldest first, DESC = newest first
-            direction_label = "FIRST/EARLIEST" if is_first_query else "LAST/RECENT"
-            
-            logger.info(f"🎯 TEMPORAL DIRECTION: Detected '{direction_label}' query pattern")
             
             # Generate embedding for semantic search if needed
             query_embedding = await self.generate_embedding(query)
@@ -4043,12 +4065,16 @@ class VectorMemoryManager:
             logger.warning("🎯 MULTI-VECTOR: Coordinator initialization failed: %s", str(e))
             self._multi_vector_coordinator = None
         
-        # 🎯 PHASE 2: Initialize QueryClassifier for intelligent vector routing
+        # 🎯 PHASE 2: Initialize UnifiedQueryClassifier for intelligent vector routing
+        # This replaces separate QueryClassifier + SemanticKnowledgeRouter systems
         try:
-            self._query_classifier = create_query_classifier()
-            logger.info("🎯 PHASE 2: QueryClassifier initialized for hybrid vector routing")
+            self._unified_query_classifier = create_unified_query_classifier()
+            # Also keep adapter for backward compatibility with old code
+            self._query_classifier = QueryClassifierAdapter(self._unified_query_classifier)
+            logger.info("✅ UNIFIED: UnifiedQueryClassifier initialized for single-source-of-truth routing")
         except Exception as e:
-            logger.warning("🎯 PHASE 2: QueryClassifier initialization failed: %s", str(e))
+            logger.warning("❌ UNIFIED: UnifiedQueryClassifier initialization failed: %s", str(e))
+            self._unified_query_classifier = None
             self._query_classifier = None
         
         logger.info("VectorMemoryManager initialized - local-first single source of truth ready")
@@ -4861,6 +4887,29 @@ class VectorMemoryManager:
             logger.warning("Multi-vector fusion failed: %s", str(e))
             return []
     
+    def _map_intent_to_category(self, intent: QueryIntent) -> QueryCategory:
+        """
+        Map QueryIntent to QueryCategory for backward compatibility with monitor.track_routing().
+        
+        Used to convert unified classification results to old QueryCategory enum for logging.
+        """
+        if intent == QueryIntent.FACTUAL_RECALL:
+            return QueryCategory.FACTUAL
+        elif intent == QueryIntent.CONVERSATION_STYLE:
+            return QueryCategory.CONVERSATIONAL
+        elif intent == QueryIntent.TEMPORAL_ANALYSIS:
+            return QueryCategory.TEMPORAL
+        elif intent == QueryIntent.PERSONALITY_KNOWLEDGE:
+            return QueryCategory.CONVERSATIONAL
+        elif intent == QueryIntent.RELATIONSHIP_DISCOVERY:
+            return QueryCategory.CONVERSATIONAL
+        elif intent == QueryIntent.ENTITY_SEARCH:
+            return QueryCategory.FACTUAL
+        elif intent == QueryIntent.USER_ANALYTICS:
+            return QueryCategory.GENERAL
+        else:
+            return QueryCategory.GENERAL
+    
     async def retrieve_relevant_memories_with_classification(
         self,
         user_id: str,
@@ -4903,42 +4952,55 @@ class VectorMemoryManager:
         monitor = get_intelligent_retrieval_monitor()
         
         try:
-            # Step 1: Detect temporal queries (highest priority)
-            temporal_start = time.time()
-            is_temporal = await self.vector_store._detect_temporal_query_with_qdrant(query, user_id)
-            temporal_time_ms = (time.time() - temporal_start) * 1000
-            
-            # Step 2: Classify query using QueryClassifier
+            # Step 1: Use Unified Query Classifier (replaces old temporal + QueryClassifier logic)
             classification_start = time.time()
-            if self._query_classifier:
-                category = await self._query_classifier.classify_query(
+            if self._unified_query_classifier:
+                # Single unified classification call returns complete routing information
+                unified_result = await self._unified_query_classifier.classify(
                     query=query,
-                    emotion_data=emotion_data,
-                    is_temporal=is_temporal
+                    emotion_data=emotion_data
                 )
                 classification_time_ms = (time.time() - classification_start) * 1000
                 
-                # Get vector strategy for this category
-                strategy = self._query_classifier.get_vector_strategy(category)
+                # Extract routing information from unified result
+                vector_strategy = unified_result.vector_strategy
+                is_temporal = unified_result.is_temporal
+                intent_type = unified_result.intent_type
+                data_sources = unified_result.data_sources
+                intent_confidence = unified_result.intent_confidence
+                strategy_confidence = unified_result.strategy_confidence
                 
-                logger.info("🎯 PHASE 2 ROUTING: query='%s...' → category=%s → strategy=%s",
-                           query[:40], category.value, strategy['description'])
+                # Get vector weights for strategy
+                vector_weights = self._unified_query_classifier.get_vector_weights(vector_strategy)
+                strategy = {
+                    'vectors': list(vector_weights.keys()),
+                    'weights': list(vector_weights.values()),
+                    'use_fusion': len(vector_weights) > 1,
+                    'description': f"Strategy: {vector_strategy.value}",
+                }
+                
+                logger.info("✅ UNIFIED ROUTING: query='%s...' → intent=%s → strategy=%s (conf: %.0f%%/%.0f%%)",
+                           query[:40], intent_type.value, vector_strategy.value,
+                           intent_confidence * 100, strategy_confidence * 100)
                 
                 # Track classification decision
                 await monitor.track_classification(
                     user_id=user_id,
                     query=query,
-                    category=category,
+                    category=QueryCategory.GENERAL,  # For backward compat - adapter maps strategy to category
                     emotion_intensity=emotion_data.get('emotional_intensity') if emotion_data else None,
                     is_temporal=is_temporal,
                     classification_time_ms=classification_time_ms
                 )
                 
-                # Step 3: Route based on category
-                if category == QueryCategory.TEMPORAL:
-                    # Use existing temporal logic with channel privacy filtering
+                # Step 2: Route based on vector strategy
+                if vector_strategy == UnifiedVectorStrategy.TEMPORAL_CHRONOLOGICAL:
+                    # Task #2: Pass temporal direction from unified classifier to ensure correct sort order
                     results = await self.vector_store._handle_temporal_query_with_qdrant(
-                        query, user_id, limit, channel_type=channel_type
+                        query, user_id, limit, 
+                        channel_type=channel_type,
+                        is_temporal_first=unified_result.is_temporal_first,
+                        is_temporal_last=unified_result.is_temporal_last
                     )
                     # Format results
                     formatted_results = []
@@ -4960,7 +5022,7 @@ class VectorMemoryManager:
                     # Track routing decision
                     await monitor.track_routing(
                         user_id=user_id,
-                        query_category=category,
+                        query_category=self._map_intent_to_category(unified_result.intent_type),
                         search_type="temporal_chronological",
                         vectors_used=[],  # Temporal doesn't use vectors
                         memory_count=len(formatted_results),
@@ -4979,7 +5041,7 @@ class VectorMemoryManager:
                     
                     return formatted_results
                 
-                elif category == QueryCategory.FACTUAL:
+                elif vector_strategy == UnifiedVectorStrategy.CONTENT_ONLY:
                     # Single content vector (fast path) with channel privacy
                     search_start = time.time()
                     results = await self._search_single_vector(
@@ -5001,7 +5063,7 @@ class VectorMemoryManager:
                     # Track routing decision
                     await monitor.track_routing(
                         user_id=user_id,
-                        query_category=category,
+                        query_category=self._map_intent_to_category(unified_result.intent_type),
                         search_type="content_vector",
                         vectors_used=["content"],
                         memory_count=len(results),
@@ -5020,7 +5082,7 @@ class VectorMemoryManager:
                     
                     return results
                 
-                elif category == QueryCategory.EMOTIONAL:
+                elif vector_strategy == UnifiedVectorStrategy.EMOTION_FUSION:
                     # Multi-vector fusion: content + emotion with channel privacy
                     search_start = time.time()
                     results = await self._search_multi_vector_fusion(
@@ -5043,7 +5105,7 @@ class VectorMemoryManager:
                     # Track routing decision
                     await monitor.track_routing(
                         user_id=user_id,
-                        query_category=category,
+                        query_category=self._map_intent_to_category(unified_result.intent_type),
                         search_type="multi_vector_fusion",
                         vectors_used=strategy['vectors'],
                         memory_count=len(results),
@@ -5064,8 +5126,8 @@ class VectorMemoryManager:
                     
                     return results
                 
-                elif category == QueryCategory.CONVERSATIONAL:
-                    # Multi-vector fusion: content + semantic with channel privacy
+                elif vector_strategy in [UnifiedVectorStrategy.SEMANTIC_FUSION, UnifiedVectorStrategy.MULTI_CATEGORY, UnifiedVectorStrategy.BALANCED_FUSION]:
+                    # Multi-vector fusion: content + semantic (or balanced) with channel privacy
                     search_start = time.time()
                     results = await self._search_multi_vector_fusion(
                         vectors=strategy['vectors'],
@@ -5081,13 +5143,13 @@ class VectorMemoryManager:
                         r['query_category'] = 'conversational'
                     
                     total_time_ms = (time.time() - start_time) * 1000
-                    logger.debug("💬 CONVERSATIONAL: %d results in %.1fms",
+                    logger.debug("💬 CONVERSATIONAL/FUSION: %d results in %.1fms",
                                len(results), total_time_ms)
                     
                     # Track routing decision
                     await monitor.track_routing(
                         user_id=user_id,
-                        query_category=category,
+                        query_category=self._map_intent_to_category(unified_result.intent_type),
                         search_type="multi_vector_fusion",
                         vectors_used=strategy['vectors'],
                         memory_count=len(results),
@@ -5108,7 +5170,7 @@ class VectorMemoryManager:
                     
                     return results
                 
-                else:  # GENERAL
+                else:  # Fallback strategy
                     # Single content vector (default) with channel privacy
                     search_start = time.time()
                     results = await self._search_single_vector(
@@ -5124,13 +5186,13 @@ class VectorMemoryManager:
                         r['query_category'] = 'general'
                     
                     total_time_ms = (time.time() - start_time) * 1000
-                    logger.debug("🔍 GENERAL: %d results in %.1fms",
+                    logger.debug("🔍 FALLBACK: %d results in %.1fms",
                                len(results), total_time_ms)
                     
                     # Track routing decision
                     await monitor.track_routing(
                         user_id=user_id,
-                        query_category=category,
+                        query_category=self._map_intent_to_category(unified_result.intent_type),
                         search_type="content_vector",
                         vectors_used=["content"],
                         memory_count=len(results),

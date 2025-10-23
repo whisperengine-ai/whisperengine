@@ -48,6 +48,13 @@ from src.intelligence.database_emoji_selector import create_database_emoji_selec
 # Emotional Adaptation component
 from src.intelligence.emotional_context_engine import EmotionalContextEngine, EmotionalContext, EmotionalState
 
+# Phase 2c: Unified Query Classification for single authoritative classification
+from src.memory.unified_query_classification import (
+    create_unified_query_classifier,
+    UnifiedQueryClassifier,
+    VectorStrategy as UnifiedVectorStrategy,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,6 +116,14 @@ class MessageProcessor:
         self.emoji_intelligence = emoji_intelligence
         self.image_processor = image_processor
         self.conversation_cache = conversation_cache
+        
+        # Phase 2c: Initialize unified query classifier for single authoritative classification
+        self._unified_query_classifier = None
+        try:
+            self._unified_query_classifier = create_unified_query_classifier()
+            logger.info("✅ UNIFIED: MessageProcessor using UnifiedQueryClassifier for routing")
+        except Exception as e:
+            logger.warning("⚠️  UNIFIED: Failed to initialize UnifiedQueryClassifier: %s", str(e))
         
         # Phase 5: Initialize temporal intelligence with PostgreSQL integration
         # Temporal intelligence is now permanently enabled (no feature flag)
@@ -1806,98 +1821,184 @@ class MessageProcessor:
         start_time: datetime
     ) -> List[Dict[str, Any]]:
         """
-        🎯 MULTI-VECTOR INTELLIGENCE: Retrieve memories using intelligent vector routing.
+        🎯 PHASE 2c: UNIFIED QUERY CLASSIFICATION - Single authoritative memory routing.
         
-        Routes queries through existing MultiVectorIntelligence system to leverage
-        emotion and semantic vectors based on query intent.
+        Replaces MultiVectorIntelligence.classify_query() with UnifiedQueryClassifier
+        for consistent intent analysis across entire platform.
+        
+        Routes queries through unified classification to leverage emotion and semantic
+        vectors based on query intent, using single source of truth for all routing.
         
         Args:
             message_context: Message context with user query
             start_time: Start time for performance tracking
             
         Returns:
-            List of relevant memories from intelligent multi-vector search
+            List of relevant memories from intelligent unified vector search
         """
         try:
-            # Get recent conversation context for better classification
-            conversation_context = self._build_conversation_context_for_memoryboost(message_context)
+            # Phase 2c: Use unified classifier for authoritative classification
+            if self._unified_query_classifier is not None:
+                try:
+                    # Get unified classification result
+                    unified_result = await self._unified_query_classifier.classify(
+                        message_context.content
+                    )
+                    
+                    logger.info(
+                        "✅ UNIFIED: Query classified as %s (strategy: %s, confidence: %.2f)",
+                        unified_result.intent_type.value,
+                        unified_result.vector_strategy.value,
+                        unified_result.intent_confidence
+                    )
+                    
+                    # Route to appropriate search strategy based on unified classification
+                    memories = []
+                    
+                    if unified_result.vector_strategy == UnifiedVectorStrategy.EMOTION_FUSION:
+                        # Use emotion-focused search
+                        logger.info("🎭 UNIFIED: Using emotion-fusion search")
+                        memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                            content_query=message_context.content,
+                            emotional_query=message_context.content,  # Use full query for emotion embedding
+                            user_id=message_context.user_id,
+                            top_k=20
+                        )
+                        
+                    elif unified_result.vector_strategy == UnifiedVectorStrategy.SEMANTIC_FUSION:
+                        # Use semantic-focused search
+                        logger.info("🧠 UNIFIED: Using semantic-fusion search")
+                        memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                            content_query=message_context.content,
+                            personality_context=message_context.content,  # Use query as context
+                            user_id=message_context.user_id,
+                            top_k=20
+                        )
+                        
+                    elif unified_result.vector_strategy == UnifiedVectorStrategy.BALANCED_FUSION:
+                        # Use triple-vector search for complex queries
+                        logger.info("⚖️ UNIFIED: Using balanced-fusion (all vectors)")
+                        memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                            content_query=message_context.content,
+                            emotional_query=message_context.content,
+                            personality_context=message_context.content,
+                            user_id=message_context.user_id,
+                            top_k=20
+                        )
+                    elif unified_result.vector_strategy == UnifiedVectorStrategy.TEMPORAL_CHRONOLOGICAL:
+                        # For temporal queries, use chronological ordering
+                        logger.info("⏰ UNIFIED: Using temporal-chronological search")
+                        memories = await self.memory_manager.retrieve_relevant_memories(
+                            user_id=message_context.user_id,
+                            query=message_context.content,
+                            limit=20,
+                            sort_by_timestamp=True
+                        )
+                    else:
+                        # Default to content-primary search
+                        logger.info("📄 UNIFIED: Using content-only search (default)")
+                        memories = await self.memory_manager.retrieve_relevant_memories(
+                            user_id=message_context.user_id,
+                            query=message_context.content,
+                            limit=20
+                        )
+                    
+                    # Calculate retrieval time
+                    end_time = datetime.now()
+                    retrieval_time_ms = int((end_time - start_time).total_seconds() * 1000)
+                    
+                    logger.info(
+                        "✅ UNIFIED: Retrieved %d memories in %dms using %s strategy",
+                        len(memories),
+                        retrieval_time_ms,
+                        unified_result.vector_strategy.value
+                    )
+                    
+                    return memories
+                    
+                except TypeError as e:
+                    logger.warning(
+                        "⚠️  UNIFIED: Unified classification failed: %s. Falling back to MultiVectorIntelligence.",
+                        str(e)
+                    )
+                    # Fall through to legacy MultiVectorIntelligence below
             
-            # Classify query using existing MultiVectorIntelligence
-            classification = await self.memory_manager._multi_vector_coordinator.intelligence.classify_query(
-                message_context.content,
-                user_context=conversation_context[:200] if conversation_context else None  # Limit context size
-            )
+            # Fallback: Legacy MultiVectorIntelligence (if unified classifier unavailable)
+            if hasattr(self.memory_manager, '_multi_vector_coordinator') and self.memory_manager._multi_vector_coordinator:
+                try:
+                    # Get recent conversation context for better classification
+                    conversation_context = self._build_conversation_context_for_memoryboost(message_context)
+                    
+                    # Classify query using existing MultiVectorIntelligence
+                    classification = await self.memory_manager._multi_vector_coordinator.intelligence.classify_query(
+                        message_context.content,
+                        user_context=conversation_context[:200] if conversation_context else None
+                    )
+                    
+                    logger.info(
+                        "⚠️  FALLBACK: Multi-vector classification: %s (strategy: %s, confidence: %.2f)",
+                        classification.query_type.value,
+                        classification.strategy.value,
+                        classification.confidence
+                    )
+                    
+                    # Import VectorStrategy for comparison
+                    from src.memory.multi_vector_intelligence import VectorStrategy
+                    
+                    # Route to appropriate search strategy based on classification
+                    memories = []
+                    
+                    if classification.strategy == VectorStrategy.EMOTION_PRIMARY:
+                        logger.info("🎭 FALLBACK: Using emotion-primary search")
+                        memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                            content_query=message_context.content,
+                            emotional_query=message_context.content,
+                            user_id=message_context.user_id,
+                            top_k=20
+                        )
+                    elif classification.strategy == VectorStrategy.SEMANTIC_PRIMARY:
+                        logger.info("🧠 FALLBACK: Using semantic-primary search")
+                        memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                            content_query=message_context.content,
+                            personality_context=" ".join(classification.semantic_indicators[:5]),
+                            user_id=message_context.user_id,
+                            top_k=20
+                        )
+                    elif classification.strategy == VectorStrategy.BALANCED_FUSION:
+                        logger.info("⚖️ FALLBACK: Using balanced fusion")
+                        memories = await self.memory_manager.vector_store.search_with_multi_vectors(
+                            content_query=message_context.content,
+                            emotional_query=message_context.content if classification.emotional_indicators else None,
+                            personality_context=" ".join(classification.semantic_indicators[:5]) if classification.semantic_indicators else None,
+                            user_id=message_context.user_id,
+                            top_k=20
+                        )
+                    else:
+                        logger.info("📄 FALLBACK: Using content-primary search")
+                        memories = await self.memory_manager.retrieve_relevant_memories(
+                            user_id=message_context.user_id,
+                            query=message_context.content,
+                            limit=20
+                        )
+                    
+                    end_time = datetime.now()
+                    retrieval_time_ms = int((end_time - start_time).total_seconds() * 1000)
+                    
+                    logger.info(
+                        "✅ FALLBACK: Retrieved %d memories in %dms using %s strategy",
+                        len(memories),
+                        retrieval_time_ms,
+                        classification.strategy.value
+                    )
+                    
+                    return memories
+                    
+                except Exception as e:
+                    logger.warning("Multi-vector intelligence fallback failed: %s", str(e))
+                    return []
             
-            logger.info("🎯 MULTI-VECTOR: Query classified as %s (primary: %s, strategy: %s, confidence: %.2f)",
-                       classification.query_type.value,
-                       classification.primary_vector,
-                       classification.strategy.value,
-                       classification.confidence)
-            
-            # Import VectorStrategy for comparison
-            from src.memory.multi_vector_intelligence import VectorStrategy
-            
-            # Route to appropriate search strategy based on classification
-            memories = []
-            
-            if classification.strategy == VectorStrategy.EMOTION_PRIMARY:
-                # Use existing search_with_multi_vectors for emotion-focused search
-                logger.info("🎭 MULTI-VECTOR: Using emotion-primary search")
-                memories = await self.memory_manager.vector_store.search_with_multi_vectors(
-                    content_query=message_context.content,
-                    emotional_query=message_context.content,  # Use full query for emotion embedding
-                    user_id=message_context.user_id,
-                    top_k=20
-                )
-                
-            elif classification.strategy == VectorStrategy.SEMANTIC_PRIMARY:
-                # Use existing search_with_multi_vectors for semantic-focused search
-                logger.info("🧠 MULTI-VECTOR: Using semantic-primary search")
-                memories = await self.memory_manager.vector_store.search_with_multi_vectors(
-                    content_query=message_context.content,
-                    personality_context=" ".join(classification.semantic_indicators[:5]),  # Top semantic indicators
-                    user_id=message_context.user_id,
-                    top_k=20
-                )
-                
-            elif classification.strategy == VectorStrategy.BALANCED_FUSION:
-                # Use triple-vector search for complex queries
-                logger.info("⚖️ MULTI-VECTOR: Using balanced fusion (all 3 vectors)")
-                memories = await self.memory_manager.vector_store.search_with_multi_vectors(
-                    content_query=message_context.content,
-                    emotional_query=message_context.content if classification.emotional_indicators else None,
-                    personality_context=" ".join(classification.semantic_indicators[:5]) if classification.semantic_indicators else None,
-                    user_id=message_context.user_id,
-                    top_k=20
-                )
-            else:
-                # Default to content-primary search (existing behavior)
-                logger.info("📄 MULTI-VECTOR: Using content-primary search (default)")
-                memories = await self.memory_manager.retrieve_relevant_memories(
-                    user_id=message_context.user_id,
-                    query=message_context.content,
-                    limit=20
-                )
-            
-            # Calculate retrieval time
-            end_time = datetime.now()
-            retrieval_time_ms = int((end_time - start_time).total_seconds() * 1000)
-            
-            logger.info("✅ MULTI-VECTOR: Retrieved %d memories in %dms using %s strategy",
-                       len(memories),
-                       retrieval_time_ms,
-                       classification.strategy.value)
-            
-            # Track vector strategy effectiveness in InfluxDB
-            await self._track_vector_strategy_effectiveness(
-                message_context=message_context,
-                classification=classification,
-                results_count=len(memories),
-                retrieval_time_ms=retrieval_time_ms
-            )
-            
-            return memories
-            
+            return []
+        
         except Exception as e:
             logger.error("Multi-vector intelligence retrieval failed: %s", str(e), exc_info=True)
             return []
