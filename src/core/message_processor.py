@@ -1924,8 +1924,8 @@ class MessageProcessor:
             return
         
         try:
-            # Record vector strategy usage
-            await self.fidelity_metrics.record_memory_quality(
+            # Record vector strategy usage (synchronous call - no await)
+            self.fidelity_metrics.record_memory_quality(
                 user_id=message_context.user_id,
                 operation=f"multi_vector_{classification.strategy.value}",
                 relevance_score=classification.confidence,
@@ -1934,8 +1934,8 @@ class MessageProcessor:
                 vector_similarity=0.0  # Not available in classification
             )
             
-            logger.debug("📊 TRACKING: Recorded vector strategy effectiveness - %s with %d results",
-                        classification.strategy.value, results_count)
+            logger.info("📊 TRACKING: Recorded vector strategy effectiveness - %s with %d results (confidence: %.2f)",
+                        classification.strategy.value, results_count, classification.confidence)
             
         except Exception as e:
             logger.warning("Failed to track vector strategy effectiveness: %s", str(e))
