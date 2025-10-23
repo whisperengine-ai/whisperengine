@@ -594,31 +594,25 @@ class DatabaseEmojiSelector:
         if not emojis:
             return []
         
-        # 🎯 NEW: Use multi-factor intelligence for emoji count
-        if bot_emotion_data:
-            count = self._calculate_emotionally_intelligent_emoji_count(
-                intensity=intensity,
-                combination_style=combination_style,
-                bot_emotion_data=bot_emotion_data,
-                user_emotion_data=user_emotion_data
+        # 🎯 EMOTIONAL INTELLIGENCE: Always use multi-factor emoji count calculation
+        # If bot_emotion_data is missing, use defaults to maintain consistent behavior
+        if not bot_emotion_data:
+            bot_emotion_data = {
+                'confidence': 0.5,
+                'intensity': intensity,
+                'emotional_variance': 0.5
+            }
+            logger.debug(
+                "📊 Pattern selection using default emotion data (intensity=%.2f, combination_style=%s)",
+                intensity, combination_style
             )
-        else:
-            # Fallback to original logic if no emotion data
-            if combination_style == 'minimal_symbolic_emoji':
-                count = 1
-            elif combination_style == 'text_with_accent_emoji':
-                count = 1
-            elif combination_style == 'text_plus_emoji':
-                if intensity > 0.8:
-                    count = min(3, len(emojis))
-                elif intensity > 0.5:
-                    count = min(2, len(emojis))
-                else:
-                    count = 1
-            elif combination_style == 'emoji_only':
-                count = min(2, len(emojis))
-            else:
-                count = 1
+        
+        count = self._calculate_emotionally_intelligent_emoji_count(
+            intensity=intensity,
+            combination_style=combination_style,
+            bot_emotion_data=bot_emotion_data,
+            user_emotion_data=user_emotion_data
+        )
         
         return emojis[:count]
     
