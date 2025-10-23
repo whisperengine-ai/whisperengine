@@ -334,6 +334,11 @@ class EnrichmentWorker:
             # Convert datetime to Unix timestamp for Qdrant query
             since_unix = since_timestamp.timestamp()
             
+            logger.debug(
+                f"[QDRANT_QUERY] user={user_id}, collection={collection_name}, "
+                f"since_timestamp={since_timestamp.isoformat()}, since_unix={since_unix}"
+            )
+            
             # Scroll through Qdrant with filters
             results, _ = self.qdrant_client.scroll(
                 collection_name=collection_name,
@@ -356,10 +361,13 @@ class EnrichmentWorker:
                 with_vectors=False
             )
             
+            logger.debug(f"[QDRANT_RESULT] Found {len(results)} messages for user {user_id}")
+            
             messages = []
             for point in results:
                 # Parse timestamp
                 timestamp_str = point.payload.get('timestamp', '')
+                timestamp_unix = point.payload.get('timestamp_unix', 0)
                 try:
                     timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
                     # Make timezone-naive for comparison consistency
@@ -378,6 +386,13 @@ class EnrichmentWorker:
             
             # Sort by timestamp
             messages.sort(key=lambda m: m['timestamp'])
+            
+            # DEBUG: Log first and last message timestamps
+            if messages:
+                logger.debug(
+                    f"[QDRANT_TIMESTAMPS] user={user_id}, first_msg={messages[0]['timestamp'].isoformat()}, "
+                    f"last_msg={messages[-1]['timestamp'].isoformat()}, count={len(messages)}"
+                )
             return messages
             
         except Exception as e:
@@ -609,6 +624,7 @@ class EnrichmentWorker:
         logger.debug("Found %s users for fact extraction", len(users))
         
         facts_extracted = 0
+        llm_calls_made = 0
         
         for user_id in users:
             try:
@@ -651,9 +667,19 @@ class EnrichmentWorker:
                     
                     logger.debug("Last processed MESSAGE timestamp for user %s: %s", user_id, last_processed)
                 else:
-                    # No facts yet - backfill from 30 days ago
+                    # No facts yet - backfill from LOOKBACK_DAYS ago
                     last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
                     logger.debug("No existing facts for user %s, backfilling from %s", user_id, last_processed)
+                
+                # CRITICAL: Enforce maximum lookback window - NEVER process messages older than LOOKBACK_DAYS
+                # This prevents burning tokens on ancient conversations even if marker timestamp is old
+                max_lookback = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                if last_processed < max_lookback:
+                    logger.info(
+                        f"⏭️  [ENFORCING LOOKBACK] User {user_id} marker is old ({last_processed.isoformat()}), "
+                        f"enforcing {config.LOOKBACK_DAYS}-day limit (since {max_lookback.isoformat()})"
+                    )
+                    last_processed = max_lookback
                 
                 # Get NEW messages since last processing
                 new_messages = await self._get_new_messages_since(
@@ -663,14 +689,14 @@ class EnrichmentWorker:
                 )
                 
                 if not new_messages:
-                    logger.debug("✅ No new messages for fact extraction (user %s)", user_id)
+                    logger.info("⏭️  [NO LLM CALL] No new messages for fact extraction (user %s)", user_id)
                     continue
                 
                 if len(new_messages) < config.MIN_MESSAGES_FOR_SUMMARY:
-                    logger.debug("Skipping user %s - only %s new messages", user_id, len(new_messages))
+                    logger.info("⏭️  [NO LLM CALL] Skipping user %s - only %s new messages (min: %s)", user_id, len(new_messages), config.MIN_MESSAGES_FOR_SUMMARY)
                     continue
                 
-                logger.info("🔍 Extracting facts from %s new messages (user %s)", len(new_messages), user_id)
+                logger.info("🔍 [LLM CALL] Extracting facts from %s new messages (user %s)", len(new_messages), user_id)
                 
                 # Track the latest message timestamp for incremental processing
                 latest_message_timestamp = max(msg['timestamp'] for msg in new_messages)
@@ -682,8 +708,10 @@ class EnrichmentWorker:
                     bot_name=bot_name
                 )
                 
+                llm_calls_made += 1
+                
                 if not extracted_facts:
-                    logger.debug("No facts extracted from new messages (user %s)", user_id)
+                    logger.info("✅ [LLM CALL COMPLETE] No facts extracted from new messages (user %s) - 0 facts found", user_id)
                     # CRITICAL FIX: Still need to update the timestamp so we don't reprocess same messages!
                     # Store a marker record that we've processed up to latest_message_timestamp
                     await self._store_last_processed_timestamp(
@@ -727,13 +755,22 @@ class EnrichmentWorker:
                 )
                 
                 facts_extracted += stored_count
-                logger.info("✅ Extracted and stored %s facts for user %s", stored_count, user_id)
+                logger.info("✅ [LLM CALL COMPLETE] Extracted and stored %s facts for user %s", stored_count, user_id)
+                
+                # CRITICAL: Update the processing marker timestamp AFTER successful extraction
+                # This tells the next cycle: "we've processed messages up to latest_message_timestamp"
+                # Without this, we'll keep re-extracting the same facts over and over
+                await self._store_last_processed_timestamp(
+                    user_id=user_id,
+                    bot_name=bot_name,
+                    latest_message_timestamp=latest_message_timestamp
+                )
                 
             except Exception as e:
                 logger.error("Error extracting facts for user %s: %s", user_id, e, exc_info=True)
                 continue
         
-        logger.info("✅ Extracted %s total facts for %s", facts_extracted, bot_name)
+        logger.info("📊 [CYCLE SUMMARY - FACTS] Bot=%s | LLM Calls Made=%s | Facts Extracted=%s", bot_name, llm_calls_made, facts_extracted)
         return facts_extracted
     
     async def _get_existing_facts(self, user_id: str, bot_name: str) -> List[Dict]:
@@ -742,6 +779,10 @@ class EnrichmentWorker:
         
         Uses fact_entities + user_fact_relationships tables (matches inline extraction).
         Returns facts with created_at timestamps for incremental processing.
+        
+        CRITICAL: Processing markers should be returned REGARDLESS of bot_name,
+        since a marker just indicates "messages have been processed up to this timestamp"
+        regardless of which bot created it.
         """
         async with self.db_pool.acquire() as conn:
             rows = await conn.fetch(
@@ -756,7 +797,11 @@ class EnrichmentWorker:
                 FROM user_fact_relationships ufr
                 JOIN fact_entities fe ON ufr.entity_id = fe.id
                 WHERE ufr.user_id = $1 
-                  AND (ufr.context_metadata->>'bot_name' = $2 OR ufr.context_metadata IS NULL)
+                  AND (
+                    fe.entity_type = '_processing_marker'
+                    OR ufr.context_metadata->>'bot_name' = $2
+                    OR ufr.context_metadata IS NULL
+                  )
                 ORDER BY ufr.created_at DESC
                 """,
                 user_id,
@@ -781,31 +826,60 @@ class EnrichmentWorker:
         in context_metadata, allowing _get_existing_facts() to find it and skip already-processed messages.
         """
         async with self.db_pool.acquire() as conn:
-            # Create a marker entity to track processing progress
-            marker_entity_id = await conn.fetchval("""
-                INSERT INTO fact_entities (entity_type, entity_name, category, attributes)
-                VALUES ('_processing_marker', $1, '_marker', '{"type": "enrichment_progress"}'::jsonb)
-                ON CONFLICT (entity_type, entity_name) 
-                DO UPDATE SET updated_at = NOW()
-                RETURNING id
-            """, f"{bot_name}_{user_id}")
-            
-            # Store the timestamp in the marker's relationship
-            context_metadata = {
-                'latest_message_timestamp': latest_message_timestamp.isoformat(),
-                'bot_name': bot_name,
-                'marker_type': 'enrichment_progress'
-            }
-            
-            await conn.execute("""
-                INSERT INTO user_fact_relationships 
-                (user_id, entity_id, relationship_type, confidence, context_metadata)
-                VALUES ($1, $2, '_enrichment_progress_marker', 1.0, $3)
-                ON CONFLICT (user_id, entity_id, relationship_type)
-                DO UPDATE SET
-                    context_metadata = EXCLUDED.context_metadata,
-                    updated_at = NOW()
-            """, user_id, marker_entity_id, json.dumps(context_metadata))
+            async with conn.transaction():
+                # First, ensure user exists in universal_users (FK requirement)
+                await conn.execute("""
+                    INSERT INTO universal_users 
+                    (universal_id, primary_username, display_name, created_at, last_active)
+                    VALUES ($1, $2, $3, NOW(), NOW())
+                    ON CONFLICT (universal_id) DO UPDATE SET last_active = NOW()
+                """, user_id, f"user_{user_id[-8:]}", f"User {user_id[-6:]}")
+                
+                # Create a marker entity to track processing progress
+                marker_entity_id = await conn.fetchval("""
+                    INSERT INTO fact_entities (entity_type, entity_name, category, attributes)
+                    VALUES ('_processing_marker', $1, '_marker', '{"type": "enrichment_progress"}'::jsonb)
+                    ON CONFLICT (entity_type, entity_name) 
+                    DO UPDATE SET updated_at = NOW()
+                    RETURNING id
+                """, f"{bot_name}_{user_id}")
+                
+                # Store the timestamp in the marker's relationship
+                # CRITICAL: Ensure timestamp is naive UTC datetime for consistency
+                ts_to_store = latest_message_timestamp
+                if ts_to_store.tzinfo is not None:
+                    ts_to_store = ts_to_store.replace(tzinfo=None)
+                
+                context_metadata = {
+                    'latest_message_timestamp': ts_to_store.isoformat(),
+                    'bot_name': bot_name,
+                    'marker_type': 'enrichment_progress'
+                }
+                
+                logger.debug(
+                    f"[TIMESTAMP_UPDATE] user_id={user_id}, bot_name={bot_name}, "
+                    f"timestamp={ts_to_store.isoformat()}, marker_id={marker_entity_id}"
+                )
+                
+                # DEBUG: Log what we're about to insert
+                json_str = json.dumps(context_metadata)
+                logger.info(f"[TIMESTAMP_DEBUG] About to INSERT: user_id={user_id}, entity_id={marker_entity_id}, context_metadata={json_str}")
+                
+                result = await conn.execute("""
+                    INSERT INTO user_fact_relationships 
+                    (user_id, entity_id, relationship_type, confidence, context_metadata)
+                    VALUES ($1, $2, '_enrichment_progress_marker', 1.0, $3::jsonb)
+                    ON CONFLICT (user_id, entity_id, relationship_type)
+                    DO UPDATE SET
+                        context_metadata = $3::jsonb,
+                        updated_at = NOW()
+                """, user_id, marker_entity_id, json_str)
+                
+                logger.info(f"[TIMESTAMP_RESULT] Execute result: {result}")
+                
+                logger.debug(
+                    f"[TIMESTAMP_UPDATE_SUCCESS] user_id={user_id} - marker updated"
+                )
     
     async def _apply_conflict_resolutions(
         self,
@@ -1301,11 +1375,22 @@ class EnrichmentWorker:
         logger.debug("Found %s users for preference extraction", len(users))
         
         preferences_extracted = 0
+        llm_calls_made = 0
         
         for user_id in users:
             try:
                 # Get last preference extraction timestamp
                 last_extraction = await self._get_last_preference_extraction(user_id, bot_name)
+                
+                # CRITICAL: Enforce maximum lookback window - NEVER process messages older than LOOKBACK_DAYS
+                # This prevents burning tokens on ancient conversations even if marker timestamp is old
+                max_lookback = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                if last_extraction < max_lookback:
+                    logger.info(
+                        f"⏭️  [ENFORCING LOOKBACK] User {user_id} preference marker is old ({last_extraction.isoformat()}), "
+                        f"enforcing {config.LOOKBACK_DAYS}-day limit (since {max_lookback.isoformat()})"
+                    )
+                    last_extraction = max_lookback
                 
                 # Get NEW messages since last extraction
                 new_messages = await self._get_new_messages_since(
@@ -1315,14 +1400,14 @@ class EnrichmentWorker:
                 )
                 
                 if not new_messages:
-                    logger.debug("✅ No new messages for preference extraction (user %s)", user_id)
+                    logger.info("⏭️  [NO LLM CALL] No new messages for preference extraction (user %s)", user_id)
                     continue
                 
                 if len(new_messages) < 3:  # Need at least a few messages for context
-                    logger.debug("Skipping user %s - only %s new messages", user_id, len(new_messages))
+                    logger.info("⏭️  [NO LLM CALL] Skipping user %s - only %s new messages (min: 3)", user_id, len(new_messages))
                     continue
                 
-                logger.info("🔍 Extracting preferences from %s new messages (user %s)", len(new_messages), user_id)
+                logger.info("🔍 [LLM CALL] Extracting preferences from %s new messages (user %s)", len(new_messages), user_id)
                 
                 # Extract preferences from conversation window using LLM
                 # Track latest message timestamp for preference extraction
@@ -1334,8 +1419,10 @@ class EnrichmentWorker:
                     bot_name=bot_name
                 )
                 
+                llm_calls_made += 1
+                
                 if not extracted_prefs:
-                    logger.debug("No preferences extracted from new messages (user %s)", user_id)
+                    logger.info("✅ [LLM CALL COMPLETE] No preferences extracted from new messages (user %s) - 0 preferences found", user_id)
                     # CRITICAL FIX: Still need to update the timestamp so we don't reprocess same messages!
                     await self._store_last_processed_timestamp(
                         user_id=user_id,
@@ -1352,76 +1439,73 @@ class EnrichmentWorker:
                 )
                 
                 preferences_extracted += stored_count
-                logger.info("✅ Extracted and stored %s preferences for user %s", stored_count, user_id)
+                logger.info("✅ [LLM CALL COMPLETE] Extracted and stored %s preferences for user %s", stored_count, user_id)
+                
+                # CRITICAL: Update the processing marker timestamp AFTER successful extraction
+                # This tells the next cycle: "we've processed messages up to latest_message_timestamp"
+                # Without this, we'll keep re-extracting the same preferences over and over
+                await self._store_last_processed_timestamp(
+                    user_id=user_id,
+                    bot_name=bot_name,
+                    latest_message_timestamp=latest_message_timestamp
+                )
                 
             except Exception as e:
                 logger.error("Error extracting preferences for user %s: %s", user_id, e, exc_info=True)
                 continue
         
-        logger.info("✅ Extracted %s total preferences for %s", preferences_extracted, bot_name)
+        logger.info("📊 [CYCLE SUMMARY - PREFS] Bot=%s | LLM Calls Made=%s | Preferences Extracted=%s", bot_name, llm_calls_made, preferences_extracted)
         return preferences_extracted
     
     async def _get_last_preference_extraction(self, user_id: str, bot_name: str) -> datetime:
         """
         Get timestamp of last preference extraction for incremental processing.
         
-        Checks universal_users.preferences JSONB for extraction timestamps.
-        Falls back to 30 days ago if no preferences exist.
+        CRITICAL: Uses SAME marker system as fact extraction (_enrichment_progress_marker).
+        This ensures both fact and preference extraction use consistent timestamps,
+        preventing redundant re-processing of the same messages.
         
         INCREMENTAL APPROACH (matches fact extraction pattern):
-        - Tracks last extraction via preference updated_at timestamps
-        - Only processes NEW messages since last extraction
+        - Checks processing marker's latest_message_timestamp
+        - Only processes NEW messages since last marker update
         - Avoids wasteful re-processing of old conversations
         """
         async with self.db_pool.acquire() as conn:
-            # Check if user has any preferences with extraction timestamp
+            # Check if user has a processing marker (same as fact extraction)
             row = await conn.fetchrow("""
-                SELECT preferences
-                FROM universal_users
-                WHERE universal_id = $1
+                SELECT ufr.context_metadata, ufr.created_at
+                FROM user_fact_relationships ufr
+                JOIN fact_entities fe ON ufr.entity_id = fe.id
+                WHERE ufr.user_id = $1 
+                  AND fe.entity_type = '_processing_marker'
+                  AND ufr.relationship_type = '_enrichment_progress_marker'
+                LIMIT 1
             """, user_id)
             
-            if row and row['preferences']:
-                # Find most recent preference extraction timestamp
-                prefs = row['preferences']
-                
-                # Handle case where preferences might be a JSON string instead of dict
-                if isinstance(prefs, str):
+            if row and row['context_metadata']:
+                # Extract timestamp from processing marker
+                context_metadata = row['context_metadata']
+                if isinstance(context_metadata, str):
                     import json
                     try:
-                        prefs = json.loads(prefs)
+                        context_metadata = json.loads(context_metadata)
                     except json.JSONDecodeError:
-                        logger.warning("Failed to parse preferences JSON for user %s, using default backfill", user_id)
-                        prefs = {}  # Fall through to backfill logic
+                        context_metadata = {}
                 
-                # Process preferences if we have a valid dict
-                if isinstance(prefs, dict) and prefs:
-                    timestamps = []
-                    
-                    for pref_type, pref_data in prefs.items():
-                        if isinstance(pref_data, dict) and 'updated_at' in pref_data:
-                            try:
-                                # Parse ISO timestamp (handles both with/without timezone)
-                                ts_str = pref_data['updated_at']
-                                if isinstance(ts_str, str):
-                                    # Remove 'Z' and add UTC timezone if needed
-                                    ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                                    # Convert to naive UTC datetime for consistency with Qdrant queries
-                                    if ts.tzinfo is not None:
-                                        ts = ts.replace(tzinfo=None)
-                                    timestamps.append(ts)
-                            except (ValueError, AttributeError) as e:
-                                logger.warning("Failed to parse timestamp for preference %s: %s", pref_type, e)
-                                continue
-                    
-                    if timestamps:
-                        last_extraction = max(timestamps)
-                        logger.debug("Last preference extraction for user %s: %s", user_id, last_extraction)
-                        return last_extraction
+                if context_metadata.get('latest_message_timestamp'):
+                    try:
+                        ts = datetime.fromisoformat(context_metadata['latest_message_timestamp'])
+                        # Make timezone-naive for consistency
+                        if ts.tzinfo is not None:
+                            ts = ts.replace(tzinfo=None)
+                        logger.debug("Last preference extraction for user %s: %s (from marker)", user_id, ts)
+                        return ts
+                    except (ValueError, TypeError) as e:
+                        logger.warning("Failed to parse marker timestamp for user %s: %s", user_id, e)
             
-            # No preferences yet - backfill from 30 days ago
+            # No marker yet - backfill from LOOKBACK_DAYS ago
             backfill_from = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
-            logger.debug("No existing preferences for user %s, backfilling from %s", user_id, backfill_from)
+            logger.debug("No existing preference marker for user %s, backfilling from %s", user_id, backfill_from)
             return backfill_from
     
     async def _extract_preferences_from_window(
