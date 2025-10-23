@@ -36,6 +36,8 @@ class UserMemory:
     entity_name: str
     relationship_type: str
     confidence: float
+    is_preference: bool = False  # NEW: Distinguish preferences from facts
+    preference_type: Optional[str] = None  # NEW: For preferences (preferred_name, language, etc.)
     category: Optional[str] = None
     subcategory: Optional[str] = None
     emotional_context: Optional[str] = None
@@ -105,55 +107,55 @@ class ChatGPTMemoriesImporter:
         first_line = memory_text.split('\n')[0].strip()
         
         # Enhanced pattern matching for various memory types
+        # CRITICAL: Order matters! More specific patterns MUST come before generic ones
         patterns = [
-            # Ownership/possession patterns
-            (r"owns?\s+(?:the\s+)?following\s+(.+)", "possession", "owns", 0.8),
-            (r"(?:has|owns?)\s+(?:a|an|the)?\s*(.+)", "possession", "owns", 0.7),
-            
-            # Background/experience patterns  
-            (r"has\s+(?:a\s+)?background\s+in\s+(.+)", "background", "has_background", 0.8),
-            (r"has\s+experience\s+(?:with|in)\s+(.+)", "experience", "experienced_in", 0.8),
-            
-            # Device/equipment patterns
-            (r"uses?\s+(?:the\s+)?(.+)", "equipment", "uses", 0.7),
-            (r"bought\s+(?:the\s+)?(.+)", "equipment", "owns", 0.8),
-            
-            # Learning/educational patterns
+            # Goals and aspirations (very specific "wants" patterns - BEFORE generic wants)
+            (r"wants?\s+to\s+learn\s+(.+)", "learning", "wants_to_learn", 0.9),
             (r"wants?\s+to\s+remember\s+(.+)", "learning", "wants_to_remember", 0.8),
             (r"wants?\s+(?:a\s+)?document\s+that\s+(.+)", "learning", "wants", 0.7),
-            
-            # Personal characteristics
-            (r"is\s+(?:a\s+)?(.+)", "characteristic", "is", 0.7),
-            (r"tends?\s+to\s+(.+)", "behavior", "tends_to", 0.7),
-            (r"prefers?\s+(.+)", "preference", "prefers", 0.8),
-            
-            # Professional patterns
-            (r"(?:was|is)\s+(?:an?\s+)?engineer\s+(.+)", "professional", "worked_as", 0.8),
-            (r"(?:works?|working)\s+on\s+(.+)", "professional", "works_on", 0.8),
-            (r"is\s+doing\s+(?:a\s+)?mentorship\s+(.+)", "professional", "mentorship", 0.8),
-            
-            # Goals and aspirations
             (r"goal\s+is\s+to\s+(.+)", "goal", "goal", 0.9),
             (r"is\s+focused\s+on\s+(.+)", "focus", "focused_on", 0.8),
             (r"is\s+not\s+aiming\s+to\s+(.+)", "goal", "not_aiming", 0.8),
+            
+            # Background/experience patterns (specific "has" patterns - BEFORE generic has)
+            (r"has\s+(?:a\s+)?background\s+in\s+(.+)", "background", "has_background", 0.8),
+            (r"has\s+experience\s+(?:with|in)\s+(.+)", "experience", "experienced_in", 0.8),
+            
+            # Ownership/possession patterns (specific first, then generic)
+            (r"owns?\s+(?:the\s+)?following\s+(.+)", "possession", "owns", 0.8),
+            (r"(?:has|owns?)\s+(?:a|an|the)?\s*(.+)", "possession", "owns", 0.7),
             
             # Skills and abilities
             (r"strengths?\s+include\s+(.+)", "skill", "strengths", 0.8),
             (r"is\s+less\s+experienced\s+at\s+(.+)", "skill", "less_experienced", 0.7),
             
-            # Technology and devices
+            # Professional patterns (specific "is" patterns - BEFORE generic is)
+            (r"(?:was|is)\s+(?:an?\s+)?engineer\s+(.+)", "professional", "worked_as", 0.8),
+            (r"(?:works?|working)\s+on\s+(.+)", "professional", "works_on", 0.8),
+            (r"is\s+doing\s+(?:a\s+)?mentorship\s+(.+)", "professional", "mentorship", 0.8),
+            
+            # Technology and devices (specific "is" patterns)
             (r"is\s+(?:a\s+)?mac,?\s+(.+)", "technology", "uses", 0.8),
             
             # Mentorship and advice
             (r"mentor,?\s+(.+)", "mentorship", "mentor_advice", 0.8),
             
-            # Likes/preferences (original patterns)
+            # Device/equipment patterns
+            (r"uses?\s+(?:the\s+)?(.+)", "equipment", "uses", 0.7),
+            (r"bought\s+(?:the\s+)?(.+)", "equipment", "owns", 0.8),
+            
+            # Likes/preferences (specific subject patterns)
             (r"(?:user|they|he|she)\s+likes?\s+(.+)", "preference", "likes", 0.8),
             (r"(?:user|they|he|she)\s+loves?\s+(.+)", "preference", "loves", 0.9),
             (r"(?:user|they|he|she)\s+enjoys?\s+(.+)", "activity", "enjoys", 0.8),
             (r"(?:user|they|he|she)\s+dislikes?\s+(.+)", "preference", "dislikes", 0.8),
             
-            # Generic fallback
+            # Personal characteristics (generic patterns - near the end)
+            (r"prefers?\s+(.+)", "preference", "prefers", 0.8),
+            (r"tends?\s+to\s+(.+)", "behavior", "tends_to", 0.7),
+            (r"is\s+(?:a\s+)?(.+)", "characteristic", "is", 0.7),
+            
+            # Generic fallback (ALWAYS LAST)
             (r"(.+)", "general", "mentioned", 0.5),
         ]
         
@@ -171,6 +173,11 @@ class ChatGPTMemoriesImporter:
                 category, subcategory = self._categorize_entity(entity_type, entity_name)
                 emotional_context = self._detect_emotional_context(relationship)
                 
+                # NEW: Determine if this is a preference or fact
+                is_preference, preference_type = self._classify_as_preference(
+                    relationship, entity_type, entity_name
+                )
+                
                 # Create attributes dict with source information
                 attributes = {
                     "source": "chatgpt_import",
@@ -186,6 +193,8 @@ class ChatGPTMemoriesImporter:
                     entity_name=entity_name,
                     relationship_type=relationship,
                     confidence=confidence,
+                    is_preference=is_preference,
+                    preference_type=preference_type,
                     category=category,
                     subcategory=subcategory,
                     emotional_context=emotional_context,
@@ -264,6 +273,52 @@ class ChatGPTMemoriesImporter:
         
         return "neutral"
     
+    def _classify_as_preference(
+        self, 
+        relationship: str, 
+        entity_type: str, 
+        entity_name: str
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Classify whether this memory should be stored as a preference or fact.
+        
+        PREFERENCES (user choices/opinions/settings):
+        - "likes", "prefers", "dislikes", "loves" → subjective opinions
+        - "preferred_name", "timezone", "language" → system settings
+        
+        FACTS (objective information):
+        - "owns", "has", "is", "works_on" → objective reality
+        - "experienced_in", "knows" → skills/knowledge
+        
+        Args:
+            relationship: Type of relationship (likes, owns, etc.)
+            entity_type: Type of entity (preference, possession, etc.)
+            entity_name: Name of the entity
+            
+        Returns:
+            Tuple of (is_preference: bool, preference_type: str or None)
+        """
+        # Opinion/taste preferences
+        opinion_relationships = ["likes", "dislikes", "loves", "hates", "prefers", "enjoys"]
+        if relationship in opinion_relationships:
+            # Map to preference types
+            if entity_type in ["food", "activity", "entertainment", "music", "sport"]:
+                return (True, f"{entity_type}_preference")
+            return (True, "general_preference")
+        
+        # System/setting preferences (preferred name, timezone, language, etc.)
+        if "preferred" in relationship.lower() or "preference" in entity_name.lower():
+            if "name" in entity_name.lower():
+                return (True, "preferred_name")
+            elif "timezone" in entity_name.lower() or "time zone" in entity_name.lower():
+                return (True, "timezone")
+            elif "language" in entity_name.lower():
+                return (True, "language")
+            return (True, "user_setting")
+        
+        # Everything else is a fact (objective information)
+        return (False, None)
+    
     async def import_memories_file(self, file_path: str) -> Dict[str, int]:
         """
         Import memories from a text file (memory blocks separated by blank lines)
@@ -341,24 +396,53 @@ class ChatGPTMemoriesImporter:
                 logger.error("   Block content: '%s'", memory_block[:200] + "..." if len(memory_block) > 200 else memory_block)
     
     async def _store_memory(self, memory: UserMemory):
-        """Store a memory in the PostgreSQL knowledge graph"""
+        """
+        Store a memory in the PostgreSQL knowledge graph.
+        
+        Routes to appropriate storage:
+        - Preferences → universal_users.preferences JSONB (fast key-value)
+        - Facts → user_fact_relationships table (semantic graph)
+        """
         try:
-            # Store using the semantic knowledge router
-            await self.knowledge_router.store_user_fact(
-                user_id=self.user_id,
-                entity_type=memory.entity_type,
-                entity_name=memory.entity_name,
-                relationship_type=memory.relationship_type,
-                confidence=memory.confidence,
-                category=memory.category,
-                emotional_context=memory.emotional_context,
-                mentioned_by_character=self.character_name,
-                source_conversation_id=None,
-                attributes=memory.attributes
-            )
-            
-            if self.verbose:
-                logger.info("💾 Stored: %s -> %s", memory.entity_name, memory.relationship_type)
+            if memory.is_preference:
+                # Store as preference in JSONB column
+                await self.knowledge_router.store_user_preference(
+                    user_id=self.user_id,
+                    preference_type=memory.preference_type or "general_preference",
+                    preference_value=memory.entity_name,
+                    confidence=memory.confidence,
+                    metadata={
+                        "relationship": memory.relationship_type,
+                        "entity_type": memory.entity_type,
+                        "category": memory.category,
+                        "emotional_context": memory.emotional_context,
+                        "source": "chatgpt_import",
+                        "raw_text": memory.raw_text,
+                        "import_timestamp": memory.attributes.get("import_timestamp")
+                    }
+                )
+                
+                if self.verbose:
+                    logger.info("💾 Stored PREFERENCE: %s = %s", 
+                               memory.preference_type, memory.entity_name)
+            else:
+                # Store as fact in graph structure
+                await self.knowledge_router.store_user_fact(
+                    user_id=self.user_id,
+                    entity_type=memory.entity_type,
+                    entity_name=memory.entity_name,
+                    relationship_type=memory.relationship_type,
+                    confidence=memory.confidence,
+                    category=memory.category,
+                    emotional_context=memory.emotional_context,
+                    mentioned_by_character=self.character_name,
+                    source_conversation_id=None,
+                    attributes=memory.attributes
+                )
+                
+                if self.verbose:
+                    logger.info("💾 Stored FACT: %s -> %s", 
+                               memory.entity_name, memory.relationship_type)
                 
         except Exception as e:
             logger.error("❌ Failed to store memory '%s': %s", memory.raw_text, e)
