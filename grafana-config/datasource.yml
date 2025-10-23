@@ -9,7 +9,7 @@ datasources:
     database: performance_metrics
     user: whisperengine
     password: whisperengine_metrics
-    uid: influxdb-whisperengine
+    uid: influxdb
     isDefault: true
     jsonData:
       version: Flux
