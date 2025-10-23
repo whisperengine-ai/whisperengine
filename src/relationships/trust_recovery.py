@@ -117,6 +117,16 @@ class TrustRecoverySystem:
             'moderate': 0.15, # Aim to recover 0.15 trust for moderate declines
             'severe': 0.20    # Aim to recover 0.20 trust for severe declines
         }
+        
+        # Telemetry: Usage tracking for evaluation
+        self._telemetry = {
+            'detect_trust_decline_count': 0,
+            'activate_recovery_count': 0,
+            'assess_recovery_progress_count': 0,
+            'declines_detected': 0,
+            'recoveries_activated': 0,
+            'initialization_time': datetime.utcnow()
+        }
     
     async def detect_trust_decline(
         self,
@@ -137,6 +147,11 @@ class TrustRecoverySystem:
         Returns:
             TrustDeclineDetection if decline detected, None if trust is healthy
         """
+        # Telemetry: Track invocation
+        self._telemetry['detect_trust_decline_count'] += 1
+        logger.info("🔍 TRUST RECOVERY TELEMETRY: detect_trust_decline called (count: %d)", 
+                   self._telemetry['detect_trust_decline_count'])
+        
         try:
             # Get current relationship scores
             current_trust = await self._get_current_trust(user_id, bot_name)
@@ -194,10 +209,15 @@ class TrustRecoverySystem:
                 detection_timestamp=datetime.now()
             )
             
+            # Telemetry: Track decline detection
+            self._telemetry['declines_detected'] += 1
+            
             self.logger.info(
                 "⚠️ Trust decline detected for %s/%s: trust=%.2f, slope=%.3f, severity=%s",
                 bot_name, user_id, current_trust, trust_slope, severity
             )
+            logger.info("🔍 TRUST RECOVERY TELEMETRY: Trust decline detected (total: %d)", 
+                       self._telemetry['declines_detected'])
             
             return detection
             
@@ -218,6 +238,11 @@ class TrustRecoverySystem:
         Returns:
             RecoveryProgress tracking object
         """
+        # Telemetry: Track recovery activation
+        self._telemetry['activate_recovery_count'] += 1
+        logger.info("🔧 TRUST RECOVERY TELEMETRY: activate_recovery_mode called (count: %d)", 
+                   self._telemetry['activate_recovery_count'])
+        
         try:
             user_id = detection.user_id
             bot_name = detection.bot_name
@@ -259,10 +284,15 @@ class TrustRecoverySystem:
                 detection.current_trust
             )
             
+            # Telemetry: Track successful recovery activation
+            self._telemetry['recoveries_activated'] += 1
+            
             self.logger.info(
                 "🔧 Recovery mode activated for %s/%s: target_trust=%.2f (current=%.2f)",
                 bot_name, user_id, target_trust, detection.current_trust
             )
+            logger.info("🔧 TRUST RECOVERY TELEMETRY: Recovery activated (total: %d)", 
+                       self._telemetry['recoveries_activated'])
             
             return recovery
             
