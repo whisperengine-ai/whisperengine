@@ -1,0 +1,295 @@
+{
+  "dashboard": {
+    "title": "Learning System Telemetry & Experimental Features",
+    "tags": ["whisperengine", "learning", "telemetry", "experimental"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "schemaVersion": 38,
+    "version": 1,
+    "panels": [
+      {
+        "id": 1,
+        "title": "📊 Attachment Monitor - Risk Level Distribution (7d)",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"attachment_monitoring\")\n  |> filter(fn: (r) => r[\"_field\"] == \"emotional_intensity\")\n  |> group(columns: [\"risk_level\"])\n  |> count()\n  |> group()\n  |> rename(columns: {_value: \"count\"})"
+          }
+        ],
+        "options": {
+          "pieType": "pie",
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "🧠 Attachment Monitor - Emotional Intensity Trends",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 16,
+          "x": 8,
+          "y": 0
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"attachment_monitoring\")\n  |> filter(fn: (r) => r[\"_field\"] == \"emotional_intensity\")\n  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)\n  |> group(columns: [\"risk_level\"])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "Emotional Intensity",
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "⚠️ Attachment Interventions Provided (24h)",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 6,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"attachment_monitoring\")\n  |> filter(fn: (r) => r[\"_field\"] == \"intervention_provided\")\n  |> filter(fn: (r) => r[\"_value\"] == true)\n  |> count()"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 5,
+                  "color": "yellow"
+                },
+                {
+                  "value": 10,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "textMode": "value_and_name",
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 4,
+        "title": "📈 Interaction Frequency by User",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 6,
+          "w": 10,
+          "x": 6,
+          "y": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"attachment_monitoring\")\n  |> filter(fn: (r) => r[\"_field\"] == \"interaction_frequency\")\n  |> aggregateWindow(every: 2h, fn: mean, createEmpty: false)\n  |> group(columns: [\"user_id\"])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "Messages per Day",
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 5
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "📊 Consecutive Days Streak Distribution",
+        "type": "bargauge",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 16,
+          "y": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"attachment_monitoring\")\n  |> filter(fn: (r) => r[\"_field\"] == \"consecutive_days\")\n  |> last()\n  |> group(columns: [\"user_id\"])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 30,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 7,
+                  "color": "yellow"
+                },
+                {
+                  "value": 14,
+                  "color": "orange"
+                },
+                {
+                  "value": 21,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        }
+      },
+      {
+        "id": 6,
+        "title": "🎯 EXPERIMENTAL: Engagement Engine Metrics (Coming Soon)",
+        "type": "text",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "## 🚀 ProactiveConversationEngagementEngine Telemetry\n\n**Enhancement #5 Complete** - Telemetry added to track:\n\n- **analyze_engagement_potential_count**: Total invocations\n- **analyze_conversation_engagement_count**: Analysis calls\n- **interventions_generated**: Recommendations triggered\n- **total_recommendations**: Cumulative suggestions\n\n### 📊 To Enable InfluxDB Tracking:\n\n1. Add InfluxDB writes in `src/conversation/proactive_engagement_engine.py`\n2. Write telemetry counters periodically or on-demand\n3. Use measurement: `engagement_engine_telemetry`\n\n**Current Status**: Logging-based telemetry ✅  \n**Next Step**: Add InfluxDB integration for Grafana visualization"
+        }
+      },
+      {
+        "id": 7,
+        "title": "🔧 EXPERIMENTAL: Trust Recovery Metrics (Coming Soon)",
+        "type": "text",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 14
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "## 🛡️ TrustRecoverySystem Telemetry\n\n**Enhancement #6 Complete** - Telemetry added to track:\n\n- **detect_trust_decline_count**: Decline detection invocations\n- **declines_detected**: Actual declines found\n- **activate_recovery_count**: Recovery activation attempts\n- **recoveries_activated**: Successful activations\n- **assess_recovery_progress_count**: Progress check calls\n\n### 📊 To Enable InfluxDB Tracking:\n\n1. Add InfluxDB writes in `src/relationships/trust_recovery.py`\n2. Write telemetry counters periodically\n3. Use measurement: `trust_recovery_telemetry`\n\n**Current Status**: Logging-based telemetry ✅  \n**Next Step**: Add InfluxDB integration for Grafana visualization"
+        }
+      },
+      {
+        "id": 8,
+        "title": "📚 Learning Components Telemetry Status",
+        "type": "text",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 20
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "## 🎓 Sprint 6 Learning Components - Telemetry Implementation Status\n\n**Enhancement #4 Complete** - All 8 components instrumented:\n\n| Component | Telemetry Status | Key Metrics |\n|-----------|-----------------|-------------|\n| **AttachmentMonitor** | ✅ InfluxDB Enabled | `attachment_monitoring` measurement |\n| **CharacterGraphKnowledgeBuilder** | ✅ Logging | `build_count`, `facts_extracted`, `graph_updates` |\n| **CharacterGraphKnowledgeIntelligence** | ✅ Logging | `query_count`, `results_found` |\n| **CharacterInsightStorage** | ✅ Logging | `store_count`, `retrieve_count`, `insights_stored` |\n| **CharacterLearningMomentDetector** | ✅ Logging | `detect_count`, `moments_detected`, `learning_opportunities` |\n| **CharacterSelfKnowledgeExtractor** | ✅ Logging | `extract_count`, `facts_extracted`, `self_knowledge_stored` |\n| **CharacterTemporalEvolutionAnalyzer** | ✅ Logging | `analyze_count`, `evolutions_detected` |\n| **CharacterVectorEpisodicIntelligence** | ✅ Logging | `store_count`, `retrieve_count`, `episodes_stored` |\n\n### 📊 Next Steps for Full Grafana Integration:\n\n1. **Add InfluxDB writes** to remaining 7 components (follow `AttachmentMonitor` pattern)\n2. **Create measurements** for each component type\n3. **Update this dashboard** with real-time panels once InfluxDB integration complete\n\n### 🔍 Current Monitoring:\n\n- **Attachment Monitor**: Fully tracked in panels above ✅\n- **Other Components**: Monitor via application logs (INFO level with telemetry markers)\n- **Experimental Features**: Track via log aggregation until InfluxDB integration added"
+        }
+      }
+    ]
+  }
+}
