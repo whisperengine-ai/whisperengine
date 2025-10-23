@@ -157,6 +157,16 @@ class LearningOrchestrator:
         self.optimization_cycle_interval = timedelta(hours=24)
         self.correlation_analysis_interval = timedelta(days=7)
         
+        # Sprint 6 Telemetry: Usage tracking for evaluation
+        self._telemetry = {
+            'coordinate_learning_cycle_count': 0,
+            'monitor_learning_health_count': 0,
+            'prioritize_learning_tasks_count': 0,
+            'analyze_cross_sprint_correlations_count': 0,
+            'total_execution_time_seconds': 0.0,
+            'initialization_time': datetime.utcnow()
+        }
+        
         logger.info("Learning Orchestrator initialized with all sprint components")
     
     async def coordinate_learning_cycle(self, bot_name: str) -> Dict[str, Any]:
@@ -178,6 +188,9 @@ class LearningOrchestrator:
         """
         cycle_start = datetime.utcnow()
         logger.info("🎯 ORCHESTRATOR: Starting unified learning cycle for %s", bot_name)
+        
+        # Sprint 6 Telemetry: Track invocation
+        self._telemetry['coordinate_learning_cycle_count'] += 1
         
         try:
             # Phase 1: Health assessment across all components
@@ -204,6 +217,34 @@ class LearningOrchestrator:
                 )
             
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
+            
+            # Sprint 6 Telemetry: Record execution time
+            self._telemetry['total_execution_time_seconds'] += cycle_duration
+            
+            # Sprint 6 Telemetry: Write to InfluxDB for evaluation
+            if self.temporal_client:
+                try:
+                    telemetry_point = {
+                        'measurement': 'component_usage',
+                        'tags': {
+                            'component': 'learning_orchestrator',
+                            'method': 'coordinate_learning_cycle',
+                            'bot_name': bot_name
+                        },
+                        'fields': {
+                            'execution_time_seconds': cycle_duration,
+                            'tasks_executed': len(execution_results.get('completed_tasks', [])),
+                            'tasks_failed': len(execution_results.get('failed_tasks', [])),
+                            'correlations_analyzed': len(correlations),
+                            'performance_improvement': performance_update.get('improvement_score', 0.0),
+                            'invocation_count': self._telemetry['coordinate_learning_cycle_count']
+                        },
+                        'time': cycle_start
+                    }
+                    await self.temporal_client.write_point(telemetry_point)
+                    logger.info("📊 ORCHESTRATOR TELEMETRY: Recorded cycle metrics to InfluxDB")
+                except Exception as telemetry_error:
+                    logger.warning("Failed to record orchestrator telemetry: %s", telemetry_error)
             
             learning_cycle_result = {
                 'cycle_id': f"learning_cycle_{bot_name}_{int(cycle_start.timestamp())}",
@@ -259,6 +300,9 @@ class LearningOrchestrator:
         """
         health_check_start = datetime.utcnow()
         component_statuses = []
+        
+        # Sprint 6 Telemetry: Track invocation
+        self._telemetry['monitor_learning_health_count'] += 1
         
         try:
             # Sprint 1: TrendWise health check

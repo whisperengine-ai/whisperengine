@@ -152,6 +152,17 @@ class LearningPipelineManager:
         self._paused = False
         self._shutdown_event = asyncio.Event()
         
+        # Sprint 6 Telemetry: Usage tracking for evaluation
+        self._telemetry = {
+            'start_pipeline_count': 0,
+            'schedule_learning_cycle_count': 0,
+            'execute_task_count': 0,
+            'total_tasks_completed': 0,
+            'total_tasks_failed': 0,
+            'total_execution_time_seconds': 0.0,
+            'initialization_time': datetime.utcnow()
+        }
+        
         logger.info("Learning Pipeline Manager initialized")
     
     # =============================================================================
@@ -166,6 +177,9 @@ class LearningPipelineManager:
         
         self._running = True
         self._shutdown_event.clear()
+        
+        # Sprint 6 Telemetry: Track invocation
+        self._telemetry['start_pipeline_count'] += 1
         
         logger.info("Starting Learning Pipeline Manager")
         
@@ -238,6 +252,9 @@ class LearningPipelineManager:
         Returns:
             str: Cycle ID
         """
+        # Sprint 6 Telemetry: Track invocation
+        self._telemetry['schedule_learning_cycle_count'] += 1
+        
         async with self._cycle_lock:
             cycle = PipelineCycle(
                 name=name,
@@ -548,7 +565,11 @@ class LearningPipelineManager:
     
     async def _execute_task(self, task: PipelineTask):
         """Execute a single task."""
+        task_start = datetime.utcnow()
         logger.info("Executing task: %s", task.name)
+        
+        # Sprint 6 Telemetry: Track invocation
+        self._telemetry['execute_task_count'] += 1
         
         # Update task status
         task.status = TaskStatus.RUNNING
@@ -570,6 +591,36 @@ class LearningPipelineManager:
             task.completed_at = datetime.utcnow()
             task.result = result
             
+            # Sprint 6 Telemetry: Record successful task execution
+            task_duration = (datetime.utcnow() - task_start).total_seconds()
+            self._telemetry['total_tasks_completed'] += 1
+            self._telemetry['total_execution_time_seconds'] += task_duration
+            
+            # Sprint 6 Telemetry: Write to InfluxDB for evaluation
+            if self.temporal_client:
+                try:
+                    telemetry_point = {
+                        'measurement': 'component_usage',
+                        'tags': {
+                            'component': 'learning_pipeline_manager',
+                            'method': 'execute_task',
+                            'task_category': task.category.value,
+                            'task_stage': task.stage.value,
+                            'bot_name': task.bot_name or 'unknown'
+                        },
+                        'fields': {
+                            'execution_time_seconds': task_duration,
+                            'task_priority': task.priority.value,
+                            'invocation_count': self._telemetry['execute_task_count'],
+                            'total_tasks_completed': self._telemetry['total_tasks_completed']
+                        },
+                        'time': task_start
+                    }
+                    await self.temporal_client.write_point(telemetry_point)
+                    logger.info("📊 PIPELINE TELEMETRY: Recorded task execution metrics to InfluxDB")
+                except Exception as telemetry_error:
+                    logger.warning("Failed to record pipeline telemetry: %s", telemetry_error)
+            
             # Record task completion
             await self._record_task_event(task, "completed")
             
@@ -588,6 +639,9 @@ class LearningPipelineManager:
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.utcnow()
             task.error = str(e)
+            
+            # Sprint 6 Telemetry: Record failed task
+            self._telemetry['total_tasks_failed'] += 1
             
             # Record task failure
             await self._record_task_event(task, "failed", {"error": str(e)})
