@@ -135,6 +135,17 @@ class PredictiveAdaptationEngine:
         self._adaptation_effectiveness_threshold = 0.6
         self._max_active_predictions_per_user = 5
         
+        # Sprint 6 Telemetry: Usage tracking for evaluation
+        self._telemetry = {
+            'predict_user_needs_count': 0,
+            'preemptively_adapt_responses_count': 0,
+            'validate_predictions_count': 0,
+            'total_predictions_generated': 0,
+            'total_adaptations_created': 0,
+            'total_execution_time_seconds': 0.0,
+            'initialization_time': datetime.utcnow()
+        }
+        
         logger.info("Predictive Adaptation Engine initialized")
     
     # =============================================================================
@@ -149,8 +160,12 @@ class PredictiveAdaptationEngine:
         Uses Sprint 1 TrendWise analysis to identify patterns that typically
         precede user issues or needs.
         """
+        prediction_start = datetime.utcnow()
         logger.info("Predicting user needs for %s with %s (horizon: %dh)", 
                    user_id, bot_name, prediction_horizon_hours)
+        
+        # Sprint 6 Telemetry: Track invocation
+        self._telemetry['predict_user_needs_count'] += 1
         
         try:
             predictions = []
@@ -187,6 +202,36 @@ class PredictiveAdaptationEngine:
             # Record prediction metrics
             await self._record_prediction_metrics(user_id, bot_name, predictions)
             
+            # Sprint 6 Telemetry: Record execution metrics
+            prediction_duration = (datetime.utcnow() - prediction_start).total_seconds()
+            self._telemetry['total_predictions_generated'] += len(predictions)
+            self._telemetry['total_execution_time_seconds'] += prediction_duration
+            
+            # Sprint 6 Telemetry: Write to InfluxDB for evaluation
+            if self.temporal_client:
+                try:
+                    telemetry_point = {
+                        'measurement': 'component_usage',
+                        'tags': {
+                            'component': 'predictive_engine',
+                            'method': 'predict_user_needs',
+                            'bot_name': bot_name,
+                            'user_id': user_id
+                        },
+                        'fields': {
+                            'execution_time_seconds': prediction_duration,
+                            'predictions_generated': len(predictions),
+                            'prediction_horizon_hours': prediction_horizon_hours,
+                            'invocation_count': self._telemetry['predict_user_needs_count'],
+                            'total_predictions_lifetime': self._telemetry['total_predictions_generated']
+                        },
+                        'time': prediction_start
+                    }
+                    await self.temporal_client.write_point(telemetry_point)
+                    logger.info("📊 PREDICTIVE ENGINE TELEMETRY: Recorded prediction metrics to InfluxDB")
+                except Exception as telemetry_error:
+                    logger.warning("Failed to record predictive engine telemetry: %s", telemetry_error)
+            
             logger.info("Generated %d predictions for %s", len(predictions), user_id)
             return predictions
             
@@ -200,7 +245,11 @@ class PredictiveAdaptationEngine:
         
         Generates specific adaptation strategies before issues occur.
         """
+        adaptation_start = datetime.utcnow()
         logger.info("Creating preemptive adaptations for %d predicted needs", len(predicted_needs))
+        
+        # Sprint 6 Telemetry: Track invocation
+        self._telemetry['preemptively_adapt_responses_count'] += 1
         
         try:
             adaptations = []
@@ -218,6 +267,11 @@ class PredictiveAdaptationEngine:
             
             # Record adaptation metrics
             await self._record_adaptation_metrics(adaptations)
+            
+            # Sprint 6 Telemetry: Record execution metrics
+            adaptation_duration = (datetime.utcnow() - adaptation_start).total_seconds()
+            self._telemetry['total_adaptations_created'] += len(adaptations)
+            self._telemetry['total_execution_time_seconds'] += adaptation_duration
             
             logger.info("Created %d preemptive adaptations", len(adaptations))
             return adaptations
