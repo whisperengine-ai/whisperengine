@@ -607,19 +607,8 @@ class BotEventHandlers:
         # Replace original message content with sanitized version
         message.content = sanitized_content
 
-        # 🏷️ AUTO-DETECT USER NAMES: Process message for name information
-        try:
-            from src.utils.automatic_name_storage import create_automatic_name_storage
-            from src.llm.llm_protocol import create_llm_client
-            
-            if self.memory_manager:
-                llm_client = create_llm_client()
-                name_storage = create_automatic_name_storage(self.memory_manager, llm_client)
-                detected_name = await name_storage.process_message_for_names(user_id, message.content)
-                if detected_name:
-                    logger.info("🏷️ Auto-detected name '%s' for user %s in DM", detected_name, user_id)
-        except Exception as e:
-            logger.debug("Name detection failed in DM: %s", e)
+        # 🏷️ AUTO-DETECT USER NAMES: Now handled by MessageProcessor._process_name_detection()
+        # (Removed duplicate call - MessageProcessor handles this in Phase 2.5)
 
         # AI identity questions are now handled naturally through CDL character responses
         # No more dirty filter patterns - let characters respond authentically

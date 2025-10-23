@@ -1,8 +1,14 @@
 """
 Automatic Name Detection and Storage System
 
-This module provides automatic detection and storage of user names during conversations.
-Integrates with the existing vector memory system to ensure persistent name storage.
+⚠️ DEPRECATED: This module is no longer used.
+
+Name storage now happens directly in MessageProcessor using Discord display names
+from metadata. No regex patterns, no LLM calls - just direct Discord metadata.
+
+See: src/core/message_processor.py -> _process_name_detection()
+
+This file is kept for backward compatibility only.
 """
 
 import logging
@@ -23,6 +29,8 @@ class AutomaticNameStorage:
         """
         Process a user message for name information and store if found.
         
+        Uses ONLY regex pattern matching - NO LLM calls.
+        
         Args:
             user_id: The user's ID
             message: The user's message content
@@ -31,12 +39,8 @@ class AutomaticNameStorage:
             The detected name if found, None otherwise
         """
         try:
-            # First try basic pattern detection (fast)
+            # Use pattern detection ONLY (fast, no LLM calls)
             detected_name = self._extract_name_from_text(message)
-            
-            # If no basic pattern found and LLM available, try LLM detection
-            if not detected_name and self.llm_client:
-                detected_name = await self._llm_extract_name(message)
             
             # Store the name if detected
             if detected_name:
@@ -76,23 +80,11 @@ class AutomaticNameStorage:
         return None
     
     async def _llm_extract_name(self, message: str) -> Optional[str]:
-        """Use LLM to extract name from message"""
-        try:
-            if not self.llm_client or not hasattr(self.llm_client, 'extract_personal_info'):
-                return None
-                
-            personal_info = self.llm_client.extract_personal_info(message)
-            
-            if isinstance(personal_info, dict) and "personal_info" in personal_info:
-                names = personal_info["personal_info"].get("name", [])
-                if names and isinstance(names, list) and len(names) > 0:
-                    name = names[0].strip()
-                    if self._is_valid_name(name):
-                        return name.title()
-                        
-        except (ValueError, RuntimeError, OSError, AttributeError) as e:
-            logger.debug("LLM name extraction failed: %s", e)
-            
+        """
+        DEPRECATED: LLM-based name extraction disabled to avoid unnecessary LLM calls.
+        Use regex pattern matching only (_extract_name_from_text).
+        """
+        logger.debug("LLM name extraction is deprecated - use pattern matching only")
         return None
     
     def _is_valid_name(self, name: str) -> bool:

@@ -1436,21 +1436,51 @@ class MessageProcessor:
             }
 
     async def _process_name_detection(self, message_context: MessageContext):
-        """Process message for automatic name detection and storage."""
+        """
+        Store user's Discord display name as their preferred name.
+        NO regex patterns, NO LLM calls - just use Discord metadata directly.
+        """
         try:
-            from src.utils.automatic_name_storage import create_automatic_name_storage
-            from src.llm.llm_protocol import create_llm_client
+            if not self.memory_manager or not message_context.metadata:
+                return
             
-            if self.memory_manager:
-                llm_client = create_llm_client()
-                name_storage = create_automatic_name_storage(self.memory_manager, llm_client)
-                detected_name = await name_storage.process_message_for_names(
-                    message_context.user_id, message_context.content
+            # Get Discord display name from metadata
+            discord_author_name = message_context.metadata.get('discord_author_name')
+            if not discord_author_name:
+                logger.debug("No discord_author_name in metadata - skipping name storage")
+                return
+            
+            # Store the Discord display name as a user fact
+            if hasattr(self.memory_manager, 'store_fact'):
+                await self.memory_manager.store_fact(
+                    user_id=message_context.user_id,
+                    fact=f"User's preferred name is {discord_author_name}",
+                    context="Extracted from Discord display name",
+                    confidence=1.0,
+                    metadata={
+                        "preferred_name": discord_author_name,
+                        "detection_method": "discord_metadata",
+                        "source": "discord_display_name"
+                    }
                 )
-                if detected_name:
-                    logger.info("🏷️ Auto-detected name '%s' for user %s", detected_name, message_context.user_id)
-        except (ImportError, AttributeError, ValueError) as e:
-            logger.debug("Name detection failed: %s", str(e))
+                logger.info("🏷️ Stored Discord name '%s' for user %s", discord_author_name, message_context.user_id)
+            else:
+                # Fallback: store as regular conversation with special metadata
+                await self.memory_manager.store_conversation(
+                    user_id=message_context.user_id,
+                    user_message=f"My name is {discord_author_name}",
+                    bot_response=f"Nice to meet you, {discord_author_name}!",
+                    metadata={
+                        "preferred_name": discord_author_name,
+                        "memory_type": "name_fact",
+                        "confidence": 1.0,
+                        "detection_method": "discord_metadata"
+                    }
+                )
+                logger.info("🏷️ Stored Discord name '%s' for user %s (fallback method)", discord_author_name, message_context.user_id)
+                
+        except Exception as e:
+            logger.debug("Name storage failed: %s", str(e))
 
     async def _process_workflow_detection(self, message_context: MessageContext):
         """
