@@ -33,6 +33,32 @@ def format_speaker_name(speaker: str, participants: Dict) -> str:
     return f"**{speaker.title()}**"
 
 
+def format_dialogue_text(text: str) -> str:
+    """Format dialogue text with stage directions in subdued style and dialogue in quotes."""
+    import re
+    
+    # Split into lines to process each separately
+    lines = text.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        # Check if the entire line (or most of it) is a stage direction
+        # Stage directions are lines that start with * and end with *
+        if stripped.startswith('*') and stripped.endswith('*') and len(stripped) > 2:
+            # This is a stage direction line - make it smaller and subdued
+            formatted_lines.append(f'<sub>{line}</sub>')
+        elif stripped and not stripped.startswith('*'):
+            # This is dialogue - wrap in quotes
+            # But preserve any emphasis markers within
+            formatted_lines.append(f'"{line}"')
+        else:
+            # Empty line or other - keep as is
+            formatted_lines.append(line)
+    
+    return '\n'.join(formatted_lines)
+
+
 def create_markdown_conversation(json_file: Path, output_dir: Path) -> str:
     """Convert a single JSON conversation to markdown format."""
     
@@ -77,37 +103,52 @@ def create_markdown_conversation(json_file: Path, output_dir: Path) -> str:
     for i, exchange in enumerate(conversation, 1):
         timestamp = format_timestamp(exchange['timestamp'])
         
-        # Determine speakers
+        # The JSON structure is:
+        # - "message" field contains the PROMPT (what was said TO the speaker)
+        # - "response" field contains what the SPEAKER actually said
+        # - "speaker" field indicates who is responding (not who sent the message)
+        
         if exchange['speaker'] == 'system':
-            speaker1 = "System"
+            # First exchange: system prompt goes to bot2
+            speaker1 = "System Prompt"
             speaker2_name = participants['bot2']['full_name']
         else:
-            # Find which bot is speaking
+            # Find which bot is responding
             speaker_name = exchange['speaker']
             if speaker_name == participants['bot1']['name']:
-                speaker1 = participants['bot1']['full_name']
-                speaker2_name = participants['bot2']['full_name']
-            else:
+                # Bot1 is responding, so the message came from bot2
                 speaker1 = participants['bot2']['full_name']
                 speaker2_name = participants['bot1']['full_name']
+            else:
+                # Bot2 is responding, so the message came from bot1
+                speaker1 = participants['bot1']['full_name']
+                speaker2_name = participants['bot2']['full_name']
         
         # Add exchange header
         md_lines.append(f"### Exchange {i}")
         md_lines.append(f"*{timestamp}*")
         md_lines.append("")
-        
-        # Add first message
-        md_lines.append(f"**{speaker1}:**")
-        md_lines.append("")
-        md_lines.append(exchange['message'])
-        md_lines.append("")
-        
-        # Add response
-        md_lines.append(f"**{speaker2_name}:**")
-        md_lines.append("")
-        md_lines.append(exchange['response'])
-        md_lines.append("")
         md_lines.append("---")
+        md_lines.append("")
+        
+        # The "message" field is what was said TO the speaker
+        md_lines.append(f"## 💬 **{speaker1}**")
+        md_lines.append("")
+        # Format and add indentation to message content
+        formatted_message = format_dialogue_text(exchange['message'])
+        indented_message = '\n'.join('> ' + line if line.strip() else '>' 
+                                     for line in formatted_message.split('\n'))
+        md_lines.append(indented_message)
+        md_lines.append("")
+        
+        # The "response" field is what the speaker actually said
+        md_lines.append(f"## 💬 **{speaker2_name}**")
+        md_lines.append("")
+        # Format and add indentation to response content
+        formatted_response = format_dialogue_text(exchange['response'])
+        indented_response = '\n'.join('> ' + line if line.strip() else '>' 
+                                      for line in formatted_response.split('\n'))
+        md_lines.append(indented_response)
         md_lines.append("")
     
     # Create output filename
