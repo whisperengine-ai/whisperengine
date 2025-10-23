@@ -11,7 +11,6 @@ from typing import Dict, Optional, Any
 from pathlib import Path
 
 from src.characters.cdl.parser import Character
-from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
 from src.prompts.trigger_mode_controller import TriggerModeController
 
 logger = logging.getLogger(__name__)
