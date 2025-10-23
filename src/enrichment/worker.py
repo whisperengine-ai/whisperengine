@@ -684,6 +684,13 @@ class EnrichmentWorker:
                 
                 if not extracted_facts:
                     logger.debug("No facts extracted from new messages (user %s)", user_id)
+                    # CRITICAL FIX: Still need to update the timestamp so we don't reprocess same messages!
+                    # Store a marker record that we've processed up to latest_message_timestamp
+                    await self._store_last_processed_timestamp(
+                        user_id=user_id,
+                        bot_name=bot_name,
+                        latest_message_timestamp=latest_message_timestamp
+                    )
                     continue
                 
                 # Detect conflicts with existing facts
@@ -757,6 +764,48 @@ class EnrichmentWorker:
             )
             
             return [dict(row) for row in rows]
+    
+    async def _store_last_processed_timestamp(
+        self,
+        user_id: str,
+        bot_name: str,
+        latest_message_timestamp: datetime
+    ):
+        """
+        Store the last processed message timestamp for incremental processing.
+        
+        CRITICAL FIX: Even when NO facts are extracted, we must update this timestamp.
+        Otherwise, next cycle will reprocess the same messages again, making redundant LLM calls.
+        
+        This creates/updates a marker record in user_fact_relationships with the latest_message_timestamp
+        in context_metadata, allowing _get_existing_facts() to find it and skip already-processed messages.
+        """
+        async with self.db_pool.acquire() as conn:
+            # Create a marker entity to track processing progress
+            marker_entity_id = await conn.fetchval("""
+                INSERT INTO fact_entities (entity_type, entity_name, category, attributes)
+                VALUES ('_processing_marker', $1, '_marker', '{"type": "enrichment_progress"}'::jsonb)
+                ON CONFLICT (entity_type, entity_name) 
+                DO UPDATE SET updated_at = NOW()
+                RETURNING id
+            """, f"{bot_name}_{user_id}")
+            
+            # Store the timestamp in the marker's relationship
+            context_metadata = {
+                'latest_message_timestamp': latest_message_timestamp.isoformat(),
+                'bot_name': bot_name,
+                'marker_type': 'enrichment_progress'
+            }
+            
+            await conn.execute("""
+                INSERT INTO user_fact_relationships 
+                (user_id, entity_id, relationship_type, confidence, context_metadata)
+                VALUES ($1, $2, '_enrichment_progress_marker', 1.0, $3)
+                ON CONFLICT (user_id, entity_id, relationship_type)
+                DO UPDATE SET
+                    context_metadata = EXCLUDED.context_metadata,
+                    updated_at = NOW()
+            """, user_id, marker_entity_id, json.dumps(context_metadata))
     
     async def _apply_conflict_resolutions(
         self,
@@ -1276,6 +1325,9 @@ class EnrichmentWorker:
                 logger.info("🔍 Extracting preferences from %s new messages (user %s)", len(new_messages), user_id)
                 
                 # Extract preferences from conversation window using LLM
+                # Track latest message timestamp for preference extraction
+                latest_message_timestamp = max(msg['timestamp'] for msg in new_messages)
+                
                 extracted_prefs = await self._extract_preferences_from_window(
                     messages=new_messages,
                     user_id=user_id,
@@ -1284,6 +1336,12 @@ class EnrichmentWorker:
                 
                 if not extracted_prefs:
                     logger.debug("No preferences extracted from new messages (user %s)", user_id)
+                    # CRITICAL FIX: Still need to update the timestamp so we don't reprocess same messages!
+                    await self._store_last_processed_timestamp(
+                        user_id=user_id,
+                        bot_name=bot_name,
+                        latest_message_timestamp=latest_message_timestamp
+                    )
                     continue
                 
                 # Store preferences in PostgreSQL
