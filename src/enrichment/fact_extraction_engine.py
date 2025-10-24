@@ -70,7 +70,7 @@ class FactExtractionEngine:
     - Tracks temporal fact evolution
     """
     
-    def __init__(self, llm_client, model: str = "anthropic/claude-sonnet-4.5"):
+    def __init__(self, llm_client, model: str = "anthropic/claude-sonnet-4.5", preprocessor=None):
         """
         Initialize fact extraction engine
         
@@ -80,6 +80,8 @@ class FactExtractionEngine:
         """
         self.llm_client = llm_client
         self.model = model
+        # Optional enrichment NLP preprocessor (spaCy-backed). May be None.
+        self.preprocessor = preprocessor
         
         # Opposing relationships mapping (from semantic_router.py)
         self.opposing_relationships = {
@@ -167,12 +169,33 @@ class FactExtractionEngine:
         
         # 🔍 DEBUG: Log conversation text IMMEDIATELY after formatting
         logger.warning("🔍 CONVERSATION TEXT BUILT: %d chars", len(conversation_text))
-        
+
+        # Optional: Add local NLP context prefix (entities/SVO) to guide LLM
+        context_prefix = ""
+        if (
+            getattr(self, "preprocessor", None) is not None
+            and self.preprocessor
+            and hasattr(self.preprocessor, "is_available")
+            and self.preprocessor.is_available()
+        ):
+            try:
+                context_prefix = self.preprocessor.build_llm_context_prefix(conversation_text)
+                if context_prefix:
+                    logger.info("✅ SPACY FACT EXTRACTION: Using spaCy preprocessing (context_prefix: %d chars)", len(context_prefix))
+                else:
+                    logger.warning("⚠️  SPACY FACT EXTRACTION: Preprocessor available but returned empty context")
+            except (AttributeError, ValueError, TypeError) as e:
+                # Non-fatal: fallback to no prefix
+                logger.warning("⚠️  SPACY FACT EXTRACTION: Failed to generate context prefix: %s", e)
+                context_prefix = ""
+        else:
+            logger.info("ℹ️  FACT EXTRACTION: Using pure LLM (no spaCy preprocessing)")
+
         # Build extraction prompt (MATCHES inline bot implementation for consistency)
-        # Simpler prompt = better LLM compliance and fact extraction
+        # Simpler prompt = better LLM compliance and fact extraction. We prepend optional local signals.
         extraction_prompt = f"""Analyze this conversation and extract ONLY clear, factual personal statements about the user.
 
-Conversation:
+{context_prefix}Conversation:
 {conversation_text}
 
 Instructions:

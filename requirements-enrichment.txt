@@ -13,3 +13,8 @@ requests>=2.31.0
 
 # Logging and utilities
 python-dotenv>=1.0.0
+
+# Optional NLP preprocessing (spaCy for entity extraction, dependency parsing)
+# Enables hybrid LLM+local preprocessing in enrichment worker
+# Reduces LLM token usage and improves extraction accuracy
+spacy==3.8.7

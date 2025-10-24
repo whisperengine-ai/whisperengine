@@ -6,6 +6,10 @@ WORKDIR /app
 COPY requirements-enrichment.txt .
 RUN pip install --no-cache-dir -r requirements-enrichment.txt
 
+# Download spaCy model for NLP preprocessing (90MB, better accuracy)
+# This enables local entity extraction and reduces LLM token usage
+RUN python -m spacy download en_core_web_md
+
 # Copy only necessary source code for enrichment worker
 COPY src/enrichment/ ./src/enrichment/
 COPY src/llm/ ./src/llm/

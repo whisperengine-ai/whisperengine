@@ -65,10 +65,18 @@ class EnrichmentWorker:
             api_key=config.LLM_API_KEY
         )
         
+        # Optional: Initialize spaCy preprocessor if available
+        try:
+            from src.enrichment.nlp_preprocessor import EnrichmentNLPPreprocessor
+            self._nlp_preprocessor = EnrichmentNLPPreprocessor()
+        except Exception:
+            self._nlp_preprocessor = None
+
         # Initialize summarization engine (uses LLM_CHAT_MODEL)
         self.summarizer = SummarizationEngine(
             llm_client=self.llm_client,
-            llm_model=config.LLM_CHAT_MODEL
+            llm_model=config.LLM_CHAT_MODEL,
+            preprocessor=self._nlp_preprocessor
         )
         
         # Initialize fact extraction engine (uses LLM_FACT_EXTRACTION_MODEL)
@@ -76,7 +84,8 @@ class EnrichmentWorker:
         # Can be overridden to GPT-3.5 in .env for cost savings
         self.fact_extractor = FactExtractionEngine(
             llm_client=self.llm_client,
-            model=config.LLM_FACT_EXTRACTION_MODEL
+            model=config.LLM_FACT_EXTRACTION_MODEL,
+            preprocessor=self._nlp_preprocessor
         )
         
         logger.info("EnrichmentWorker initialized - Qdrant: %s:%s, Summary Model: %s, Fact Model: %s",
@@ -1527,10 +1536,39 @@ class EnrichmentWorker:
         """
         # Format conversation for LLM analysis
         conversation_text = self._format_messages_for_preference_analysis(messages)
+
+        # Optional: add pre-identified preference indicators from local NLP
+        preidentified = ""
+        if (
+            getattr(self, "_nlp_preprocessor", None) is not None
+            and self._nlp_preprocessor
+            and hasattr(self._nlp_preprocessor, "is_available")
+            and self._nlp_preprocessor.is_available()
+        ):
+            try:
+                signals = self._nlp_preprocessor.extract_preference_indicators(conversation_text)
+                logger.info(
+                    "✅ SPACY PREFERENCE EXTRACTION: Using spaCy preprocessing "
+                    f"(names={len(signals.get('names', []))}, "
+                    f"locations={len(signals.get('locations', []))}, "
+                    f"questions={len(signals.get('question_sentences', []))})"
+                )
+                preidentified = (
+                    "Pre-identified signals (spaCy):\n"
+                    f"- Names mentioned: {signals.get('names', [])}\n"
+                    f"- Locations: {signals.get('locations', [])}\n"
+                    f"- Pronoun usage: {signals.get('pronoun_counts', {})}\n"
+                    f"- Question sentences: {signals.get('question_sentences', [])[:5]}\n\n"
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ SPACY PREFERENCE EXTRACTION: Failed to extract preference indicators: {e}")
+                preidentified = ""
+        else:
+            logger.info("ℹ️ PREFERENCE EXTRACTION: Using pure LLM (no spaCy preprocessing)")
         
         prompt = f"""Analyze this conversation and extract user preferences.
 
-Conversation between user and {bot_name}:
+{preidentified}Conversation between user and {bot_name}:
 {conversation_text}
 
 Extract ANY of these preference types that are clearly stated or strongly implied:

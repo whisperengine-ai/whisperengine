@@ -25,9 +25,11 @@ class SummarizationEngine:
     - No time pressure - can use 1000+ token responses
     """
     
-    def __init__(self, llm_client, llm_model: str):
+    def __init__(self, llm_client, llm_model: str, preprocessor=None):
         self.llm_client = llm_client
         self.llm_model = llm_model
+        # Optional enrichment NLP preprocessor (spaCy-backed). May be None.
+        self.preprocessor = preprocessor
         logger.info(f"Initialized SummarizationEngine with model: {llm_model}")
     
     async def generate_conversation_summary(
@@ -58,8 +60,34 @@ class SummarizationEngine:
         # Build conversation context
         conversation_text = self._format_messages_for_llm(messages, bot_name)
         
+        # Optional: build structured scaffold from local NLP to reduce tokens
+        scaffold_text = ""
+        if (
+            getattr(self, "preprocessor", None) is not None
+            and self.preprocessor
+            and hasattr(self.preprocessor, "is_available")
+            and self.preprocessor.is_available()
+        ):
+            try:
+                scaffold = self.preprocessor.build_summary_scaffold(conversation_text)
+                scaffold_text = self.preprocessor.build_scaffold_string(scaffold)
+                if scaffold_text:
+                    logger.info("✅ SPACY SUMMARIZATION: Using spaCy scaffold (entities, actions, topics)")
+                else:
+                    logger.warning("⚠️  SPACY SUMMARIZATION: Preprocessor available but returned empty scaffold")
+            except (AttributeError, ValueError, TypeError) as e:
+                logger.warning("⚠️  SPACY SUMMARIZATION: Failed to build scaffold: %s", e)
+                scaffold_text = ""
+        else:
+            logger.info("ℹ️  SUMMARIZATION: Using pure LLM (no spaCy preprocessing)")
+        
         # Generate summary with high-quality LLM
-        summary_text = await self._generate_summary_text(conversation_text, len(messages), bot_name)
+        summary_text = await self._generate_summary_text(
+            conversation_text,
+            len(messages),
+            bot_name,
+            scaffold_text=scaffold_text
+        )
         
         # Extract key topics
         key_topics = await self._extract_key_topics(conversation_text)
@@ -110,7 +138,8 @@ class SummarizationEngine:
         self, 
         conversation_text: str, 
         message_count: int,
-        bot_name: str
+        bot_name: str,
+        scaffold_text: str = ""
     ) -> str:
         """
         Generate natural language summary using LLM
@@ -129,6 +158,7 @@ class SummarizationEngine:
         
         NOT "You asked..." (that would incorrectly address the bot)
         """
+        extra_scaffold = f"\n\nStructured overview (spaCy):\n{scaffold_text}\n" if scaffold_text else ""
         summary_prompt = f"""You are an expert conversation analyst. Summarize this conversation between a user and {bot_name} (an AI character).
 
 Focus on:
@@ -143,7 +173,7 @@ Conversation ({message_count} messages):
 
 Provide a comprehensive 3-5 sentence summary in 3rd person perspective. Write about what "the user" did/said, what {bot_name} discussed, etc. Example: "The user asked about marine biology and shared their passion..." NOT "You asked about..."
 
-Be specific and preserve important details."""
+Be specific and preserve important details.{extra_scaffold}"""
 
         # 🔄 RETRY LOGIC: Handle transient LLM failures with exponential backoff
         max_retries = 3
