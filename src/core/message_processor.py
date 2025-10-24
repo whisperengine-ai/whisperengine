@@ -1410,6 +1410,65 @@ class MessageProcessor:
         else:
             return "new_connection"
 
+    async def _get_user_display_name(self, message_context: MessageContext) -> str:
+        """
+        Get user's display name with preference hierarchy:
+        1. Preferred name from stored facts/preferences (if user explicitly shared)
+        2. Discord display name from metadata (fallback)
+        3. Generic "User" (final fallback)
+        """
+        try:
+            # Try to get preferred name from knowledge graph facts
+            if hasattr(self.bot_core, 'knowledge_router') and self.bot_core.knowledge_router:
+                try:
+                    facts = await self.bot_core.knowledge_router.get_temporally_relevant_facts(
+                        user_id=message_context.user_id,
+                        lookback_days=365,  # Check up to a year
+                        limit=50
+                    )
+                    
+                    # Look for preferred_name in fact metadata or content
+                    for fact in facts:
+                        # Check metadata for preferred_name key
+                        if isinstance(fact.get('metadata'), dict):
+                            preferred_name = fact['metadata'].get('preferred_name')
+                            if preferred_name:
+                                logger.debug("Using stored preferred name '%s' for user %s", 
+                                           preferred_name, message_context.user_id)
+                                return preferred_name
+                        
+                        # Check fact content for name patterns
+                        fact_content = fact.get('fact', '').lower()
+                        if 'preferred name is' in fact_content or 'name is' in fact_content:
+                            # Extract name from fact content
+                            import re
+                            match = re.search(r"(?:preferred )?name is ([A-Z][a-zA-Z\-']+)", 
+                                            fact.get('fact', ''), re.IGNORECASE)
+                            if match:
+                                preferred_name = match.group(1)
+                                logger.debug("Extracted preferred name '%s' from fact for user %s", 
+                                           preferred_name, message_context.user_id)
+                                return preferred_name
+                except Exception as e:
+                    logger.debug("Could not retrieve preferred name from facts: %s", e)
+            
+            # Fallback to Discord display name from metadata
+            if message_context.metadata:
+                discord_name = message_context.metadata.get('discord_author_name')
+                if discord_name:
+                    logger.debug("Using Discord display name '%s' for user %s", 
+                               discord_name, message_context.user_id)
+                    return discord_name
+            
+            # Final fallback
+            logger.debug("No display name found, using generic 'User' for user %s", 
+                       message_context.user_id)
+            return "User"
+            
+        except Exception as e:
+            logger.warning("Error getting user display name: %s", e)
+            return "User"
+
     async def _validate_security(self, message_context: MessageContext) -> Dict[str, Any]:
         """Validate message security and sanitize content."""
         if not self.security_validator:
@@ -1437,50 +1496,17 @@ class MessageProcessor:
 
     async def _process_name_detection(self, message_context: MessageContext):
         """
-        Store user's Discord display name as their preferred name.
-        NO regex patterns, NO LLM calls - just use Discord metadata directly.
+        DISABLED: No automatic name storage.
+        
+        User's preferred name should only be stored when explicitly mentioned in conversation
+        (e.g., "My name is John", "Call me Sarah"). Discord display names are already 
+        available in metadata for reference but should not be preemptively stored as "preferred name".
+        
+        This method is kept as a no-op placeholder for the processing pipeline.
         """
-        try:
-            if not self.memory_manager or not message_context.metadata:
-                return
-            
-            # Get Discord display name from metadata
-            discord_author_name = message_context.metadata.get('discord_author_name')
-            if not discord_author_name:
-                logger.debug("No discord_author_name in metadata - skipping name storage")
-                return
-            
-            # Store the Discord display name as a user fact
-            if hasattr(self.memory_manager, 'store_fact'):
-                await self.memory_manager.store_fact(
-                    user_id=message_context.user_id,
-                    fact=f"User's preferred name is {discord_author_name}",
-                    context="Extracted from Discord display name",
-                    confidence=1.0,
-                    metadata={
-                        "preferred_name": discord_author_name,
-                        "detection_method": "discord_metadata",
-                        "source": "discord_display_name"
-                    }
-                )
-                logger.info("🏷️ Stored Discord name '%s' for user %s", discord_author_name, message_context.user_id)
-            else:
-                # Fallback: store as regular conversation with special metadata
-                await self.memory_manager.store_conversation(
-                    user_id=message_context.user_id,
-                    user_message=f"My name is {discord_author_name}",
-                    bot_response=f"Nice to meet you, {discord_author_name}!",
-                    metadata={
-                        "preferred_name": discord_author_name,
-                        "memory_type": "name_fact",
-                        "confidence": 1.0,
-                        "detection_method": "discord_metadata"
-                    }
-                )
-                logger.info("🏷️ Stored Discord name '%s' for user %s (fallback method)", discord_author_name, message_context.user_id)
-                
-        except Exception as e:
-            logger.debug("Name storage failed: %s", str(e))
+        # No-op: Name detection happens naturally through conversation only
+        logger.debug("Name detection phase: No automatic storage - waiting for explicit user introduction")
+        pass
 
     async def _process_workflow_detection(self, message_context: MessageContext):
         """
@@ -2945,15 +2971,19 @@ class MessageProcessor:
                 # ================================
                 # Add final "Respond as [character] to [user]:" instruction at highest priority
                 # This ensures it appears at the end of the system prompt
+                
+                # Get user display name: prefer stored name, fallback to Discord display name
+                user_display_name = await self._get_user_display_name(message_context)
+                
                 final_guidance_component = await create_final_response_guidance_component(
                     enhanced_manager=enhanced_manager,
                     character_name=bot_name,
-                    user_display_name="User",  # Could be enhanced with actual user name later
+                    user_display_name=user_display_name,
                     priority=20  # Highest priority to ensure it appears last
                 )
                 if final_guidance_component:
                     assembler.add_component(final_guidance_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added final response guidance for {bot_name}")
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added final response guidance for {bot_name} addressing '{user_display_name}'")
                 else:
                     logger.warning(f"⚠️ STRUCTURED CONTEXT: No final guidance component for {bot_name}")
                     
@@ -6178,7 +6208,7 @@ class MessageProcessor:
         """Validate response for character consistency and sanitize for security."""
         try:
             # 🚨 CRITICAL: Check for LLM recursive failures FIRST
-            response = self._detect_and_fix_recursive_patterns(response, message_context)
+            response = await self._detect_and_fix_recursive_patterns(response, message_context)
             
             # Character consistency check
             response = await self._validate_character_consistency(response, message_context.user_id, message_context)
@@ -6244,7 +6274,7 @@ class MessageProcessor:
             logger.error("Meta-analysis sanitization failed: %s", str(e))
             return response
 
-    def _detect_and_fix_recursive_patterns(self, response: str, message_context: MessageContext) -> str:
+    async def _detect_and_fix_recursive_patterns(self, response: str, message_context: MessageContext) -> str:
         """Detect and fix LLM recursive failures that could poison memory."""
         import re
         from src.memory.vector_memory_system import get_normalized_bot_name_from_env
@@ -6274,7 +6304,7 @@ class MessageProcessor:
                     if re.search(pattern, response, re.IGNORECASE):
                         logger.error("🚨 RECURSIVE PATTERN DETECTED: %s pattern found in %s response", 
                                    pattern, bot_name)
-                        return self._generate_fallback_response(message_context, "recursive_pattern")
+                        return await self._generate_fallback_response(message_context, "recursive_pattern")
             
             # Pattern-based detection (regardless of length)
             for pattern in recursive_patterns:
@@ -6283,7 +6313,7 @@ class MessageProcessor:
                     logger.error("🚨 RECURSIVE PATTERN DETECTED: %s pattern found in %s response", 
                                pattern, bot_name)
                     logger.error("🚨 PATTERN CONTEXT: ...%s...", response[max(0, match.start()-50):match.end()+50])
-                    return self._generate_fallback_response(message_context, "recursive_pattern")
+                    return await self._generate_fallback_response(message_context, "recursive_pattern")
             
             # Repetition detection - more targeted to catch severe loops
             words = response.split()
@@ -6297,7 +6327,7 @@ class MessageProcessor:
                     if phrase_count >= 3:  # Same 5-word phrase appears 3+ more times (reduced from 5)
                         logger.error("🚨 REPETITION PATTERN: Phrase '%s' repeats %d times in %s response", 
                                    phrase, phrase_count, bot_name)
-                        return self._generate_fallback_response(message_context, "repetition_pattern")
+                        return await self._generate_fallback_response(message_context, "repetition_pattern")
             
             return response
             
@@ -6305,15 +6335,17 @@ class MessageProcessor:
             logger.error("🚨 RECURSIVE PATTERN DETECTION FAILED: %s", e)
             return response  # Return original if detection fails
 
-    def _generate_fallback_response(self, message_context: MessageContext, failure_type: str) -> str:
+    async def _generate_fallback_response(self, message_context: MessageContext, failure_type: str) -> str:
         """Generate a safe fallback response when recursive patterns are detected."""
         from src.memory.vector_memory_system import get_normalized_bot_name_from_env
         
         bot_name = get_normalized_bot_name_from_env()
-        user_name = getattr(message_context, 'user_display_name', 'there')
+        
+        # Get user display name using the same preference hierarchy
+        user_name = await self._get_user_display_name(message_context)
         
         # Generic fallback response - character personality will be applied by CDL system
-        fallback = f"I apologize {user_name}, I need to gather my thoughts for a moment. What can I help you with?"
+        fallback = f"I apologize, {user_name}. I need to gather my thoughts for a moment. What can I help you with?"
         
         logger.warning("🛡️ FALLBACK RESPONSE: Generated safe response for %s due to %s", bot_name, failure_type)
         return fallback
