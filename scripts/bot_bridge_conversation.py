@@ -32,6 +32,7 @@ BOT_CONFIGS = {
     "jake": {"port": 9097, "name": "Jake Sterling", "archetype": "Real-World"},
     "dotty": {"port": 9098, "name": "Dotty", "archetype": "Narrative AI"},
     "aetheris": {"port": 9099, "name": "Aetheris", "archetype": "Narrative AI"},
+    "nottaylor": {"port": 9100, "name": "Not Taylor", "archetype": "Narrative AI"},
     "aethys": {"port": 3007, "name": "Aethys", "archetype": "Fantasy"},
 }
 

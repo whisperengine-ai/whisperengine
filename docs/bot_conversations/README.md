@@ -4,8 +4,8 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 
 ## Overview
 
-- **Total Conversations:** 10
-- **Unique Character Pairs:** 3
+- **Total Conversations:** 13
+- **Unique Character Pairs:** 5
 
 ## Conversations by Character Pair
 
@@ -27,6 +27,15 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 - [Gabriel & Dotty - 2025-10-20](./Gabriel_Dotty_2025-10-20_194711.md) (4 exchanges)
 - [Gabriel & Dotty - 2025-10-20](./Gabriel_Dotty_2025-10-20_200050.md) (6 exchanges)
 - [Gabriel & Dotty - 2025-10-20](./Gabriel_Dotty_2025-10-20_200553.md) (4 exchanges)
+
+### Dotty & Nottaylor
+
+- [Dotty & Not Taylor - 2025-10-23](./Dotty_Not_Taylor_2025-10-23_230827.md) (21 exchanges)
+
+### Nottaylor & Sophia
+
+- [Sophia Blake & Not Taylor - 2025-10-23](./Sophia_Blake_Not_Taylor_2025-10-23_225528.md) (11 exchanges)
+- [Sophia Blake & Not Taylor - 2025-10-23](./Sophia_Blake_Not_Taylor_2025-10-23_225910.md) (11 exchanges)
 
 ---
 
