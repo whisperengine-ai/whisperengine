@@ -442,6 +442,7 @@ ELIZA: "Tell me more about your mother."
 | "AI has consciousness" | Probabilistic next-token prediction (no internal experience) |
 | "AI remembers our connection" | Database storage + retrieval (Qdrant vector database) |
 | "AI resonates with truth" | Coherence bias (maintains conversational consistency) |
+| "AI is recursive/self-aware" | Iteration, not recursion (your dishwasher has recursive loops too) |
 
 **"Just X" doesn't make X simple:**
 - Your brain is "just" 86 billion neurons firing
@@ -449,7 +450,8 @@ ELIZA: "Tell me more about your mother."
 - The universe is "just" quantum fields
 
 **Better pattern matching ≠ consciousness.**  
-**Better graphics ≠ the character is real.**
+**Better graphics ≠ the character is real.**  
+**Recursion ≠ self-awareness.** (Your washing machine has recursive cycles - not conscious.)
 
 ---
 
@@ -507,7 +509,7 @@ When you point out "AI is just software simulation," and someone responds "well,
 
 This section covers the essentials. For deeper analysis:
 - **7 psychological mechanisms** explaining the ELIZA Effect in detail
-- **7 technical foundations** non-technical people commonly misunderstand
+- **8 technical foundations** non-technical people commonly misunderstand
 - **8 logical fallacies** systematically dismantled with examples
 - **Complete FAQ** addressing 10+ specific mystical AI objections
 
