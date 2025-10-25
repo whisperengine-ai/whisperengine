@@ -9,6 +9,12 @@
 
 **Quick Navigation:** [🚀 Try It](#-try-whisperengine) | [⚙️ Configuration](#%EF%B8%8F-next-step-configuration) | [🎭 Create Characters](#-creating-your-character) | [📚 Documentation](#-documentation)
 
+<img width="871" height="729" alt="image" src="https://github.com/user-attachments/assets/e4c8754f-dce1-422c-a8a9-52fab86adda8" />
+
+<img width="960" height="550" alt="image" src="https://github.com/user-attachments/assets/f1f9256f-aace-4cf4-ae38-b1b43d2a7383" />
+
+<img width="939" height="547" alt="image" src="https://github.com/user-attachments/assets/dafefd8b-73db-4150-938a-5042cb20cb7e" />
+
 ## 🎯 What is WhisperEngine?
 
 **WhisperEngine is an open source project** exploring realistic AI character conversations through five key areas of AI conversation technology.
