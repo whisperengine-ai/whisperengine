@@ -12,7 +12,7 @@ The approach differs from typical chatbots in three key ways:
 
 1. **Emotional Intelligence**: Characters analyze emotional state (current, trajectory, and historical patterns) using specialized emotion detection models
 2. **Factual Memory**: Actual conversation history stored in vector databases, not LLM-fabricated "memories"
-3. **Adaptive Learning**: Machine learning through metrics and patterns, without requiring model training
+3. **Adaptive Learning**: Metrics-driven feedback system that adapts through data patterns, without requiring model training
 
 These three layers work together synergistically. Emotional intelligence without memory context would be shallow. Memory without emotional understanding would be robotic. Learning without both would have no foundation to build upon.
 
@@ -88,7 +88,7 @@ InfluxDB time-series data tracks how feelings change:
 **Memory integration**: Conversation history explains *why* emotions are evolving—work stress building up, personal achievement celebrated, relationship changes, etc.
 
 #### 3. **Adaptive Learning** (Effective Patterns)
-ML metrics identify what works for each individual:
+Feedback metrics identify what works for each individual:
 - Which conversation approaches resonate well
 - What emotional support styles are effective  
 - Topic engagement patterns and preferences
@@ -165,11 +165,11 @@ Before we dive into the technical details, let's understand why WhisperEngine's 
 └─────────────────────────────────────┘
 ```
 
-## The ML Pipeline: Learning Without Training
+## The Feedback System: Adaptation Without Training
 
-One of WhisperEngine's most powerful innovations is its **machine learning pipeline that requires no model training or retraining**. Traditional AI systems need expensive GPU training cycles to improve. WhisperEngine learns continuously through intelligent data analysis.
+One of WhisperEngine's architectural approaches is its **metrics-driven feedback system that requires no model training or retraining**. Traditional AI systems need expensive GPU training cycles to improve. WhisperEngine adapts continuously through intelligent data analysis.
 
-### **Traditional ML vs WhisperEngine ML**
+### **Traditional ML vs WhisperEngine Feedback**
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -191,7 +191,7 @@ One of WhisperEngine's most powerful innovations is its **machine learning pipel
 └────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────┐
-│          WHISPERENGINE ML PIPELINE                          │
+│          WHISPERENGINE FEEDBACK SYSTEM                      │
 │          (Query-Time Intelligence)                          │
 │                                                             │
 │  Every Conversation:                                        │
@@ -225,7 +225,7 @@ Characters don't have a single fixed personality—they have a **CDL-defined cor
 │  • Uses ocean metaphors                                    │
 │  • Balances technical accuracy with accessibility          │
 │                                                             │
-│  Adaptive Expression (ML-Tuned Per User):                  │
+│  Adaptive Expression (Feedback-Tuned Per User):            │
 │                                                             │
 │  User A Prefers:                  User B Prefers:          │
 │  ┌──────────────────┐            ┌──────────────────┐     │
@@ -241,13 +241,13 @@ Characters don't have a single fixed personality—they have a **CDL-defined cor
 │  • Scientific terminology        • Everyday language       │
 │                                                             │
 │  Same core personality, different expression!              │
-│  ML pipeline learns which modes work best for each user.   │
+│  Feedback system learns which modes work best for each user│
 └────────────────────────────────────────────────────────────┘
 ```
 
 **The Learning Metrics:**
 
-The ML pipeline tracks dozens of metrics to guide emotional adaptation and self-tuning:
+The feedback system tracks dozens of metrics to guide emotional adaptation and self-tuning:
 - **Emotional Resonance**: Do the character's emotional responses match what you need? (Primary metric)
 - **Engagement Quality**: Does the user respond with depth, trust, and openness?
 - **Emotional Support Effectiveness**: Do supportive responses lead to improved user mood?
@@ -365,7 +365,7 @@ Instead of making the LLM do everything, WhisperEngine uses **specialized system
    Week 1: User anxious → Try reassurance (emotional resonance: 45%)
    Week 2: User anxious → Try gentle validation (emotional resonance: 78%)
    Week 3+: Automatically use validation approach for THIS user
-   (ML pipeline learned what emotional support works best)
+   (Feedback system learned what emotional support works best)
 ```
 
 #### **2. Emotional Trajectory Understanding**
@@ -823,9 +823,9 @@ While vector memory stores conversations, PostgreSQL stores structured facts and
 └────────────────────────────────────────────────────────────┘
 ```
 
-### 4. **InfluxDB Time-Series Database** (The Learning Loop)
+### 4. **InfluxDB Time-Series Database** (The Feedback Loop)
 
-Here's where the real magic of machine learning happens! InfluxDB tracks **every metric over time**, creating a continuous feedback loop that helps AI characters actually **learn** from experience—**without training or re-training models**.
+Here's where the metrics-driven adaptation happens! InfluxDB tracks **every metric over time**, creating a continuous feedback loop that helps AI characters actually **adapt** from experience—**without training or re-training models**.
 
 **Why Time-Series Data Matters:**
 
@@ -838,9 +838,9 @@ This temporal intelligence enables the AI to:
 - Adapt responses based on interaction patterns over time
 - **Self-tune character behavior without model training**
 
-**The ML Pipeline: No Training Required**
+**The Feedback System: No Training Required**
 
-Unlike traditional machine learning that requires expensive model retraining, WhisperEngine uses a **real-time ML pipeline** that learns continuously:
+Unlike traditional machine learning that requires expensive model retraining, WhisperEngine uses a **metrics-driven feedback system** that adapts continuously:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -861,7 +861,7 @@ Unlike traditional machine learning that requires expensive model retraining, Wh
 └────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────┐
-│          WHISPERENGINE ML PIPELINE (Fast & Adaptive)        │
+│          WHISPERENGINE FEEDBACK SYSTEM (Fast & Adaptive)    │
 │                                                             │
 │  1. Every conversation generates metrics (InfluxDB)        │
 │  2. Patterns detected in real-time (PostgreSQL)            │
@@ -880,7 +880,7 @@ Unlike traditional machine learning that requires expensive model retraining, Wh
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│         THE MACHINE LEARNING FEEDBACK LOOP                  │
+│         THE METRICS-DRIVEN FEEDBACK LOOP                    │
 │         (Self-Tuning Without Model Training)                │
 │                                                             │
 │  Step 1: INTERACTION                                       │
@@ -911,7 +911,7 @@ Unlike traditional machine learning that requires expensive model retraining, Wh
 │  │ • Technical mode → Lower engagement │                  │
 │  │ • Personal stories → Higher engagement │              │
 │  │                                     │                  │
-│  │ ML INSIGHT: User prefers casual     │                  │
+│  │ System Insight: User prefers casual │                  │
 │  │ storytelling over technical depth   │                  │
 │  └─────────────────┬───────────────────┘                  │
 │                    │                                        │
@@ -949,7 +949,7 @@ Unlike traditional machine learning that requires expensive model retraining, Wh
 │  │ • Engagement: +23% (strategy works!)│                  │
 │  │ • Emotional resonance: 0.94 (+0.05) │                  │
 │  │                                     │                  │
-│  │ ML Pipeline reinforces successful   │                  │
+│  │ Feedback system reinforces successful│                 │
 │  │ strategy, continues using it        │                  │
 │  └─────────────────────────────────────┘                  │
 │                                                             │
@@ -969,7 +969,7 @@ InfluxDB gives characters two types of temporal intelligence:
 - Split-second adaptation during chat
 
 **Historical Intelligence** (What we've learned over TIME):
-- Long-term interaction patterns discovered through ML analysis
+- Long-term interaction patterns discovered through feedback analysis
 - Seasonal patterns (you chat more on weekends)
 - Topic preferences that emerged gradually
 - Conversation styles that work best (learned, not programmed)
@@ -980,17 +980,17 @@ InfluxDB gives characters two types of temporal intelligence:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│    ML PIPELINE: HOW CHARACTERS SELF-TUNE PERSONALITY       │
+│    FEEDBACK-DRIVEN ADAPTATION: HOW CHARACTERS SELF-TUNE    │
 │    (Without Training Models)                               │
 │                                                             │
 │  Week 1: Character tries multiple approaches               │
 │  ┌────────────────────────────────────┐                   │
 │  │ Technical explanations: 40% engage │                   │
-│  │ Casual storytelling: 78% engage    │ ← ML detects this│
+│  │ Casual storytelling: 78% engage    │ ← System detects  │
 │  │ Formal tone: 35% engage            │                   │
 │  └────────────────────────────────────┘                   │
 │                                                             │
-│  Week 2: ML pipeline adjusts strategy                      │
+│  Week 2: Feedback system adjusts strategy                  │
 │  ┌────────────────────────────────────┐                   │
 │  │ Weight storytelling mode higher    │                   │
 │  │ Reduce technical terminology       │                   │
@@ -1003,8 +1003,8 @@ InfluxDB gives characters two types of temporal intelligence:
 │  │ Strategy reinforced automatically  │                   │
 │  └────────────────────────────────────┘                   │
 │                                                             │
-│  This is MACHINE LEARNING without model training!          │
-│  Data-driven adaptation at query-time!                     │
+│  This is METRICS-DRIVEN ADAPTATION without model training! │
+│  Data-driven strategy adjustment at query-time!            │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -1037,7 +1037,7 @@ InfluxDB gives characters two types of temporal intelligence:
 
 **What Metrics Are Tracked:**
 
-InfluxDB continuously monitors dozens of metrics that feed the ML learning loop:
+InfluxDB continuously monitors dozens of metrics that feed the feedback learning loop:
 
 - **Engagement Metrics**: Response length, conversation duration, message frequency, follow-up questions
 - **Emotional Metrics**: Sentiment scores, emotion transitions, emotional resonance, mood patterns
@@ -1047,7 +1047,7 @@ InfluxDB continuously monitors dozens of metrics that feed the ML learning loop:
 - **Performance Metrics**: Memory recall accuracy, response relevance, user satisfaction signals, strategy effectiveness
 - **Learning Metrics**: Adaptation success rates, preference convergence, personality tuning effectiveness
 
-All of these data points flow back into the system through the **ML pipeline**, helping each character learn what works specifically for YOU—**without ever training or re-training a model**. Instead, the system queries historical data in real-time and adjusts strategies dynamically based on proven patterns.
+All of these data points flow back into the system through the **feedback loop**, helping each character learn what works specifically for YOU—**without ever training or re-training a model**. Instead, the system queries historical data in real-time and adjusts strategies dynamically based on proven patterns.
 
 ### 5. **Character Definition Language (CDL)** (The Personality Blueprint)
 
@@ -1115,7 +1115,7 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 │  ✗ Generic emotional responses (no personalization)        │
 │  ✗ Unknown emotional preferences for YOUR communication    │
 │                                                             │
-│  ML PIPELINE STATUS:                                       │
+│  FEEDBACK SYSTEM STATUS:                                   │
 │  • Collecting baseline emotional patterns                  │
 │  • Recording initial emotional resonance metrics           │
 │  • No adaptation patterns detected yet (insufficient data) │
@@ -1135,7 +1135,7 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 │  • Tracking YOUR emotional patterns (joy, fear, trust...)  │
 │  • Recording emotional resonance to different approaches   │
 │  • Testing what emotional support styles work for YOU      │
-│  • ML Pipeline: Gathering emotional training data          │
+│  • Feedback System: Gathering emotional pattern data       │
 │  • Storing conversation memories with emotion metadata     │
 │                                                             │
 │  WHAT YOU'LL NOTICE:                                       │
@@ -1146,7 +1146,7 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 │  ✓ Emotional context improving with each chat              │
 │  △ Emotional personalization beginning but still developing│
 │                                                             │
-│  ML PIPELINE STATUS:                                       │
+│  FEEDBACK SYSTEM STATUS:                                   │
 │  • Testing multiple emotional response strategies          │
 │  • Recording which empathy styles work better for YOU      │
 │  • Not enough data for confident emotional adaptation yet  │
@@ -1164,10 +1164,10 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 │                                                             │
 │  • Sufficient emotional data for pattern detection         │
 │  • InfluxDB tracks YOUR emotional trajectory reliably      │
-│  • ML identifies which emotional approaches work for YOU   │
+│  • System identifies which emotional approaches work for YOU│
 │  • Character learns your emotional comfort zones           │
 │  • Emotional resonance patterns reach significance         │
-│  • ML Pipeline: Emotional patterns statistically clear     │
+│  • Feedback System: Emotional patterns statistically clear │
 │  • Self-Tuning: Emotional support automatically adapted    │
 │                                                             │
 │  WHAT YOU'LL NOTICE:                                       │
@@ -1179,7 +1179,7 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 │  ✓ Emotional trajectory understanding (how you've evolved) │
 │  ✓ Empathy that feels genuine and personalized             │
 │                                                             │
-│  ML PIPELINE STATUS:                                       │
+│  FEEDBACK SYSTEM STATUS:                                   │
 │  • Emotional patterns identified with 80%+ confidence      │
 │  • Response strategies weighted by emotional resonance     │
 │  • Character knows when YOU need validation vs solutions   │
@@ -1201,7 +1201,7 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 │  • Refined emotional learning from 50+ feedback cycles     │
 │  • Rich emotional trajectory data (weeks/months)           │
 │  • Highly accurate predictions of YOUR emotional needs     │
-│  • ML Pipeline: Mature emotional adaptation strategies     │
+│  • Feedback System: Mature emotional adaptation strategies │
 │  • Self-Tuning: Character fully optimized to YOUR feelings │
 │                                                             │
 │  WHAT YOU'LL NOTICE:                                       │
@@ -1214,7 +1214,7 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 │  ✓ Perfect emotional calibration for YOUR personality      │
 │  ✓ Emotional support that feels genuinely personal         │
 │                                                             │
-│  ML PIPELINE STATUS:                                       │
+│  FEEDBACK SYSTEM STATUS:                                   │
 │  • 95%+ confidence in emotional preference patterns        │
 │  • Strategies continuously refined by emotional resonance  │
 │  • Character "emotional intelligence" tuned to YOU         │
@@ -1230,34 +1230,34 @@ One of WhisperEngine's core principles is **genuine learning over time**—and t
 ```
 ┌────────────────────────────────────────────────────────────┐
 │            THE DATA SCIENCE BEHIND THE TIMELINE             │
-│            (ML Without Model Training)                      │
+│        (Metrics-Driven Without Model Training)              │
 │                                                             │
 │  Messages 1-10:   Establishing baseline                    │
 │  ├─ Not enough data for pattern detection                  │
 │  ├─ Learning your basic communication style                │
-│  └─ Recording initial metrics for ML pipeline              │
+│  └─ Recording initial metrics for feedback system          │
 │                                                             │
 │  Messages 10-30:  Pattern emergence                        │
 │  ├─ InfluxDB identifies recurring themes                   │
 │  ├─ Vector clustering shows topic preferences              │
 │  ├─ Emotional baselines established                        │
-│  └─ ML Pipeline: Testing multiple strategies               │
+│  └─ Feedback System: Testing multiple strategies           │
 │                                                             │
 │  Messages 30-50:  Statistical significance                 │
 │  ├─ Enough data to identify true patterns vs randomness    │
 │  ├─ Feedback loop optimizations become reliable            │
 │  ├─ Personalization accuracy crosses 80% threshold         │
-│  ├─ ML confidence reaches actionable levels                │
+│  ├─ System confidence reaches actionable levels            │
 │  └─ Self-tuning mechanisms activate                        │
 │                                                             │
 │  Messages 50+:    Continuous refinement                    │
 │  ├─ Each conversation improves the model                   │
 │  ├─ Long-term trends become visible                        │
 │  ├─ Relationship history provides rich context             │
-│  ├─ ML Pipeline: Mature adaptation strategies              │
+│  ├─ Feedback System: Mature adaptation strategies          │
 │  └─ Character personality optimized to YOUR preferences    │
 │                                                             │
-│  Think of it like training any ML model—you need enough    │
+│  Think of it like metrics-driven adaptation—you need enough│
 │  data for the patterns to be statistically meaningful.     │
 │  But unlike traditional ML, no model retraining happens!   │
 │  Everything adapts via real-time queries and weights.      │
@@ -1293,7 +1293,7 @@ Here's the critical difference:
                 try that approach again?"
                 (Emotional resonance: 92%)
    
-   CONTINUOUS EMOTIONAL LEARNING. ML discovers what works.
+   CONTINUOUS EMOTIONAL LEARNING. Feedback system discovers what works.
    Emotional support calibrated specifically to YOUR needs.
 ```
 
@@ -1383,13 +1383,13 @@ WhisperEngine:
 │ • Analyzes preferences                  │
 │ • Generates summaries                   │
 │ • Updates knowledge graph               │
-│ • ML Pipeline: Records metrics          │
+│ • Feedback System: Records metrics      │
 │ • Self-Tuning: Adjusts strategies       │
 │                                         │
 │ Total: 2-10 seconds user-facing ✅     │
 │ User Experience: Natural conversation   │
 │ Intelligence: Builds over time          │
-│ ML Learning: Continuous self-tuning     │
+│ Feedback Learning: Continuous self-tuning   │
 └─────────────────────────────────────────┘
 ```
 
@@ -1522,7 +1522,7 @@ YOU: "I'm really struggling with my marine bio coursework.
 │    ✓ Pattern: Sustained interest until now    │
 │    ✓ Emotional baseline: Usually optimistic   │
 │                                                │
-│ 3. ML-LEARNED EMOTIONAL PREFERENCES:          │
+│ 3. FEEDBACK-LEARNED EMOTIONAL PREFERENCES:    │
 │    • This user responds to: Personal stories  │
 │    • Emotional resonance: 85% with mentorship │
 │    • Preferred support style: Encouraging     │
@@ -1550,7 +1550,7 @@ YOU: "I'm really struggling with my marine bio coursework.
 │    ✓ Emotional moment: Vulnerability shared   │
 │    ✓ Response type: Mentorship + validation   │
 │    ✓ Outcome: Deepened emotional connection   │
-│    ✓ ML feedback: Track if support was helpful│
+│    ✓ Feedback system: Track if support was helpful│
 │                                                │
 │ 7. BACKGROUND ENRICHMENT (async):             │
 │    → Enrichment worker captures:              │
@@ -1561,7 +1561,7 @@ YOU: "I'm really struggling with my marine bio coursework.
 └────────────────────────────────────────────────┘
 ```
 
-Notice how by Day 30, Elena doesn't just respond—she emotionally understands the entire journey, validates the struggle based on learned emotional preferences, and provides deeply personalized emotional support drawing on a month of emotional history and ML-learned patterns about what works for THIS user.
+Notice how by Day 30, Elena doesn't just respond—she emotionally understands the entire journey, validates the struggle based on learned emotional preferences, and provides deeply personalized emotional support drawing on a month of emotional history and feedback-learned patterns about what works for THIS user.
 
 ## Privacy: Your Memories, Your Control
 
@@ -1614,28 +1614,28 @@ As an open-source project, WhisperEngine welcomes contributions from developers,
 WhisperEngine is a personal project exploring AI character learning through architectural integration. The system demonstrates how specialized components working together can create more consistent and adaptive characters than LLM hallucination alone.
 
 - 🎭 **Emotional Intelligence First**: Characters understand YOUR specific emotional needs through RoBERTa analysis + trajectory tracking
-- 💝 **Emotionally-Attuned Responses**: ML pipeline learns what emotional support works for YOU (validation, reassurance, solutions, etc.)
+- 💝 **Emotionally-Attuned Responses**: Feedback system learns what emotional support works for YOU (validation, reassurance, solutions, etc.)
 - 📈 **Emotional Growth Tracking**: Characters witness your emotional journey over time, not just individual moments
 - ✨ **Genuine Memory**: Characters who truly remember your story—not hallucinated fake memories
-- 🧠 **Real Emotional Learning**: Machine learning feedback loop that adapts emotional responses to YOUR resonance patterns
+- 🧠 **Real Emotional Learning**: Metrics-driven feedback loop that adapts emotional responses to YOUR resonance patterns
 - 🎯 **Per-User Emotional Adaptation**: Each character learns YOUR emotional preferences individually through continuous analysis
 - � **Emotional Trajectory Intelligence**: InfluxDB tracks how your emotions evolve over hours, days, and weeks
 - 🤝 **Authentic Personality**: Consistent, distinctive characters who feel real—no character drift
 - 🔒 **Privacy & Control**: Your data stays on YOUR infrastructure, under YOUR control
 - 🔓 **Open Source**: Complete transparency into how the system works
 - ⚡ **Efficient Architecture**: Only 1 LLM call per message (2-10 seconds)—instant responses with background intelligence building
-- � **Self-Tuning Characters**: ML pipeline optimizes emotional intelligence without training models
+- � **Self-Tuning Characters**: Feedback system optimizes emotional intelligence without training models
 - 📊 **Query-Time Intelligence**: Real-time emotional adaptation through intelligent data queries, not expensive GPU training
 
 ### **The Bottom Line**
 
 Other AI character systems ask you to believe in the illusion. WhisperEngine builds the reality.
 
-- **They offer generic empathy** → We learn YOUR emotional needs through ML
+- **They offer generic empathy** → We learn YOUR emotional needs through metrics-driven feedback
 - **They fake emotional understanding** → We track your emotional trajectory over time
 - **They guess at what you feel** → We analyze with RoBERTa and measure resonance
 - **They hallucinate memories** → We store actual emotional moments
-- **They pretend to learn** → We adapt through proven ML patterns
+- **They pretend to learn** → We adapt through proven feedback patterns
 - **They rely on LLM magic** → We use specialized systems for emotional intelligence
 
 Every conversation adds to the tapestry of your interaction with each character. Every emotion, every vulnerability, every moment of joy or fear becomes part of a growing emotional history. This is AI that doesn't just respond—it **emotionally understands, learns, and grows with YOU**.
@@ -1669,16 +1669,16 @@ High-performance vector similarity search with sub-50ms query times, supporting 
 Structured personality framework stored in PostgreSQL, ensuring consistent character behavior across all interactions. Includes Big Five personality traits, communication patterns, expertise domains, and ethical frameworks.
 
 ### **InfluxDB Time-Series Intelligence**:
-Continuous machine learning feedback loop tracking conversation metrics, engagement patterns, and relationship evolution over time. Enables both real-time adaptation (responding to current mood) and historical learning (understanding long-term preferences). Tracks 30+ metrics including emotional resonance, topic engagement, response satisfaction, and behavioral patterns. 
+Continuous metrics-driven feedback loop tracking conversation metrics, engagement patterns, and relationship evolution over time. Enables both real-time adaptation (responding to current mood) and historical learning (understanding long-term preferences). Tracks 30+ metrics including emotional resonance, topic engagement, response satisfaction, and behavioral patterns. 
 
-**The ML Pipeline**: This temporal intelligence allows characters to learn what communication styles work best for each individual user **without training or re-training models**. Instead of expensive GPU training cycles, WhisperEngine queries historical metrics in real-time and dynamically adjusts conversation strategies based on proven patterns. The system:
+**The Feedback System**: This temporal intelligence allows characters to learn what communication styles work best for each individual user **without training or re-training models**. Instead of expensive GPU training cycles, WhisperEngine queries historical metrics in real-time and dynamically adjusts conversation strategies based on proven patterns. The system:
 - Records detailed metrics for every conversation (InfluxDB)
-- Analyzes patterns using time-series queries (no ML training needed)
+- Analyzes patterns using time-series queries (no model training needed)
 - Adjusts strategy weights dynamically (query-time optimization)
 - Continuously measures results and reinforces successful approaches
 - Self-tunes character personality to match user preferences
 
-This is **machine learning through intelligent data queries**, not through model training. Characters adapt and improve with every conversation, learning your preferences through statistical pattern analysis rather than neural network retraining.
+This is **metrics-driven adaptation through intelligent data queries**, not through model training. Characters adapt and improve with every conversation, learning your preferences through statistical pattern analysis rather than neural network retraining.
 
 ### **Enrichment Worker**:
 Background service that asynchronously processes conversations without blocking real-time responses. Runs independently from chat bots to perform:
@@ -1695,9 +1695,9 @@ WhisperEngine achieves superior performance with only **1 LLM call per message**
 - **Lower costs**: Minimal LLM usage during conversations
 - **Background intelligence**: Deep learning happens without blocking chat
 - **Scalability**: Real-time performance independent of enrichment complexity
-- **ML optimization**: Context size and model selection optimized based on historical performance data
+- **Feedback optimization**: Context size and model selection optimized based on historical performance data
 
-The single LLM call receives a rich, dynamically-assembled prompt containing personality (CDL), memories (Qdrant), user context (PostgreSQL), and learned preferences (InfluxDB ML insights). Response time varies from 2-10 seconds depending on context complexity, with the ML pipeline continuously optimizing prompt assembly strategies for better performance.
+The single LLM call receives a rich, dynamically-assembled prompt containing personality (CDL), memories (Qdrant), user context (PostgreSQL), and learned preferences (InfluxDB feedback insights). Response time varies from 2-10 seconds depending on context complexity, with the feedback system continuously optimizing prompt assembly strategies for better performance.
 
 ### **Hybrid Intelligence Pipeline**:
 Combines vector search, graph relationships, temporal patterns, real-time emotion analysis, and background enrichment to create rich, contextual responses that feel genuinely human. The pipeline retrieves enriched data from multiple sources simultaneously and assembles dynamic prompts tailored to each user and conversation.
