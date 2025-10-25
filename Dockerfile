@@ -30,10 +30,15 @@ RUN pip install --no-cache-dir \
     fastembed>=0.7.0 \
     numpy>=1.24.0 \
     transformers>=4.56.0 \
-    torch>=2.0.0
+    torch>=2.0.0 \
+    spacy==3.8.7
 
 # Create model directories and cache directories
 RUN mkdir -p /app/models /root/.cache/huggingface /root/.cache/fastembed
+
+# Download spaCy medium English model (better accuracy than small)
+# en_core_web_md: 40MB, includes word vectors for better entity recognition
+RUN python -m spacy download en_core_web_md
 
 # Copy model download script
 COPY scripts/download_models.py ./
@@ -111,9 +116,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Copy Python environment from builder
+# Copy Python environment from builder (includes spaCy but not models yet)
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy spaCy model from model-downloader stage (installed as Python package)
+# The en_core_web_md model is in site-packages/en_core_web_md/
+COPY --from=model-downloader /usr/local/lib/python3.13/site-packages/en_core_web_md* /usr/local/lib/python3.13/site-packages/
 
 # Copy pre-downloaded models from model-downloader stage
 COPY --from=model-downloader /app/models /app/models
@@ -157,6 +166,18 @@ print('✅ Model configuration loaded' if config else '❌ Model configuration m
 print(f'📊 Embedding model: {config.get(\"embedding_models\", {}).get(\"primary\", \"Unknown\")}' if config else ''); \
 print(f'🎭 Emotion model: {config.get(\"emotion_models\", {}).get(\"primary\", \"Unknown\")}' if config else ''); \
 exit(0 if config else 1) \
+" && \
+    echo "🔤 Verifying spaCy model..." && \
+    python -c "\
+try: \
+    import spacy; \
+    nlp = spacy.load('en_core_web_md'); \
+    print(f'✅ spaCy model loaded: en_core_web_md'); \
+    print(f'📊 Word vectors: {nlp.vocab.vectors_length} vectors'); \
+    print(f'📦 Pipeline: {list(nlp.pipe_names)}'); \
+except Exception as e: \
+    print(f'❌ spaCy model error: {e}'); \
+    exit(1) \
 " && \
     echo "✅ FastEmbed cache ready:" && \
     ls -la /app/cache/fastembed/ 2>/dev/null || echo "FastEmbed cache empty" && \

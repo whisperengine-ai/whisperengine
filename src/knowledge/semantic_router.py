@@ -80,6 +80,21 @@ class SemanticKnowledgeRouter:
         self.qdrant = qdrant_client
         self.influx = influx_client
         
+        # Initialize spaCy for entity extraction (optional - graceful fallback)
+        self.nlp = None
+        try:
+            import spacy
+            # Try loading medium model first (better accuracy with word vectors)
+            try:
+                self.nlp = spacy.load("en_core_web_md")
+                logger.info("✅ spaCy loaded for entity extraction (en_core_web_md - with word vectors)")
+            except OSError:
+                # Fallback to small model if medium not available
+                self.nlp = spacy.load("en_core_web_sm")
+                logger.info("✅ spaCy loaded for entity extraction (en_core_web_sm - basic)")
+        except (ImportError, OSError) as e:
+            logger.warning("⚠️ spaCy unavailable (will use keyword patterns): %s", str(e))
+        
         # Phase 2b: Initialize unified query classifier for intent analysis
         try:
             self._unified_query_classifier = create_unified_query_classifier()
@@ -468,7 +483,64 @@ class SemanticKnowledgeRouter:
         )
     
     def _extract_entity_type(self, query: str) -> Optional[str]:
-        """Extract entity type from query - ChatGPT-style expanded categorization"""
+        """
+        Extract entity type from query using spaCy NER + keyword fallback.
+        
+        Prioritizes spaCy entity extraction for better accuracy, falls back
+        to keyword matching if spaCy unavailable.
+        """
+        # Try spaCy entity extraction first (if available)
+        if self.nlp:
+            try:
+                doc = self.nlp(query)
+                
+                # Map spaCy entity labels to our entity types
+                # Comprehensive mapping for all major spaCy entity types
+                entity_label_mapping = {
+                    # People and characters
+                    "PERSON": "person",
+                    
+                    # Organizations and businesses
+                    "ORG": "work",
+                    
+                    # Locations (geo-political entities, locations, facilities)
+                    "GPE": "place",          # Countries, cities, states
+                    "LOC": "place",          # Non-GPE locations (mountains, bodies of water)
+                    "FAC": "place",          # Facilities (buildings, airports, highways)
+                    
+                    # Products and objects
+                    "PRODUCT": "equipment",  # Objects, vehicles, foods, etc.
+                    
+                    # Creative works
+                    "WORK_OF_ART": "art",    # Titles of books, songs, etc.
+                    
+                    # Events and time
+                    "EVENT": "general",      # Named events (concerts, wars, etc.)
+                    "DATE": "general",       # Absolute or relative dates
+                    "TIME": "general",       # Times smaller than a day
+                    
+                    # Legal and political
+                    "LAW": "general",        # Named laws, treaties, etc.
+                    "NORP": "general",       # Nationalities, religious/political groups
+                    
+                    # Miscellaneous
+                    "LANGUAGE": "study",     # Named languages
+                    "QUANTITY": "general",   # Measurements with units
+                    "ORDINAL": "general",    # "first", "second", etc.
+                    "CARDINAL": "general",   # Numerals not covered by other types
+                    "MONEY": "general",      # Monetary values
+                    "PERCENT": "general",    # Percentage values
+                }
+                
+                # Return first recognized entity type
+                for ent in doc.ents:
+                    if ent.label_ in entity_label_mapping:
+                        logger.debug("🔍 spaCy entity extracted: %s (%s)", ent.text, ent.label_)
+                        return entity_label_mapping[ent.label_]
+            except Exception as e:
+                logger.warning("⚠️ spaCy entity extraction failed: %s", str(e))
+        
+        # Fallback: Keyword-based entity detection (ChatGPT-style expanded categorization)
         entity_keywords = {
             "food": ["food", "eat", "meal", "restaurant", "cuisine", "dish", "pizza", "pasta", "cooking", "recipe"],
             "hobby": ["hobby", "hobbies", "activity", "activities", "interest", "do for fun", "enjoy doing", "passion"],

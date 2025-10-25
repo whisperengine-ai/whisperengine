@@ -31,7 +31,7 @@ numpy==2.3.3  # Updated from 2.3.2 - Required for vector memory system
 # REMOVED: scikit-learn==1.7.2  # Not used in main bot source code
 
 # Advanced NLP Dependencies (Phase 1) - OPTIMIZED
-# spacy==3.8.7  # REMOVED: Replaced by vector-native approach + local patterns
+spacy==3.8.7  # Entity extraction for query preprocessing and semantic routing
 textblob==0.18.0.post0  # Lightweight sentiment analysis (replaces RoBERTa/transformers)
 
 # Time Series Monitoring (Fidelity-First Performance)

@@ -1761,21 +1761,40 @@ async def main():
         config.validate()
         logger.info("✅ Configuration validated")
         
-        # Create PostgreSQL connection pool
+        # Create PostgreSQL connection pool with retry logic
         logger.info("Connecting to PostgreSQL: %s:%s/%s",
                    config.POSTGRES_HOST, config.POSTGRES_PORT, config.POSTGRES_DB)
         
-        pool = await asyncpg.create_pool(
-            host=config.POSTGRES_HOST,
-            port=config.POSTGRES_PORT,
-            database=config.POSTGRES_DB,
-            user=config.POSTGRES_USER,
-            password=config.POSTGRES_PASSWORD,
-            min_size=2,
-            max_size=10
-        )
+        max_retries = 5
+        retry_delay = 2  # seconds
+        pool = None
         
-        logger.info("✅ PostgreSQL connection pool created")
+        for attempt in range(1, max_retries + 1):
+            try:
+                pool = await asyncpg.create_pool(
+                    host=config.POSTGRES_HOST,
+                    port=config.POSTGRES_PORT,
+                    database=config.POSTGRES_DB,
+                    user=config.POSTGRES_USER,
+                    password=config.POSTGRES_PASSWORD,
+                    min_size=2,
+                    max_size=10,
+                    timeout=10  # 10 second connection timeout
+                )
+                logger.info("✅ PostgreSQL connection pool created")
+                break
+            except Exception as e:
+                if attempt < max_retries:
+                    logger.warning(f"⚠️ Failed to connect to PostgreSQL (attempt {attempt}/{max_retries}): {e}")
+                    logger.info(f"🔄 Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    logger.error(f"❌ Failed to connect to PostgreSQL after {max_retries} attempts")
+                    raise
+        
+        if pool is None:
+            raise RuntimeError("Failed to create PostgreSQL connection pool")
         
         # Create and run enrichment worker
         worker = EnrichmentWorker(postgres_pool=pool)

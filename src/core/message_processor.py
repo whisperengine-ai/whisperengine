@@ -3251,48 +3251,67 @@ class MessageProcessor:
         # This provides complete context without vague summaries that add no value.
         
         # ================================
-        # COMPONENT 8B: Enriched Conversation Summaries (EXPERIMENTAL - October 2025)
+        # COMPONENT 8B: Enriched Conversation Summaries (TIERED CONTEXT - October 2025)
         # ================================
-        # NEW: High-quality LLM-generated summaries from enrichment worker
-        # These replace the removed inline summarization with proper background summaries
+        # ENHANCED: Intelligent tiered context system for long conversations
+        # - For long conversations (>20 messages): Add enriched summary + recent memories
+        # - For shorter conversations: Use recent memories only
+        # - Prevents "context cliff" where AI forgets earlier conversation
         # Feature flagged for testing and gradual rollout
         
         if os.getenv('ENABLE_ENRICHED_SUMMARIES', 'false').lower() == 'true':
             try:
                 from src.memory.vector_memory_system import get_normalized_bot_name_from_env
                 bot_name = get_normalized_bot_name_from_env()
-                enriched_summaries = await self._retrieve_enriched_summaries(
-                    user_id=message_context.user_id,
-                    bot_name=bot_name,
-                    days_back=7,   # Only recent week
-                    limit=1        # Usually just the most recent summary
-                )
                 
-                if enriched_summaries:
-                    # Use only the most recent summary for context
-                    summary = enriched_summaries[0]  # Most recent
-                    start_date = summary['start_timestamp'].strftime('%Y-%m-%d')
-                    end_date = summary['end_timestamp'].strftime('%Y-%m-%d')
-                    timeframe = f"{start_date}" if start_date == end_date else f"{start_date} to {end_date}"
+                # Check conversation history length to determine if tiered context needed
+                recent_messages = await self._get_recent_messages_structured(
+                    user_id=message_context.user_id
+                )
+                recent_message_count = len(recent_messages)
+                
+                # Apply tiered context for conversations with >20 messages
+                if recent_message_count > 20:
+                    logger.info(f"📚 Long conversation detected ({recent_message_count} messages) - using tiered context")
                     
-                    summary_text = f"RECENT CONVERSATION SUMMARY:\n"
-                    summary_text += f"[{timeframe}] ({summary['message_count']} messages)\n"
-                    summary_text += f"{summary['summary_text']}\n"
+                    # TIER 1: Add enriched summary from last 7 days (older messages)
+                    enriched_summaries = await self._retrieve_enriched_summaries(
+                        user_id=message_context.user_id,
+                        bot_name=bot_name,
+                        days_back=7,   # Last week
+                        limit=1        # Most recent summary
+                    )
                     
-                    if summary.get('key_topics'):
-                        topics = ', '.join(summary['key_topics'][:3])  # Top 3 topics
-                        summary_text += f"Key topics: {topics}\n"
+                    if enriched_summaries:
+                        summary = enriched_summaries[0]
+                        start_date = summary['start_timestamp'].strftime('%Y-%m-%d')
+                        end_date = summary['end_timestamp'].strftime('%Y-%m-%d')
+                        timeframe = f"{start_date}" if start_date == end_date else f"{start_date} to {end_date}"
+                        
+                        summary_text = f"=== EARLIER CONVERSATION SUMMARY ({timeframe}) ===\n"
+                        summary_text += f"[{summary['message_count']} messages from previous conversation]\n\n"
+                        summary_text += f"{summary['summary_text']}\n"
+                        
+                        if summary.get('key_topics'):
+                            topics = ', '.join(summary['key_topics'][:5])
+                            summary_text += f"\nKey topics discussed: {topics}"
+                        
+                        assembler.add_component(create_memory_component(
+                            summary_text,
+                            priority=11  # Priority 11: Before detailed memories (13)
+                        ))
+                        logger.info(f"✅ TIERED CONTEXT: Added earlier conversation summary ({timeframe}, {summary['message_count']} messages)")
                     
-                    assembler.add_component(create_memory_component(
-                        summary_text,
-                        priority=14  # Priority 14: Between memories (13) and knowledge context (16)
-                    ))
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added most recent enriched summary ({timeframe})")
+                    # TIER 2: Recent detailed memories are already added at priority 13
+                    # This gives us two-tier context: summary (older) + detailed (recent)
+                    logger.info(f"✅ TIERED CONTEXT: Using two-tier system - summary + recent {min(recent_message_count, 30)} detailed messages")
+                    
                 else:
-                    logger.debug("📚 No recent enriched summaries available for context")
+                    # Short conversation: Use recent memories only (already added at priority 13)
+                    logger.debug(f"📚 Short conversation ({recent_message_count} messages) - using recent memories only")
                     
             except Exception as e:
-                logger.warning(f"Failed to add enriched summaries to context: {e}")
+                logger.warning(f"⚠️ Failed to add enriched summaries to context: {e}")
         else:
             logger.debug("📚 Enriched summaries disabled (ENABLE_ENRICHED_SUMMARIES=false)")
         
@@ -3429,35 +3448,47 @@ class MessageProcessor:
             memories_with_time: List of (conversation_turn, age_hours) tuples
             
         Returns:
-            Formatted temporal narrative string
+            Formatted temporal narrative string with human-readable timestamps
         """
-        # Organize memories into time buckets
+        from src.utils.time_utils import format_relative_time_short
+        from datetime import datetime, timedelta, timezone
+        
+        # Organize memories into time buckets with timestamps
         recent = []      # < 24 hours
         this_week = []   # 24 hours - 7 days (168 hours)
         longer_term = [] # > 7 days
         
+        now = datetime.now(timezone.utc)
+        
         for conversation_turn, age_hours in memories_with_time:
+            # Calculate timestamp from age
+            memory_time = now - timedelta(hours=age_hours)
+            relative_time = format_relative_time_short(memory_time, now)
+            
+            # Prefix conversation with human-readable age
+            timestamped_turn = f"({relative_time}) {conversation_turn}"
+            
             if age_hours < 24:
-                recent.append(conversation_turn)
+                recent.append(timestamped_turn)
             elif age_hours < 168:  # 7 days = 168 hours
-                this_week.append(conversation_turn)
+                this_week.append(timestamped_turn)
             else:
-                longer_term.append(conversation_turn)
+                longer_term.append(timestamped_turn)
         
         # Build temporal narrative with natural language headers
         narrative_parts = []
         
         if recent:
-            recent_text = " | ".join(recent[:5])  # Max 5 recent memories
-            narrative_parts.append(f"🕐 RECENT (Last 24 hours):\n{recent_text}")
+            recent_text = "\n".join(recent[:5])  # Max 5 recent memories
+            narrative_parts.append(f"🕐 RECENT MEMORIES:\n{recent_text}")
         
         if this_week:
-            week_text = " | ".join(this_week[:4])  # Max 4 weekly memories
+            week_text = "\n".join(this_week[:4])  # Max 4 weekly memories
             narrative_parts.append(f"📅 THIS WEEK:\n{week_text}")
         
         if longer_term:
-            long_text = " | ".join(longer_term[:3])  # Max 3 long-term memories
-            narrative_parts.append(f"📆 LONGER-TERM CONTEXT:\n{long_text}")
+            long_text = "\n".join(longer_term[:3])  # Max 3 long-term memories
+            narrative_parts.append(f"📆 LONGER-TERM:\n{long_text}")
         
         return "\n\n".join(narrative_parts) if narrative_parts else ""
     
