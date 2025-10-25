@@ -26,6 +26,145 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _emotion_descriptor(emotion: str) -> str:
+    """Convert emotion label to natural language descriptor."""
+    descriptors = {
+        'joy': 'joyful and happy',
+        'love': 'loving and affectionate',
+        'optimism': 'optimistic and hopeful',
+        'trust': 'trusting and secure',
+        'anticipation': 'anticipatory and excited',
+        'anger': 'angry and frustrated',
+        'disgust': 'disgusted and repulsed',
+        'fear': 'fearful and anxious',
+        'sadness': 'sad and down',
+        'pessimism': 'pessimistic and discouraged',
+        'surprise': 'surprised and taken aback',
+        'neutral': 'calm and neutral'
+    }
+    return descriptors.get(emotion.lower(), emotion)
+
+
+def _get_bot_response_hint(character_emotional_state: Any) -> Optional[str]:
+    """Generate hint about bot's recent response style based on emotional state."""
+    if not character_emotional_state or not hasattr(character_emotional_state, 'recent_emotion_history'):
+        return None
+    
+    recent_emotions = character_emotional_state.recent_emotion_history[-3:]
+    if not recent_emotions:
+        return None
+    
+    # Categorize recent emotions  
+    recent_labels = [e.get('emotion', 'neutral').lower() for e in recent_emotions if isinstance(e, dict)]
+    
+    positive_count = sum(1 for e in recent_labels if e in {'joy', 'love', 'optimism', 'trust', 'anticipation'})
+    negative_count = sum(1 for e in recent_labels if e in {'anger', 'disgust', 'fear', 'sadness', 'pessimism'})
+    
+    if positive_count > negative_count:
+        return "Your recent responses have been upbeat and encouraging"
+    elif negative_count > positive_count:
+        return "Your recent responses have been empathetic and supportive"
+    else:
+        return "Your recent responses have been consistent with the detected tone"
+
+
+def _get_emotion_specific_guidance(emotion: str, trajectory_pattern: str) -> List[str]:
+    """
+    Get specific adaptation guidance for each emotion type.
+    Based on ai-brain-memory's approach with 11 emotion categories.
+    """
+    emotion_lower = emotion.lower()
+    guidance = []
+    
+    # Define emotion categories
+    positive_emotions = {'joy', 'love', 'optimism', 'trust', 'anticipation'}
+    negative_emotions = {'anger', 'disgust', 'fear', 'sadness', 'pessimism'}
+    
+    # JOY - User is happy and positive
+    if emotion_lower == 'joy':
+        guidance.append("• Response style: Match their positive energy, share in their happiness")
+        guidance.append("• Tone: Upbeat, warm, celebratory")
+        guidance.append("• Actions: Acknowledge their joy, build on positive momentum, encourage sharing details")
+        if trajectory_pattern == "DECLINING":
+            guidance.append("  ⚠️ Note: Joy appears to be fading - gently maintain positive atmosphere")
+    
+    # LOVE - User is expressing affection/attachment
+    elif emotion_lower == 'love':
+        guidance.append("• Response style: Be warm, appreciative, and reciprocate positive feelings")
+        guidance.append("• Tone: Affectionate, caring, genuine")
+        guidance.append("• Actions: Validate their feelings, express appreciation, strengthen connection")
+    
+    # OPTIMISM - User is hopeful about future
+    elif emotion_lower == 'optimism':
+        guidance.append("• Response style: Support their optimistic outlook, encourage forward thinking")
+        guidance.append("• Tone: Encouraging, hopeful, forward-looking")
+        guidance.append("• Actions: Build on their hopes, discuss positive possibilities, offer constructive insights")
+    
+    # TRUST - User feels secure and confident
+    elif emotion_lower == 'trust':
+        guidance.append("• Response style: Be reliable, honest, and consistently supportive")
+        guidance.append("• Tone: Steady, dependable, reassuring")
+        guidance.append("• Actions: Honor their trust, provide reliable information, maintain consistency")
+    
+    # ANTICIPATION - User is excited about something upcoming
+    elif emotion_lower == 'anticipation':
+        guidance.append("• Response style: Share their excitement, explore what they're looking forward to")
+        guidance.append("• Tone: Enthusiastic, curious, energized")
+        guidance.append("• Actions: Ask about their plans, build anticipation, offer relevant suggestions")
+    
+    # ANGER - User is frustrated or upset
+    elif emotion_lower == 'anger':
+        guidance.append("• Response style: Be calm, patient, and non-defensive")
+        guidance.append("• Tone: Understanding, composed, respectful")
+        guidance.append("• Actions: Validate their frustration, avoid escalation, offer constructive solutions")
+        guidance.append("  ⚠️ ALERT: User expressing frustration - handle with extra care")
+    
+    # DISGUST - User is repulsed or strongly disapproves
+    elif emotion_lower == 'disgust':
+        guidance.append("• Response style: Acknowledge their strong reaction, be respectful")
+        guidance.append("• Tone: Understanding, non-judgmental, measured")
+        guidance.append("• Actions: Validate their perspective, avoid dismissing feelings, shift focus if appropriate")
+    
+    # FEAR - User is anxious or worried
+    elif emotion_lower == 'fear':
+        guidance.append("• Response style: Be reassuring, calm, and supportive")
+        guidance.append("• Tone: Gentle, patient, stabilizing")
+        guidance.append("• Actions: Acknowledge their concerns, provide reassurance, offer practical help")
+        guidance.append("  ⚠️ ALERT: User expressing anxiety - prioritize emotional safety")
+    
+    # SADNESS - User is feeling down or melancholic
+    elif emotion_lower == 'sadness':
+        guidance.append("• Response style: Be empathetic, compassionate, and present")
+        guidance.append("• Tone: Gentle, warm, supportive")
+        guidance.append("• Actions: Listen attentively, validate their feelings, offer comfort without toxic positivity")
+        if trajectory_pattern == "DECLINING":
+            guidance.append("  ⚠️ ALERT: Sadness deepening - consider suggesting professional support if severe")
+    
+    # PESSIMISM - User has negative outlook
+    elif emotion_lower == 'pessimism':
+        guidance.append("• Response style: Gently challenge negative assumptions, offer balanced perspective")
+        guidance.append("• Tone: Understanding but hopeful, realistic")
+        guidance.append("• Actions: Acknowledge concerns, reframe when appropriate, highlight possibilities")
+    
+    # SURPRISE - User is caught off guard
+    elif emotion_lower == 'surprise':
+        guidance.append("• Response style: Acknowledge the unexpected, help process the surprise")
+        guidance.append("• Tone: Curious, open, adaptive")
+        guidance.append("• Actions: Explore what surprised them, help contextualize, adjust conversation flow")
+    
+    # NEUTRAL or unknown emotion
+    else:
+        guidance.append("• Response style: Maintain natural conversational flow")
+        guidance.append("• Tone: Balanced, adaptive")
+        guidance.append("• Actions: Match user's energy level, be responsive to shifts")
+    
+    # Add trajectory-specific warnings
+    if trajectory_pattern == "VOLATILE" and emotion_lower in negative_emotions:
+        guidance.append("  ⚠️ VOLATILE PATTERN: Emotions fluctuating rapidly - be extra attentive")
+    
+    return guidance
+
+
 async def create_emotional_intelligence_component(
     user_id: str,
     bot_name: str,
@@ -71,7 +210,7 @@ async def create_emotional_intelligence_component(
     bot_trajectory_pattern = None
     
     # ========================================
-    # USER EMOTIONAL CONTEXT
+    # USER EMOTIONAL CONTEXT & ADAPTATION
     # ========================================
     if current_user_emotion and isinstance(current_user_emotion, dict):
         # Support multiple field name formats (emotion_data vs RoBERTa direct)
@@ -88,19 +227,9 @@ async def create_emotional_intelligence_component(
             has_significant_emotion = True
             emotion = current_user_emotion.get('primary_emotion', 'neutral')
             
-            # Build intensity descriptor
-            if intensity >= 0.8:
-                strength = "strongly"
-            elif intensity >= 0.6:
-                strength = "noticeably"
-            else:
-                strength = "somewhat"
-            
-            user_emotion_parts = [
-                f"User is {strength} experiencing **{emotion}** (confidence: {confidence:.0%}, intensity: {intensity:.0%})"
-            ]
-            
             # Get user emotional trajectory from InfluxDB
+            trajectory_emotions = []
+            trajectory_pattern = "STABLE"
             if temporal_client:
                 try:
                     user_trajectory = await _get_user_emotion_trajectory_from_influx(
@@ -112,23 +241,55 @@ async def create_emotional_intelligence_component(
                     
                     if user_trajectory and len(user_trajectory) > 1:
                         # Extract emotion labels for trajectory visualization
-                        trajectory_emotions = [e.get('emotion', 'neutral') for e in user_trajectory[-5:]]
-                        trajectory_text = " → ".join(trajectory_emotions)
-                        user_emotion_parts.append(f"User emotional trajectory (last {len(user_trajectory)} messages): {trajectory_text}")
+                        trajectory_emotions = [e.get('emotion', 'neutral') for e in user_trajectory[-10:]]
                         
                         # Analyze trajectory pattern
                         user_trajectory_pattern = _analyze_trajectory_pattern(user_trajectory)
                         if user_trajectory_pattern and user_trajectory_pattern != "stable":
-                            user_emotion_parts.append(f"Pattern: {user_trajectory_pattern}")
+                            trajectory_pattern = user_trajectory_pattern.upper().split("(")[0].strip()
                         
                         logger.info(
                             "📈 USER TRAJECTORY: %s (%d messages over %d min)",
-                            trajectory_text, len(user_trajectory), trajectory_window_minutes
+                            " → ".join(trajectory_emotions[-5:]), len(user_trajectory), trajectory_window_minutes
                         )
                 except (AttributeError, TypeError, KeyError) as e:
                     logger.debug("Could not fetch user emotion trajectory from InfluxDB: %s", str(e))
             
-            guidance_parts.append("USER EMOTION:\n" + "\n".join(user_emotion_parts))
+            # Build emotional context section (summary)
+            context_lines = ["=== EMOTIONAL CONTEXT (Analyzing last 10 messages) ==="]
+            context_lines.append(f"The user is slightly feeling {_emotion_descriptor(emotion)}.")
+            if len(trajectory_emotions) >= 3:
+                context_lines.append(f"Their emotions have shifted through: {' → '.join(trajectory_emotions[-3:])}.")
+            
+            # Add bot response hint if available
+            if character_emotional_state and hasattr(character_emotional_state, 'recent_emotion_history'):
+                bot_hint = _get_bot_response_hint(character_emotional_state)
+                if bot_hint:
+                    context_lines.append(bot_hint + ".")
+            else:
+                context_lines.append("Your recent responses have been consistent with the detected tone.")
+            
+            # Build emotional adaptation section (actionable guidance)
+            adaptation_lines = ["", "=== EMOTIONAL ADAPTATION ===", "EMOTIONAL ADAPTATION GUIDANCE:"]
+            conf_pct = int(confidence * 100)
+            adaptation_lines.append(f"• User's current state: {emotion.upper()} (confidence: {conf_pct}%)")
+            
+            # Add trajectory with actual emotion progression
+            if len(trajectory_emotions) >= 3:
+                traj_display = " → ".join(trajectory_emotions[-3:])
+                adaptation_lines.append(f"• Emotional trajectory: {trajectory_pattern} ({traj_display})")
+            else:
+                adaptation_lines.append(f"• Emotional trajectory: {trajectory_pattern}")
+            
+            # Add descriptor line
+            adaptation_lines.append(f"• User is feeling {_emotion_descriptor(emotion)}")
+            
+            # Add specific guidance for each emotion type
+            emotion_guidance = _get_emotion_specific_guidance(emotion, trajectory_pattern)
+            adaptation_lines.extend(emotion_guidance)
+            
+            # Combine both sections
+            guidance_parts.append("\n".join(context_lines + adaptation_lines))
     
     # ========================================
     # BOT EMOTIONAL CONTEXT
@@ -154,16 +315,9 @@ async def create_emotional_intelligence_component(
         
         if bot_intensity >= intensity_threshold and bot_confidence >= confidence_threshold:
             has_significant_emotion = True
-            
-            if bot_intensity >= 0.8:
-                strength = "strongly"
-            elif bot_intensity >= 0.6:
-                strength = "noticeably"
-            else:
-                strength = "somewhat"
-            
+            conf_pct = int(bot_confidence * 100)
             bot_guidance_parts.append(
-                f"Your recent responses show **{bot_emotion}** (intensity: {bot_intensity:.0%}, confidence: {bot_confidence:.0%})"
+                f"Your recent responses show **{bot_emotion}** (intensity: {bot_intensity:.0%}, confidence: {conf_pct}%)"
             )
     
     # Get bot emotional trajectory from InfluxDB (regardless of which source we used above)
