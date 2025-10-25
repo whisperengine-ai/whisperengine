@@ -23,6 +23,7 @@ from dataclasses import dataclass
 
 from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
 from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+from src.utils.mystical_symbol_detector import get_mystical_symbol_detector
 from src.adapters.platform_adapters import (
     create_discord_message_adapter,
     create_discord_attachment_adapters
@@ -91,6 +92,7 @@ class ProcessingResult:
     llm_time_ms: Optional[int] = None  # LLM-specific processing time
     memory_stored: bool = False
     metadata: Optional[Dict[str, Any]] = None
+    silent_ignore: bool = False  # If True, no response should be sent (e.g., mystical symbols)
 
     def __post_init__(self):
         if self.metadata is None:
@@ -574,11 +576,25 @@ class MessageProcessor:
             validation_result = await self._validate_security(message_context)
             if not validation_result["is_safe"]:
                 logger.warning("SECURITY: Rejected unsafe message from user %s", message_context.user_id)
-                return ProcessingResult(
-                    response="I'm sorry, but I can't process that message for security reasons.",
-                    success=False,
-                    error_message="Security validation failed"
-                )
+                
+                # Check if this is a silent ignore case (e.g., mystical symbols)
+                is_silent = any("Mystical" in w for w in validation_result.get("warnings", []))
+                
+                if is_silent:
+                    # Silently ignore - no response at all
+                    return ProcessingResult(
+                        response="",
+                        success=True,
+                        silent_ignore=True,
+                        error_message="Silently ignored"
+                    )
+                else:
+                    # Normal security rejection with response
+                    return ProcessingResult(
+                        response="I'm sorry, but I can't process that message for security reasons.",
+                        success=False,
+                        error_message="Security validation failed"
+                    )
             
             # Update message content with sanitized version
             message_context.content = validation_result["sanitized_content"]
@@ -1471,6 +1487,25 @@ class MessageProcessor:
 
     async def _validate_security(self, message_context: MessageContext) -> Dict[str, Any]:
         """Validate message security and sanitize content."""
+        # Check for mystical symbols first (silent ignore) - feature flag controlled
+        import os
+        enable_mystical_filter = os.getenv("ENABLE_MYSTICAL_SYMBOL_FILTER", "false").lower() == "true"
+        
+        if enable_mystical_filter:
+            mystical_detector = get_mystical_symbol_detector()
+            should_ignore, reason = mystical_detector.should_ignore_message(message_context.content)
+            
+            if should_ignore:
+                logger.info(
+                    "🔮 MYSTICAL FILTER: Silently ignoring message from user %s - %s",
+                    message_context.user_id, reason
+                )
+                return {
+                    "is_safe": False,
+                    "sanitized_content": message_context.content,
+                    "warnings": ["Mystical symbol content detected"]
+                }
+        
         if not self.security_validator:
             return {
                 "is_safe": True,

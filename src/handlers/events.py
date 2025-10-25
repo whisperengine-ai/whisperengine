@@ -658,6 +658,11 @@ class BotEventHandlers:
                     # Process the message with unified pipeline
                     result = await self.message_processor.process_message(message_context)
                 
+                # Check for silent ignore (e.g., mystical symbols)
+                if result.silent_ignore:
+                    logger.info("🔮 Silent ignore triggered for user %s - no response sent", user_id)
+                    return
+                
                 if result.success:
                     logger.info("🎯 FOOTER DEBUG: Processing successful result, generating footer...")
                     # Generate optional status footer for Discord (NEVER stored in memory)
@@ -902,6 +907,11 @@ class BotEventHandlers:
                 # Show typing indicator while processing
                 async with reply_channel.typing():
                     result = await self.message_processor.process_message(message_context)
+                
+                # Check for silent ignore (e.g., mystical symbols)
+                if result.silent_ignore:
+                    logger.info("🔮 Silent ignore triggered for user %s - no response sent", user_id)
+                    return
                 
                 if result.success:
                     logger.info("🎯 FOOTER DEBUG (Guild): Processing successful result, generating footer...")
