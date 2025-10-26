@@ -244,6 +244,28 @@ class MessageProcessor:
             logger.warning("Fidelity metrics collector not available")
             self.fidelity_metrics = None
         
+        # ML Shadow Mode: Initialize predictor and logger for ML predictions
+        self.ml_predictor = None
+        self.ml_shadow_logger = None
+        
+        if self.temporal_client:
+            try:
+                from src.ml import create_response_strategy_predictor, create_ml_shadow_logger
+                
+                self.ml_predictor = create_response_strategy_predictor(
+                    influxdb_client=self.temporal_client
+                )
+                self.ml_shadow_logger = create_ml_shadow_logger(
+                    influxdb_client=self.temporal_client
+                )
+                
+                if self.ml_shadow_logger:
+                    logger.info("✅ ML Shadow Mode: Predictor and logger initialized")
+                else:
+                    logger.debug("ML Shadow Mode: Disabled (ENABLE_ML_SHADOW_MODE=false)")
+            except ImportError as e:
+                logger.debug("ML Shadow Mode: Not available - %s", e)
+        
         # Character Emotional State Manager: Track bot's own emotional state across conversations
         # Note: Uses lazy initialization since postgres_pool is initialized asynchronously
         self.character_state_manager = None
@@ -1230,6 +1252,29 @@ class MessageProcessor:
             
             logger.debug("Recorded temporal metrics for %s/%s", bot_name, message_context.user_id)
             
+            # ML Shadow Mode: Log prediction if enabled
+            if self.ml_shadow_logger and self.ml_predictor:
+                try:
+                    prediction = await self.ml_predictor.predict_strategy_effectiveness(
+                        user_id=message_context.user_id,
+                        bot_name=bot_name,
+                        message_content=message_context.content
+                    )
+                    
+                    # Only log if prediction was generated (skip if insufficient data)
+                    if prediction is not None:
+                        # Get current CDL mode from ai_components for comparison
+                        current_mode = ai_components.get('cdl_mode', 'unknown')
+                        
+                        await self.ml_shadow_logger.log_prediction(
+                            prediction=prediction,
+                            user_id=message_context.user_id,
+                            bot_name=bot_name,
+                            current_mode=current_mode
+                        )
+                except Exception as e:
+                    logger.debug("ML Shadow Mode: Prediction logging failed - %s", e)
+            
             # Relationship Intelligence: Lazy initialization and update of dynamic relationship scores
             await self._ensure_relationship_initialized()
             
@@ -2045,14 +2090,16 @@ class MessageProcessor:
                             top_k=20
                         )
                     elif unified_result.vector_strategy == UnifiedVectorStrategy.TEMPORAL_CHRONOLOGICAL:
-                        # For temporal queries, use chronological ordering
+                        # For temporal queries, use chronological ordering by sorting results by timestamp
                         logger.info("⏰ UNIFIED: Using temporal-chronological search")
                         memories = await self.memory_manager.retrieve_relevant_memories(
                             user_id=message_context.user_id,
                             query=message_context.content,
-                            limit=20,
-                            sort_by_timestamp=True
+                            limit=20
                         )
+                        # Sort by timestamp to get chronological order (oldest to newest for context)
+                        if memories:
+                            memories = sorted(memories, key=lambda m: m.get('timestamp', 0))
                     else:
                         # Default to content-primary search
                         logger.info("📄 UNIFIED: Using content-only search (default)")

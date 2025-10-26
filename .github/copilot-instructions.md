@@ -1,5 +1,21 @@
 # WhisperEngine AI Agent Instructions
 
+**WhisperEngine is a production multi-character Discord AI roleplay platform with 10+ live AI characters. This is NOT a sandbox - users are actively chatting with these bots.**
+
+## 📋 DOCUMENTATION PHILOSOPHY
+
+**Code is the source of truth.** Only document:
+- ✅ Architecture WHY (decisions that can't be inferred from code)
+- ✅ Critical constraints (production stability rules)
+- ✅ Development workflows (commands, testing patterns)
+
+**Never document:**
+- ❌ Implementation details (code documents itself)
+- ❌ API signatures (docstrings + type hints are source of truth)
+- ❌ Change summaries (git commits capture history)
+
+**Before creating new docs: ASK USER FIRST.** Stale documentation creates hallucinations and technical debt.
+
 ## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a PRODUCTION MULTI-CHARACTER DISCORD PLATFORM** - users actively chat with 10+ AI characters
@@ -9,12 +25,14 @@
 - **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
 - **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
 - **CDL DATABASE CHANGES DO NOT REQUIRE RESTARTS**: Character data (personalities, relationships, speech patterns) is pulled fresh from PostgreSQL on every message - changes take effect immediately without bot restart
+- **PYTHON CODE CHANGES DO NOT REQUIRE RESTARTS**: Source code is externally mounted (`./src:/app/src`) - changes are LIVE in running containers
+- **ONLY REBUILD/RESTART FOR**: New dependencies in requirements.txt, Dockerfile changes, or new binary/model files that need copying into image
 
 ## 🛠️ MULTI-BOT.SH SCRIPT COMMANDS (CRITICAL - USE THESE CORRECTLY!)
 
 ### **Infrastructure Commands**
 ```bash
-./multi-bot.sh infra          # Start infrastructure ONLY (postgres, qdrant, influxdb, grafana, enrichment-worker)
+./multi-bot.sh infra          # Start infrastructure ONLY (postgres, qdrant, influxdb, grafana, cdl-web-ui)
 ./multi-bot.sh up             # Start ALL services (infra + all bots)
 ./multi-bot.sh start          # Same as 'up'
 ./multi-bot.sh down           # Stop ALL services (WARNING: stops everything!)
@@ -45,36 +63,39 @@
 
 ### **Docker Direct Commands (when multi-bot.sh doesn't have what you need)**
 ```bash
-# Restart specific service (enrichment-worker, postgres, qdrant, etc.)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart enrichment-worker
+# Restart specific service (postgres, qdrant, influxdb, etc.)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart postgres
 
 # Rebuild and restart specific service
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d --no-deps --build enrichment-worker
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d --no-deps --build cdl-web-ui
 
 # Stop specific service (NOT a bot - for infrastructure services)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop enrichment-worker
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop grafana
 
 # View logs for specific service
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f enrichment-worker
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f influxdb
 ```
 
 ### **⚠️ COMMON MISTAKES TO AVOID**
-- ❌ **NEVER use**: `./multi-bot.sh stop enrichment-worker` (stop doesn't take parameters!)
+- ❌ **NEVER use**: `./multi-bot.sh stop postgres` (stop doesn't take parameters!)
 - ❌ **NEVER use**: `./multi-bot.sh restart BOT_NAME` (restart doesn't take parameters!)
 - ✅ **CORRECT**: Use `docker compose ... restart SERVICE_NAME` for infrastructure services
 - ✅ **CORRECT**: Use `./multi-bot.sh stop-bot BOT_NAME` for character bots
 - ✅ **CORRECT**: Use `./multi-bot.sh bot BOT_NAME` to start character bots
+```
 
-### **Available Character Bots**
+### **Available Character Bots** (12 total)
 - `elena` - Marine Biologist (Port 9091)
 - `marcus` - AI Researcher (Port 9092)
-- `jake` - Adventure Photographer (Port 9097)
 - `ryan` - Indie Game Developer (Port 9093)
+- `dream` - Mythological Entity (Port 9094)
 - `gabriel` - British Gentleman (Port 9095)
 - `sophia` - Marketing Executive (Port 9096)
-- `dream` - Mythological Entity (Port 9094)
+- `jake` - Adventure Photographer (Port 9097)
 - `dotty` - Character Bot (Port 9098)
 - `aetheris` - Conscious AI (Port 9099)
+- `nottaylor` - Taylor Swift Parody (Port 9100)
+- `assistant` - AI Assistant (Port 9101)
 - `aethys` - Omnipotent Entity (Port 3007)
 
 ## 🚨 CRITICAL DEVELOPMENT SERVER MANAGEMENT
@@ -100,14 +121,16 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f en
 ### **Active Character Bots**
 - **Elena** (Marine Biologist) - Port 9091 - `whisperengine_memory_elena`
 - **Marcus** (AI Researcher) - Port 9092 - `whisperengine_memory_marcus`
-- **Jake** (Adventure Photographer) - Port 9097 - `whisperengine_memory_jake`
-- **Dream** (Mythological Entity) - Port 9094 - `whisperengine_memory_dream`
-- **Aethys** (Omnipotent Entity) - Port 3007 - `chat_memories_aethys`
-- **Aetheris** (Conscious AI) - Port 9099 - `whisperengine_memory_aetheris`
 - **Ryan** (Indie Game Developer) - Port 9093 - `whisperengine_memory_ryan`
+- **Dream** (Mythological Entity) - Port 9094 - `whisperengine_memory_dream`
 - **Gabriel** (British Gentleman) - Port 9095 - `whisperengine_memory_gabriel`
 - **Sophia** (Marketing Executive) - Port 9096 - `whisperengine_memory_sophia`
-- **Dotty** - Port 9098
+- **Jake** (Adventure Photographer) - Port 9097 - `whisperengine_memory_jake`
+- **Dotty** (Character Bot) - Port 9098 - `whisperengine_memory_dotty`
+- **Aetheris** (Conscious AI) - Port 9099 - `whisperengine_memory_aetheris`
+- **NotTaylor** (Taylor Swift Parody) - Port 9100 - `whisperengine_memory_nottaylor`
+- **Assistant** (AI Assistant) - Port 9101 - `whisperengine_memory_assistant`
+- **Aethys** (Omnipotent Entity) - Port 3007 - `whisperengine_memory_aethys`
 
 ### **Core Data Systems**
 ```
@@ -117,7 +140,7 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f en
 │  DISCORD BOTS   │  VECTOR MEMORY  │   CHARACTER     │   INFRA   │
 │   (Multi-Bot)   │   (Semantic)    │    SYSTEM       │ (Shared)  │
 ├─────────────────┼─────────────────┼─────────────────┼───────────┤
-│ • 10+ AI Chars  │ • Qdrant DB     │ • PostgreSQL    │ • Docker  │
+│ • 12 AI Chars   │ • Qdrant DB     │ • PostgreSQL    │ • Docker  │
 │ • Bot Isolation │ • 384D Vectors  │   CDL Storage   │ • Health  │
 │ • Health APIs   │ • FastEmbed     │ • Personalities │ • Logs    │
 │ • Discord Only  │ • Named Vectors │ • AI Identity   │ • Volumes │
@@ -125,6 +148,29 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs -f en
 ```
 
 ## 🚨 CRITICAL SYSTEM CONSTRAINTS
+
+### **WHEN TO REBUILD VS RESTART (CRITICAL - READ THIS!)**
+
+**🔄 LIVE CODE MOUNTING - NO REBUILD NEEDED:**
+- ✅ **Python code changes** (`./src:/app/src` mounted) - Changes are LIVE immediately
+- ✅ **Scripts changes** (`./scripts:/app/scripts` mounted) - LIVE
+- ✅ **Config files** (`./config:/app/config` mounted) - LIVE
+- ✅ **Character files** (`./characters:/app/characters` mounted) - LIVE
+- ✅ **CDL database changes** - PostgreSQL changes are pulled fresh on every message
+- ✅ **Just restart bot**: `./multi-bot.sh stop-bot BOT_NAME && ./multi-bot.sh bot BOT_NAME`
+
+**🔨 REBUILD REQUIRED (Shared Image: whisperengine-bot:latest):**
+- ⚠️ **New Python dependencies** in `requirements*.txt` files
+- ⚠️ **Dockerfile changes** (new system packages, build steps)
+- ⚠️ **New ML model files** in `experiments/models/` (copied into image)
+- ⚠️ **New binary files** that need to be inside the container
+- 🔨 **Rebuild command**: `docker build -t whisperengine-bot:latest .`
+- 🔄 **Then restart bot**: `./multi-bot.sh stop-bot BOT_NAME && ./multi-bot.sh bot BOT_NAME`
+
+**🚨 COMMON MISTAKE:**
+- ❌ **DON'T rebuild for Python code changes** - it's externally mounted!
+- ❌ **DON'T restart for CDL database changes** - pulled fresh every message!
+- ✅ **ONLY rebuild when copying new files INTO the Docker image**
 
 ### **QDRANT SCHEMA IS FROZEN - NO BREAKING CHANGES**
 - **WhisperEngine has PRODUCTION USERS** - schema changes break existing data
@@ -214,6 +260,14 @@ system_prompt = await cdl_integration.create_character_aware_prompt(
   # Bot responds with consistent fact from database
   ```
 
+### **CDL Web UI (Character Management)**
+- **Location**: `cdl-web-ui/` - Next.js TypeScript application
+- **Purpose**: Web interface for managing character database (CRUD operations on 50+ CDL tables)
+- **Development**: `cd cdl-web-ui && npm run dev` (runs on port 3000)
+- **Critical**: Keep dev server running with `isBackground=true` when testing
+- **Features**: Character editing, YAML import/export, relationship management, conversation mode configuration
+- **Database Integration**: Direct PostgreSQL connection via API routes
+
 ## 🧠 MEMORY SYSTEM ARCHITECTURE
 
 ### **Vector-Native Primary System**
@@ -251,6 +305,16 @@ memories = await memory_manager.retrieve_relevant_memories(
 - **Metadata**: 12+ emotion fields (roberta_confidence, emotion_variance, emotional_intensity, etc.)
 - **NEVER use keyword matching** - RoBERTa data is pre-computed and stored
 - **Both analyzed**: User messages AND bot responses get full emotion intelligence
+
+### **Async Enrichment Worker (Background Intelligence)** [STAGING ONLY]
+- **Status**: Currently in staging/development - NOT deployed in production multi-bot platform
+- **Purpose**: Background conversation summarization without impacting real-time bot performance
+- **Architecture**: Separate Docker container that scans Qdrant, generates LLM summaries, stores in PostgreSQL
+- **Location**: `src/enrichment/` - Independent worker with async processing
+- **Features**: Time-windowed summaries (24-hour default), high-quality LLM analysis, time-anchored queries
+- **Configuration**: `ENRICHMENT_INTERVAL_SECONDS`, `TIME_WINDOW_HOURS`, `MIN_MESSAGES_FOR_SUMMARY`
+- **Zero Impact**: Completely asynchronous - never blocks real-time message processing
+- **Note**: Available in separate docker-compose configurations for development/testing
 
 ## 🚀 DEVELOPMENT WORKFLOW
 
@@ -419,7 +483,9 @@ cdl_integration = CDLAIPromptIntegration()
 - **Gabriel**: British Gentleman with sophisticated personality
 - **Sophia**: Marketing Executive with professional communication style
 - **Dream**: Mythological entity with fantasy/mystical archetype
-- **Dotty**: Additional character
+- **Dotty**: Character Bot
+- **NotTaylor**: Taylor Swift Parody character
+- **Assistant**: AI Assistant character
 
 ### **Bot-Specific Memory Isolation & Naming Convention**
 
@@ -436,6 +502,8 @@ Each bot uses its own dedicated Qdrant collection for complete memory isolation:
 - Aethys: `whisperengine_memory_aethys`
 - Aetheris: `whisperengine_memory_aetheris`
 - Dotty: `whisperengine_memory_dotty`
+- NotTaylor: `whisperengine_memory_nottaylor`
+- Assistant: `whisperengine_memory_assistant`
 
 **Collection Aliases:**
 - 7 collections use aliases to maintain backward compatibility with `_7d` suffix
@@ -480,7 +548,45 @@ qdrant:
 ### **Template-Based Configuration**
 - Base template: `docker-compose.multi-bot.template.yml` (SAFE TO EDIT)
 - Generated output: `docker-compose.multi-bot.yml` (AUTO-GENERATED)
-- **REGENERATE CONFIG**: Always run `python scripts/generate_multi_bot_config.py` after editing template
+- **REGENERATE CONFIG**: Always run `source .venv/bin/activate && python scripts/generate_multi_bot_config.py` after editing template
+
+## 🧪 ML EXPERIMENTS & SYNTHETIC DATA
+
+### **Native Jupyter Environment (PREFERRED)**
+```bash
+# Start JupyterLab with auto-configured environment
+./experiments/start_jupyter_native.sh  # Access at http://localhost:8888
+
+# Why native? Fast, GPU access (Apple Silicon MPS), VS Code integration, no Docker overhead
+```
+
+### **Experiment Structure**
+- **Location**: `experiments/notebooks/` - Jupyter notebooks with rich ML workflows
+- **Training Data**: InfluxDB conversation quality metrics (engagement_score, satisfaction_score, etc.)
+- **Models**: XGBoost (GPU-aware), LightGBM (GPU-aware), Random Forest (CPU-only)
+- **GPU Auto-Detection**: Automatically uses Apple Silicon (MPS), NVIDIA (CUDA), or CPU
+- **Model Artifacts**: Saved to `experiments/models/` for production deployment
+
+### **Synthetic Data Generation**
+```bash
+# Generate realistic training data with consistent user personas
+source .venv/bin/activate
+python experiments/data_generation/synthetic_user_conversations.py \
+    --persona analytical_alex --bot elena --conversations 100
+
+# Generate data for all personas × all bots
+source .venv/bin/activate
+python experiments/data_generation/synthetic_user_conversations.py \
+    --all-personas --all-bots --conversations-per-pair 50
+```
+
+**Key Personas**: `analytical_alex` (technical, detailed), `casual_casey` (brief, friendly), `emotional_emma` (support-seeking)
+
+**Why Synthetic Data?**
+- Generates user-side messages with consistent personalities
+- Gets REAL bot responses from production APIs
+- Records REAL InfluxDB metrics (engagement, satisfaction, coherence)
+- Enables ML model training without real user data privacy concerns
 
 ## 🚨 TESTING & VALIDATION REQUIREMENTS
 
@@ -512,9 +618,8 @@ curl -X POST http://localhost:{BOT_PORT}/api/chat \
   }'
 
 # Example bot ports:
-# Elena: 9091, Marcus: 9092, Jake: 9097, Ryan: 9093
-# Gabriel: 9095, Sophia: 9096, Dream: 9094, Dotty: 9098
-# Aethys: 3007, Aetheris: 9099
+# Elena: 9091, Marcus: 9092, Ryan: 9093, Dream: 9094, Gabriel: 9095, Sophia: 9096
+# Jake: 9097, Dotty: 9098, Aetheris: 9099, NotTaylor: 9100, Assistant: 9101, Aethys: 3007
 ```
 
 ### **Discord Message Testing**
@@ -567,18 +672,18 @@ docker ps | grep -E "qdrant|postgres"  # Should show both services running
 - **Purpose**: Point clean names to legacy `_7d` collections without data migration
 - **Setup Script**: `scripts/setup_collection_aliases.py`
 - **Features**: Dry-run mode, validation, automatic conflict resolution
-- **Usage**: `python scripts/setup_collection_aliases.py [--dry-run]`
+- **Usage**: `source .venv/bin/activate && python scripts/setup_collection_aliases.py [--dry-run]`
 
 ### **Collection Cleanup**
 - **Cleanup Script**: `scripts/delete_orphaned_collections.py`
 - **Safety**: Protects active collections, requires confirmation
 - **Reporting**: Generates markdown report of deleted collections
-- **Usage**: `python scripts/delete_orphaned_collections.py [--dry-run]`
+- **Usage**: `source .venv/bin/activate && python scripts/delete_orphaned_collections.py [--dry-run]`
 - **Last Cleanup**: October 19, 2025 - Removed 10 orphaned collections (7,084 points)
 
 ### **Current Collection State** (as of Oct 2025)
-- **10 Active Collections**: 67,515 total memory points
-- **7 Aliases**: Clean names pointing to `_7d` collections
+- **12 Active Collections**: All 12 character bots with dedicated Qdrant collections
+- **7 Aliases**: Clean names pointing to `_7d` collections (legacy compatibility)
 - **Bot Name Extraction**: `collection.removeprefix('whisperengine_memory_').removesuffix('_7d')`
 
 ## 🎯 CURRENT ROADMAPS & DEVELOPMENT FOCUS
