@@ -1,0 +1,31 @@
+# ML Experiments - Additional Requirements
+# Install with: pip install -r requirements-ml.txt
+# 
+# These extend the main requirements.txt for ML experimentation and shadow mode.
+
+# Core Data Science Libraries (REQUIRED for ML predictor)
+pandas>=2.2.0           # Data manipulation and feature extraction
+numpy>=1.24.0           # Numerical computing
+scikit-learn>=1.5.0     # ML algorithms (Random Forest, preprocessing)
+
+# Gradient Boosting Libraries
+xgboost>=2.1.3          # Gradient boosting with GPU support (CUDA/CPU)
+lightgbm>=4.5.0         # Fast gradient boosting for large datasets
+
+# Jupyter Notebook Environment
+jupyterlab>=4.3.3       # Interactive notebook environment
+ipywidgets>=8.1.5       # Interactive widgets for notebooks
+
+# Advanced Visualization
+seaborn>=0.13.2         # Statistical data visualization
+plotly>=5.24.1          # Interactive plots
+
+# Statistics & Advanced ML
+statsmodels>=0.14.4     # Statistical models and tests
+scikit-optimize>=0.10.2 # Bayesian hyperparameter optimization
+
+# Model Persistence
+joblib>=1.4.2           # Efficient model serialization
+
+# Note: influxdb-client is in requirements-platform.txt (required for both ML training and shadow mode)
+# matplotlib is in main requirements.txt for general plotting needs
