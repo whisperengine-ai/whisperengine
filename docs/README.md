@@ -2,7 +2,44 @@
 
 ## 📖 Complete Technical Documentation
 
-Welcome to the WhisperEngine documentation hub. This directory contains comprehensive documentation for developers, users, and contributors.
+# WhisperEngine Documentation
+
+Welcome to the WhisperEngine documentation! This comprehensive guide covers all aspects of the WhisperEngine AI platform - a production multi-character Discord AI roleplay platform with 10+ live AI characters.
+
+## 📚 Documentation Structure
+
+### **Quick Start Guides**
+- [Getting Started](getting-started/) - Setup and installation
+- [ML Shadow Mode Quickstart](ml/ML_SHADOW_MODE_QUICKSTART.md) - Enable ML-powered CDL optimization
+- [ML Integration Quick Start](ml/ML_INTEGRATION_QUICK_START.md) - Integrate ML models
+- [Enrichment Worker Quickstart](enrichment/) - Background processing setup
+
+### **Core Architecture**
+- [Architecture Overview](architecture/README.md) - System design and evolution
+- [Character Definition Language (CDL)](cdl-system/) - Database-driven personality system
+- [Memory System](memory/) - Vector-native Qdrant architecture
+- [Emoji Feedback Architecture](architecture/EMOJI_FEEDBACK_ARCHITECTURE.md) - Context-aware user feedback
+- [Query & Semantic Routing](architecture/QUERY_AND_SEMANTIC_ROUTING_ARCHITECTURE_REVIEW.md) - Intent-based routing
+
+### **Machine Learning**
+- [ML Phase 1 Summary](ml/ML_PHASE1_SUMMARY.md) - Initial ML implementation
+- [ML Shadow Mode Implementation](ml/ML_SHADOW_MODE_IMPLEMENTATION_SUMMARY.md) - Production ML deployment
+- [Response Strategy Optimization](ml/) - CDL mode prediction models
+
+### **Infrastructure & Operations**
+- [InfluxDB Field Verification](infrastructure/INFLUXDB_FIELD_VERIFICATION.md) - Metrics schema
+- [Multi-Bot Setup](multi-bot/) - Running multiple character bots
+- [Maintenance Reports](maintenance/) - System cleanup and optimization
+
+### **Development**
+- [Implementation Summary](development/IMPLEMENTATION_SUMMARY.md) - Current implementation status
+- [Testing Guides](testing/) - Automated and manual testing
+- [Debugging](debugging/) - Troubleshooting common issues
+
+### **AI Systems & Features**
+- [Character System](character-system/) - CDL personality engine
+- [Enrichment Worker](enrichment/) - Background conversation analysis
+- [Temporal Intelligence](ai-systems/) - Time-aware metrics and analytics
 
 ## 🆕 Recent Updates
 
