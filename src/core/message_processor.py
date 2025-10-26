@@ -626,8 +626,25 @@ class MessageProcessor:
             # Phase 2.5: Workflow detection and transaction processing (platform-agnostic)
             await self._process_workflow_detection(message_context)
             
-            # Phase 3: Memory retrieval with context-aware filtering
-            relevant_memories = await self._retrieve_relevant_memories(message_context)
+            # Phase 2.75: Early emotion analysis for context-aware memory retrieval
+            # Analyze user's current emotional state BEFORE retrieving memories
+            # This enables emotional memory triggering - retrieving emotionally-relevant memories
+            early_emotion_context = None
+            if self._shared_emotion_analyzer:
+                try:
+                    early_emotion_result = await self._shared_emotion_analyzer.analyze_emotion(
+                        message_context.content,
+                        message_context.user_id
+                    )
+                    if early_emotion_result and hasattr(early_emotion_result, 'primary_emotion'):
+                        early_emotion_context = early_emotion_result.primary_emotion
+                        logger.info(f"🎭 EARLY EMOTION DETECTION: {early_emotion_context} (for context-aware memory retrieval)")
+                except Exception as e:
+                    logger.debug(f"Early emotion analysis failed, using neutral context: {e}")
+                    early_emotion_context = "neutral"
+            
+            # Phase 3: Memory retrieval with emotional context-aware filtering
+            relevant_memories = await self._retrieve_relevant_memories(message_context, early_emotion_context)
             
             # Phase 4: Conversation history and context building
             # 🚀 Structured Prompt Assembly (default - no feature flag!)
@@ -1790,8 +1807,18 @@ class MessageProcessor:
             logger.error("🧠 MEMORY SUMMARY ERROR: Failed to generate memory summary: %s", e)
             return "I'm having trouble accessing my memory right now, but I'm still here to chat! Our conversation history helps me understand you better as we talk."
 
-    async def _retrieve_relevant_memories(self, message_context: MessageContext) -> List[Dict[str, Any]]:
-        """Retrieve relevant memories with multi-vector intelligence and MemoryBoost optimization."""
+    async def _retrieve_relevant_memories(
+        self, 
+        message_context: MessageContext,
+        emotional_context: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve relevant memories with multi-vector intelligence and MemoryBoost optimization.
+        
+        Args:
+            message_context: Message context containing user query
+            emotional_context: Optional emotional state for emotion-aware memory retrieval
+        """
         if not self.memory_manager:
             logger.warning("Memory manager not available; skipping memory retrieval.")
             return []
@@ -1923,16 +1950,20 @@ class MessageProcessor:
                     logger.warning("Optimized memory retrieval failed, using fallback: %s", str(e))
             
             # Fallback to context-aware retrieval with channel privacy filtering
+            # 🎭 EMOTIONAL MEMORY TRIGGERING: Pass actual emotion instead of "general conversation"
+            effective_emotional_context = emotional_context or "general conversation"
+            
             relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
                 user_id=message_context.user_id,
                 query=message_context.content,
                 max_memories=20,
                 context=classified_context,
-                emotional_context="general conversation",
+                emotional_context=effective_emotional_context,  # 🎭 FIX: Use actual detected emotion!
                 channel_type=message_context.channel_type  # 🔒 PRIVACY: Pass channel type for filtering
             )
             
-            logger.info("🔍 MEMORY: Retrieved %d memories via context-aware fallback", len(relevant_memories))
+            logger.info("🔍 MEMORY: Retrieved %d memories via context-aware fallback (emotion: %s)", 
+                       len(relevant_memories), effective_emotional_context)
             
             # REMOVED: Fake estimated memory metrics for fallback - not useful
             # Fallback doesn't provide real relevance/similarity scores
