@@ -210,24 +210,26 @@ class PredictiveAdaptationEngine:
             # Sprint 6 Telemetry: Write to InfluxDB for evaluation
             if self.temporal_client:
                 try:
-                    telemetry_point = {
-                        'measurement': 'component_usage',
-                        'tags': {
-                            'component': 'predictive_engine',
-                            'method': 'predict_user_needs',
-                            'bot_name': bot_name,
-                            'user_id': user_id
-                        },
-                        'fields': {
-                            'execution_time_seconds': prediction_duration,
-                            'predictions_generated': len(predictions),
-                            'prediction_horizon_hours': prediction_horizon_hours,
-                            'invocation_count': self._telemetry['predict_user_needs_count'],
-                            'total_predictions_lifetime': self._telemetry['total_predictions_generated']
-                        },
-                        'time': prediction_start
-                    }
-                    await self.temporal_client.write_point(telemetry_point)
+                    from influxdb_client import Point
+                    
+                    telemetry_point = Point("component_usage") \
+                        .tag("component", "predictive_engine") \
+                        .tag("method", "predict_user_needs") \
+                        .tag("bot_name", bot_name) \
+                        .tag("user_id", user_id) \
+                        .field("execution_time_seconds", prediction_duration) \
+                        .field("predictions_generated", len(predictions)) \
+                        .field("prediction_horizon_hours", prediction_horizon_hours) \
+                        .field("invocation_count", self._telemetry['predict_user_needs_count']) \
+                        .field("total_predictions_lifetime", self._telemetry['total_predictions_generated']) \
+                        .time(prediction_start)
+                    
+                    # Use correct InfluxDB client method
+                    write_api = self.temporal_client.write_api()
+                    write_api.write(
+                        bucket=self.temporal_client.bucket if hasattr(self.temporal_client, 'bucket') else 'whisperengine',
+                        record=telemetry_point
+                    )
                     logger.info("📊 PREDICTIVE ENGINE TELEMETRY: Recorded prediction metrics to InfluxDB")
                 except Exception as telemetry_error:
                     logger.warning("Failed to record predictive engine telemetry: %s", telemetry_error)

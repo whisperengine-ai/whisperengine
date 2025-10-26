@@ -217,8 +217,14 @@ class ConfidenceAnalyzer:
             processing_time_ms: Time to process and respond
             
         Returns:
-            ConversationQualityMetrics: Quality measurements
+            ConversationQualityMetrics: Quality measurements with emoji reaction priority
         """
+        
+        # Check for emoji reaction data (REAL user feedback - highest priority!)
+        emoji_reaction_data = ai_components.get('emoji_reaction_data')
+        user_reaction_score = None
+        reaction_emoji = None
+        has_user_feedback = False
         
         # Engagement score based on emotion and interaction type
         engagement_score = 0.5  # Default
@@ -227,14 +233,47 @@ class ConfidenceAnalyzer:
             intensity = emotion_data_engagement.get('intensity', 0.5)
             engagement_score = max(0.3, min(0.9, intensity))
             
-        # Satisfaction based on response appropriateness and length
-        satisfaction_score = 0.6  # Default
-        if 50 <= response_length <= 500:  # Optimal response length
-            satisfaction_score = 0.8
-        elif response_length > 500:
-            satisfaction_score = 0.7  # Slightly verbose
-        elif response_length < 50:
-            satisfaction_score = 0.5  # Too brief
+        # Satisfaction: PRIORITIZE emoji reactions (real feedback) over heuristics
+        satisfaction_score = 0.6  # Default heuristic
+        
+        if emoji_reaction_data and isinstance(emoji_reaction_data, dict):
+            # User gave emoji feedback - use it as PRIMARY satisfaction signal!
+            reaction_type = emoji_reaction_data.get('reaction_type', '')
+            confidence = emoji_reaction_data.get('confidence_score', 0.8)
+            reaction_emoji = emoji_reaction_data.get('emoji', '')
+            has_user_feedback = True
+            
+            if 'POSITIVE_STRONG' in reaction_type:
+                satisfaction_score = 0.95
+                user_reaction_score = 1.0
+            elif 'POSITIVE_MILD' in reaction_type:
+                satisfaction_score = 0.85
+                user_reaction_score = 0.85
+            elif 'NEUTRAL' in reaction_type or 'THOUGHTFUL' in reaction_type:
+                satisfaction_score = 0.6
+                user_reaction_score = 0.5
+            elif 'NEGATIVE_MILD' in reaction_type:
+                satisfaction_score = 0.35
+                user_reaction_score = 0.2
+            elif 'NEGATIVE_STRONG' in reaction_type:
+                satisfaction_score = 0.15
+                user_reaction_score = 0.0
+            else:
+                # Other reaction types (surprise, confusion, etc.)
+                satisfaction_score = 0.6
+                user_reaction_score = 0.5
+                
+            # Adjust by confidence
+            satisfaction_score = satisfaction_score * confidence + (1 - confidence) * 0.6
+            
+        else:
+            # No emoji reaction - fall back to heuristic (response length)
+            if 50 <= response_length <= 500:  # Optimal response length
+                satisfaction_score = 0.8
+            elif response_length > 500:
+                satisfaction_score = 0.7  # Slightly verbose
+            elif response_length < 50:
+                satisfaction_score = 0.5  # Too brief
             
         # Natural flow based on processing time (faster = more natural)
         natural_flow_score = 0.7  # Default
@@ -264,7 +303,10 @@ class ConfidenceAnalyzer:
             satisfaction_score=satisfaction_score,
             natural_flow_score=natural_flow_score,
             emotional_resonance=emotional_resonance,
-            topic_relevance=topic_relevance
+            topic_relevance=topic_relevance,
+            user_reaction_score=user_reaction_score,
+            reaction_emoji=reaction_emoji,
+            has_user_feedback=has_user_feedback
         )
 
 
