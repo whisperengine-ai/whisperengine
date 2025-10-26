@@ -100,7 +100,7 @@ class RoBertaEmotionAnalyzer:
                 self.roberta_classifier = pipeline(
                     "text-classification",
                     model="cardiffnlp/twitter-roberta-base-emotion-multilabel-latest",
-                    return_all_scores=True
+                    top_k=None  # Returns all scores (replaces deprecated return_all_scores=True)
                 )
                 logger.info("✅ RoBERTa emotion classifier initialized")
             except Exception as e:

@@ -662,7 +662,7 @@ class EnhancedVectorEmotionAnalyzer:
                             self.__class__._shared_roberta_classifier = pipeline(
                                 "text-classification",
                                 model=model_name,
-                                return_all_scores=True,
+                                top_k=None,  # Returns all scores (replaces deprecated return_all_scores=True)
                                 device=-1  # Force CPU to avoid GPU issues
                             )
                             logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa 11-emotion classifier initialized and cached")
