@@ -77,14 +77,15 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir --upgrade pip
 
 # Copy requirements files
-COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt ./
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt requirements-ml.txt ./
 
 # Install Python dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
     pip install --no-cache-dir -r requirements-discord.txt && \
-    pip install --no-cache-dir -r requirements-vector-memory.txt
+    pip install --no-cache-dir -r requirements-vector-memory.txt && \
+    pip install --no-cache-dir -r requirements-ml.txt
 
 # Production stage
 FROM base AS production
@@ -142,6 +143,9 @@ COPY pyproject.toml validate_config.py env_manager.py run.py ./
 COPY config/ ./config/
 COPY sql/ ./sql/
 COPY scripts/ ./scripts/
+
+# Copy ML models (XGBoost response strategy predictor)
+COPY experiments/models/ ./experiments/models/
 
 # Copy Alembic migration system
 COPY alembic.ini ./

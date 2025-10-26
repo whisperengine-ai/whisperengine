@@ -80,6 +80,8 @@ __pycache__/
 
 # Model cache directories (if any)
 models/
+# Exception: Allow ML trained models for production
+!experiments/models/*.pkl
 .fastembed_cache/
 .transformers_cache/
 
