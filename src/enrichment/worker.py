@@ -119,6 +119,7 @@ class EnrichmentWorker:
         total_summaries_created = 0
         total_facts_extracted = 0
         total_preferences_extracted = 0
+        total_emoji_feedback_processed = 0
         
         for collection_name in collections:
             bot_name = await self._extract_bot_name(collection_name)
@@ -148,13 +149,22 @@ class EnrichmentWorker:
                 
                 total_preferences_extracted += preferences_extracted
                 
+                # Process emoji reactions for ML training feedback
+                emoji_feedback = await self._process_emoji_feedback(
+                    collection_name=collection_name,
+                    bot_name=bot_name
+                )
+                
+                total_emoji_feedback_processed += emoji_feedback
+                
             except Exception as e:
                 logger.error("Error processing collection %s: %s", collection_name, e)
                 continue
         
         cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
-        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences extracted in %.2fs",
-                   total_summaries_created, total_facts_extracted, total_preferences_extracted, cycle_duration)
+        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback in %.2fs",
+                   total_summaries_created, total_facts_extracted, total_preferences_extracted, 
+                   total_emoji_feedback_processed, cycle_duration)
     
     async def _process_conversation_summaries(
         self,
@@ -1765,6 +1775,373 @@ JSON Response:"""
                         continue
         
         return stored_count
+
+
+    async def _process_emoji_feedback(
+        self,
+        collection_name: str,
+        bot_name: str
+    ) -> int:
+        """
+        Process emoji reactions as ML training feedback.
+        
+        Analyzes context to determine if emoji is:
+        - RATING: User evaluating bot response quality → satisfaction_score
+        - AGREEMENT: User affirming bot's statement → engagement_score
+        - EMOTIONAL: User expressing feeling about topic → emotional_resonance
+        - CONVERSATIONAL: User acknowledging/continuing → natural_flow
+        
+        Only writes to InfluxDB when emoji represents actual quality feedback.
+        """
+        logger.info("😀 Processing emoji feedback for %s...", bot_name)
+        
+        # Get time window for unprocessed emoji reactions
+        time_window_hours = config.TIME_WINDOW_HOURS
+        time_threshold = datetime.utcnow() - timedelta(hours=time_window_hours)
+        
+        # Query Qdrant for EMOJI REACTION memories (interaction_type=emoji_reaction)
+        # These are stored by emoji_reaction_intelligence.py with original_bot_message metadata
+        scroll_result = self.qdrant_client.scroll(
+            collection_name=collection_name,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="timestamp_unix",
+                        range=Range(
+                            gte=int(time_threshold.timestamp())
+                        )
+                    ),
+                    FieldCondition(
+                        key="interaction_type",
+                        match=MatchValue(value="emoji_reaction")
+                    )
+                ]
+            ),
+            limit=1000,  # Process up to 1000 recent emoji reactions per cycle
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        points = scroll_result[0] if scroll_result else []
+        logger.info("Found %s emoji reaction memories to analyze", len(points))
+        
+        feedback_processed = 0
+        
+        # Process each emoji reaction with context
+        for point in points:
+            if not point.payload:
+                continue
+            
+            try:
+                user_id = point.payload.get('user_id')
+                if not user_id:
+                    continue
+                
+                # Check if already processed
+                already_processed = await self._check_emoji_feedback_processed(
+                    user_id=user_id,
+                    bot_name=bot_name,
+                    point_id=str(point.id)
+                )
+                
+                if already_processed:
+                    continue
+                
+                # Extract emoji reaction data from Qdrant payload
+                user_message = point.payload.get('content', '')  # "[EMOJI_REACTION] ❤️"
+                bot_response = point.payload.get('response', '')  # "[EMOTIONAL_FEEDBACK] ..."
+                emoji = user_message.replace('[EMOJI_REACTION]', '').strip()
+                
+                # CRITICAL: Get original bot message from metadata
+                original_bot_message = point.payload.get('original_bot_message', '')
+                emotion_type = point.payload.get('emotion_type', '')
+                confidence_score = point.payload.get('confidence_score', 0.0)
+                
+                if not original_bot_message or not emoji:
+                    logger.warning("Emoji reaction missing original_bot_message or emoji: %s", point.id)
+                    continue
+                
+                # Get surrounding conversation for context
+                conversation_context = await self._get_conversation_context_around_time(
+                    collection_name=collection_name,
+                    user_id=user_id,
+                    timestamp_unix=point.payload.get('timestamp_unix', 0),
+                    window_messages=5  # Get 5 messages before the emoji
+                )
+                
+                # Analyze emoji context using LLM
+                emoji_analysis = await self._analyze_emoji_context(
+                    bot_message=original_bot_message,
+                    user_emoji=emoji,
+                    emoji_type=emotion_type,
+                    conversation_context=conversation_context
+                )
+                
+                # Import temporal client for InfluxDB recording
+                from src.temporal.temporal_protocol import create_temporal_intelligence_system
+                temporal_client, _ = create_temporal_intelligence_system()
+                
+                if not temporal_client:
+                    logger.warning("No temporal client available for emoji feedback recording")
+                    continue
+                
+                # Record emoji feedback based on type
+                if emoji_analysis['feedback_type'] == 'RATING':
+                    # Quality rating → satisfaction_score
+                    await temporal_client.record_emoji_reaction_feedback(
+                        bot_name=bot_name,
+                        user_id=user_id,
+                        reaction_emoji=emoji,
+                        user_reaction_score=emoji_analysis['user_reaction_score'],
+                        satisfaction_score=emoji_analysis['satisfaction_score'],
+                        message_id=str(point.id),
+                        timestamp=None  # Use current time
+                    )
+                    
+                    logger.info("📊 EMOJI FEEDBACK (RATING): %s → satisfaction=%.2f (confidence=%.2f) for %s/%s",
+                              emoji,
+                              emoji_analysis['satisfaction_score'],
+                              emoji_analysis['confidence'],
+                              bot_name, user_id)
+                    
+                    feedback_processed += 1
+                
+                elif emoji_analysis['feedback_type'] in ['AGREEMENT', 'CONVERSATIONAL']:
+                    # Agreement/conversational → engagement_score boost
+                    # Multiple emojis indicate high engagement, not quality rating
+                    await temporal_client.record_emoji_reaction_feedback(
+                        bot_name=bot_name,
+                        user_id=user_id,
+                        reaction_emoji=emoji,
+                        user_reaction_score=0.0,  # Not a rating
+                        satisfaction_score=0.0,   # Not a satisfaction score
+                        message_id=str(point.id),
+                        timestamp=None
+                    )
+                    
+                    logger.info("📊 EMOJI FEEDBACK (ENGAGEMENT): %s → %s (confidence=%.2f) for %s/%s",
+                              emoji,
+                              emoji_analysis['feedback_type'],
+                              emoji_analysis['confidence'],
+                              bot_name, user_id)
+                    
+                    feedback_processed += 1
+                
+                else:
+                    # EMOTIONAL reactions → track but don't record as quality/engagement
+                    logger.debug("😀 EMOJI CONTEXT (EMOTIONAL): %s → %s (confidence=%.2f) for %s/%s",
+                               emoji,
+                               emoji_analysis['feedback_type'],
+                               emoji_analysis['confidence'],
+                               bot_name, user_id)
+                
+                # Mark as processed to avoid re-analyzing (stores feedback_type for debugging)
+                await self._mark_emoji_feedback_processed(
+                    user_id=user_id,
+                    bot_name=bot_name,
+                    point_id=str(point.id),
+                    feedback_type=emoji_analysis['feedback_type'],
+                    confidence=emoji_analysis.get('confidence', 0.0)
+                )
+                
+            except Exception as e:
+                logger.error("Failed to process emoji feedback for point %s: %s", point.id, e)
+                continue
+        
+        return feedback_processed
+    
+    async def _get_conversation_context_around_time(
+        self,
+        collection_name: str,
+        user_id: str,
+        timestamp_unix: int,
+        window_messages: int = 5
+    ) -> List[Dict]:
+        """
+        Get conversation messages around the time of emoji reaction for context.
+        
+        Returns up to `window_messages` messages BEFORE the emoji timestamp.
+        """
+        # Query for conversation messages before emoji timestamp
+        before_time = timestamp_unix
+        after_time = timestamp_unix - (3600 * 2)  # Look back 2 hours max
+        
+        scroll_result = self.qdrant_client.scroll(
+            collection_name=collection_name,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="user_id",
+                        match=MatchValue(value=user_id)
+                    ),
+                    FieldCondition(
+                        key="timestamp_unix",
+                        range=Range(
+                            gte=after_time,
+                            lte=before_time
+                        )
+                    ),
+                    FieldCondition(
+                        key="memory_type",
+                        match=MatchValue(value="conversation")
+                    )
+                ]
+            ),
+            limit=window_messages,
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        points = scroll_result[0] if scroll_result else []
+        
+        # Convert to context format
+        context = []
+        for point in points:
+            if not point.payload:
+                continue
+            
+            context.append({
+                'content': point.payload.get('content', ''),
+                'role': point.payload.get('role', ''),
+                'timestamp': point.payload.get('timestamp', ''),
+                'timestamp_unix': point.payload.get('timestamp_unix', 0)
+            })
+        
+        # Sort by timestamp (oldest first)
+        context.sort(key=lambda x: x['timestamp_unix'])
+        
+        return context
+    
+    async def _analyze_emoji_context(
+        self,
+        bot_message: str,
+        user_emoji: str,
+        emoji_type: str,
+        conversation_context: List[Dict]
+    ) -> Dict:
+        """
+        Use LLM to determine if emoji is RATING vs AGREEMENT vs EMOTIONAL vs CONVERSATIONAL.
+        
+        Returns:
+            {
+                'feedback_type': 'RATING' | 'AGREEMENT' | 'EMOTIONAL' | 'CONVERSATIONAL',
+                'confidence': 0.0-1.0,
+                'satisfaction_score': 0.0-1.0,  # If RATING
+                'user_reaction_score': 0.0-1.0,  # If RATING
+                'reasoning': 'explanation'
+            }
+        """
+        # Build conversation context (last 5 messages for efficiency)
+        recent_messages = conversation_context[-5:] if len(conversation_context) > 5 else conversation_context
+        context_str = "\n".join([
+            f"{'Bot' if m['role'] == 'bot' else 'User'}: {m['content'][:100]}"
+            for m in recent_messages
+        ])
+        
+        prompt = f"""Analyze this emoji reaction in context:
+
+Conversation (recent messages):
+{context_str}
+
+Bot's message: "{bot_message[:200]}"
+User reacted with: {user_emoji} (classified as: {emoji_type})
+
+Determine the PRIMARY purpose of this emoji:
+A) RATING - User is evaluating the QUALITY of the bot's response (helpful, good answer, well-explained)
+B) AGREEMENT - User is agreeing with the bot's STATEMENT or opinion (not rating quality, but affirming content)
+C) EMOTIONAL - User is expressing an EMOTION about the topic being discussed (reacting to subject matter, not bot)
+D) CONVERSATIONAL - User is acknowledging or continuing the conversation (casual social response)
+
+Respond in JSON format:
+{{
+    "feedback_type": "RATING|AGREEMENT|EMOTIONAL|CONVERSATIONAL",
+    "confidence": 0.0-1.0,
+    "reasoning": "brief explanation"
+}}
+
+Examples:
+- Bot explains concept → ❤️ = RATING (loved the explanation)
+- Bot: "Ocean is beautiful" → ❤️ = AGREEMENT (agrees with statement)
+- Bot: "Your pet died" → 😢 = EMOTIONAL (sad about topic, not rating bot)
+- Bot: "How's your day?" → 👍 = CONVERSATIONAL (casual acknowledgment)
+"""
+        
+        try:
+            response = await self.llm_client.chat_completion(
+                model=config.LLM_CHAT_MODEL,  # Use same model as summaries
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=200,
+                temperature=0.3  # Lower temperature for more consistent analysis
+            )
+            
+            # Parse JSON response
+            analysis = json.loads(response)
+            
+            # Map emoji_type to satisfaction scores (only if RATING)
+            if analysis['feedback_type'] == 'RATING':
+                if 'POSITIVE_STRONG' in emoji_type:
+                    satisfaction_score = 0.95
+                    user_reaction_score = 1.0
+                elif 'POSITIVE_MILD' in emoji_type:
+                    satisfaction_score = 0.85
+                    user_reaction_score = 0.85
+                elif 'NEUTRAL' in emoji_type:
+                    satisfaction_score = 0.6
+                    user_reaction_score = 0.5
+                elif 'NEGATIVE_MILD' in emoji_type:
+                    satisfaction_score = 0.35
+                    user_reaction_score = 0.2
+                elif 'NEGATIVE_STRONG' in emoji_type:
+                    satisfaction_score = 0.15
+                    user_reaction_score = 0.0
+                else:
+                    satisfaction_score = 0.6
+                    user_reaction_score = 0.5
+                
+                analysis['satisfaction_score'] = satisfaction_score
+                analysis['user_reaction_score'] = user_reaction_score
+            
+            return analysis
+            
+        except Exception as e:
+            logger.error("Failed to analyze emoji context: %s", e)
+            # Default to treating as conversational (safest assumption)
+            return {
+                'feedback_type': 'CONVERSATIONAL',
+                'confidence': 0.3,
+                'reasoning': f'Failed to analyze: {e}',
+                'satisfaction_score': 0.0,
+                'user_reaction_score': 0.0
+            }
+    
+    async def _check_emoji_feedback_processed(self, user_id: str, bot_name: str, point_id: str) -> bool:
+        """Check if emoji reaction has already been processed"""
+        async with self.db_pool.acquire() as conn:
+            result = await conn.fetchval("""
+                SELECT EXISTS(
+                    SELECT 1 FROM enrichment_processing_log
+                    WHERE user_id = $1 AND bot_name = $2 
+                    AND point_id = $3 AND processing_type = 'emoji_feedback'
+                )
+            """, user_id, bot_name, point_id)
+            return result
+    
+    async def _mark_emoji_feedback_processed(
+        self, 
+        user_id: str, 
+        bot_name: str, 
+        point_id: str,
+        feedback_type: Optional[str] = None,
+        confidence: Optional[float] = None
+    ):
+        """Mark emoji reaction as processed with optional metadata"""
+        async with self.db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO enrichment_processing_log 
+                (user_id, bot_name, point_id, processing_type, processed_at, feedback_type, confidence)
+                VALUES ($1, $2, $3, 'emoji_feedback', NOW(), $4, $5)
+                ON CONFLICT (user_id, bot_name, point_id, processing_type) DO NOTHING
+            """, user_id, bot_name, point_id, feedback_type, confidence)
 
 
 async def main():

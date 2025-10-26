@@ -1487,6 +1487,14 @@ class BotEventHandlers:
             if reaction_data:
                 logger.info(f"🎭 Emoji reaction captured: {reaction_data.emoji} → {reaction_data.reaction_type.value} from user {reaction_data.user_id}")
                 
+                # NOTE: Emoji reactions stored in Qdrant memory for background enrichment
+                # Enrichment worker will analyze context and determine if emoji is:
+                # - RATING (user evaluating bot quality) → satisfaction metric
+                # - AGREEMENT (user affirming bot's statement) → engagement metric  
+                # - EMOTIONAL (user expressing feeling about topic) → emotional_resonance
+                # - CONVERSATIONAL (user acknowledging) → natural_flow
+                # This avoids incorrectly treating "agreement emojis" as quality ratings
+                
                 # Optional: Get user's emotional patterns for future context
                 patterns = self.emoji_reaction_intelligence.get_user_emotional_patterns(reaction_data.user_id)
                 if patterns.get("total_reactions", 0) > 0:

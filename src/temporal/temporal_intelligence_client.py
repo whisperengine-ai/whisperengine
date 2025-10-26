@@ -66,10 +66,13 @@ class RelationshipMetrics:
 class ConversationQualityMetrics:
     """Conversation quality assessment"""
     engagement_score: float  # 0.0-1.0
-    satisfaction_score: float  # 0.0-1.0
+    satisfaction_score: float  # 0.0-1.0 (now prioritizes emoji reactions when available)
     natural_flow_score: float  # 0.0-1.0
     emotional_resonance: float  # 0.0-1.0
     topic_relevance: float  # 0.0-1.0
+    user_reaction_score: Optional[float] = None  # Real user feedback from emoji reactions (0-1)
+    reaction_emoji: Optional[str] = None  # Emoji used for reaction (e.g., "❤️", "👎")
+    has_user_feedback: bool = False  # True if satisfaction_score is based on emoji reaction
 
 
 class TemporalIntelligenceClient:
@@ -250,7 +253,14 @@ class TemporalIntelligenceClient:
                 .field("satisfaction_score", quality_metrics.satisfaction_score) \
                 .field("natural_flow_score", quality_metrics.natural_flow_score) \
                 .field("emotional_resonance", quality_metrics.emotional_resonance) \
-                .field("topic_relevance", quality_metrics.topic_relevance)
+                .field("topic_relevance", quality_metrics.topic_relevance) \
+                .field("has_user_feedback", quality_metrics.has_user_feedback)
+            
+            # Add emoji reaction data if available (real user feedback!)
+            if quality_metrics.user_reaction_score is not None:
+                point = point.field("user_reaction_score", quality_metrics.user_reaction_score)
+            if quality_metrics.reaction_emoji:
+                point = point.tag("reaction_emoji", quality_metrics.reaction_emoji)
             
             if timestamp:
                 point = point.time(timestamp)
@@ -261,6 +271,62 @@ class TemporalIntelligenceClient:
             
         except (ValueError, ConnectionError, KeyError) as e:
             logger.error("Failed to record conversation quality: %s", e)
+            return False
+
+    async def record_emoji_reaction_feedback(
+        self,
+        bot_name: str,
+        user_id: str,
+        reaction_emoji: str,
+        user_reaction_score: float,
+        satisfaction_score: float,
+        message_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record emoji reaction as user satisfaction feedback (retroactive quality update).
+        
+        This is called when a user reacts to a bot message AFTER it was sent,
+        providing REAL user feedback that can update ML training data.
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            reaction_emoji: The emoji used (e.g., "❤️", "👎")
+            user_reaction_score: Normalized reaction score (0.0-1.0)
+            satisfaction_score: Updated satisfaction score based on reaction
+            message_id: Optional Discord message ID
+            timestamp: Time of reaction (defaults to now)
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("user_feedback") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("reaction_emoji", reaction_emoji) \
+                .tag("feedback_type", "emoji_reaction") \
+                .field("user_reaction_score", user_reaction_score) \
+                .field("satisfaction_score", satisfaction_score) \
+                .field("has_user_feedback", True)
+            
+            if message_id:
+                point = point.tag("message_id", message_id)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("✅ Recorded emoji reaction feedback: %s → %.2f satisfaction for %s/%s", 
+                        reaction_emoji, satisfaction_score, bot_name, user_id)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record emoji reaction feedback: %s", e)
             return False
 
     async def record_bot_emotion(
