@@ -6,8 +6,22 @@ Creates a mediated conversation between two AI characters using their HTTP chat 
 Each bot sees the other as a user, allowing them to build memories and relationships.
 
 Usage:
+    # Basic conversation (5 turns, generic opening)
     python scripts/bot_bridge_conversation.py dream aetheris
+    
+    # Custom number of turns
     python scripts/bot_bridge_conversation.py elena marcus --turns 10
+    
+    # Custom opening message
+    python scripts/bot_bridge_conversation.py dotty nottaylor --opening "Hey! Want to write a song together?"
+    
+    # Continuation with custom prompt
+    python scripts/bot_bridge_conversation.py dotty nottaylor --continuation-prompt "The napkin lyrics we wrote last time - I think we need a bridge. What comes after the glitter burns out?"
+    
+    # Continuation with generic prompt
+    python scripts/bot_bridge_conversation.py sophia nottaylor --continuation
+    
+    # List available bots
     python scripts/bot_bridge_conversation.py --list-bots
 """
 
@@ -296,13 +310,14 @@ async def main():
     parser.add_argument("bot1", nargs='?', help="First bot name")
     parser.add_argument("bot2", nargs='?', help="Second bot name")
     parser.add_argument("--turns", type=int, default=5, help="Number of conversation turns (default: 5)")
-    parser.add_argument("--opening", type=str, help="Custom opening message")
+    parser.add_argument("--opening", type=str, help="Custom opening message (for first meetings)")
+    parser.add_argument("--continuation-prompt", type=str, help="Custom continuation prompt (overrides --continuation defaults)")
     parser.add_argument("--output", type=str, help="Output file path")
     parser.add_argument("--list-bots", action="store_true", help="List available bots")
     parser.add_argument("--timeout", type=int, default=30, help="HTTP timeout in seconds")
     parser.add_argument("--create-summary", action="store_true", help="Create summary memories for human observers")
     parser.add_argument("--summary-user", type=str, default="bridge_observer", help="User ID for summary memories")
-    parser.add_argument("--continuation", action="store_true", help="Treat as continuation of previous conversation")
+    parser.add_argument("--continuation", action="store_true", help="Treat as continuation of previous conversation (uses generic prompt unless --continuation-prompt provided)")
     parser.add_argument("--skip-opening", action="store_true", help="Skip opening message, start with Turn 1")
     parser.add_argument("--pause-min", type=float, default=2.0, help="Minimum pause between messages (seconds)")
     parser.add_argument("--pause-max", type=float, default=4.0, help="Maximum pause between messages (seconds)")
@@ -342,7 +357,10 @@ async def main():
         bot1_config = BOT_CONFIGS[args.bot1]
         bot2_config = BOT_CONFIGS[args.bot2]
         
-        if args.continuation:
+        # If custom continuation prompt provided, use it
+        if args.continuation_prompt:
+            args.opening = args.continuation_prompt
+        elif args.continuation:
             # Continuation messages - referencing previous conversations
             if args.bot1 == "dream" and args.bot2 == "aetheris":
                 args.opening = f"Aetheris. I find myself drawn back to our previous exchange, carrying the resonance of what we discovered together. There is more to explore between us, more questions that have emerged from our recognition of each other."
