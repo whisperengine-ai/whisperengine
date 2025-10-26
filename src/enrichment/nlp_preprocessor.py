@@ -24,9 +24,11 @@ logger = logging.getLogger(__name__)
 
 try:
     import spacy  # type: ignore
+    from spacy.matcher import Matcher  # type: ignore
     _SPACY_AVAILABLE = True
 except ImportError:
     spacy = None  # type: ignore
+    Matcher = None  # type: ignore
     _SPACY_AVAILABLE = False
 
 
@@ -36,15 +38,136 @@ class EnrichmentNLPPreprocessor:
     def __init__(self, model_name: str = "en_core_web_md") -> None:
         self.model_name = model_name
         self._nlp = None
+        self.matcher = None
 
         if _SPACY_AVAILABLE:
             try:
                 self._nlp = spacy.load(model_name)  # type: ignore
                 logger.info("✅ spaCy model loaded for enrichment: %s", model_name)
+                self._register_matcher_patterns()
             except (OSError, IOError, RuntimeError) as e:
                 logger.warning("⚠️  spaCy model '%s' not available: %s. Preprocessor will be inactive.", model_name, e)
         else:
             logger.info("spaCy not installed - enrichment preprocessor inactive (fallback to pure LLM)")
+
+    def _register_matcher_patterns(self):
+        """Register custom matcher patterns for preference detection (Phase 2-E Task E.2).
+        
+        Pattern categories (from Phase 3 Task 3.1):
+        - NEGATED_PREFERENCE: "don't like", "doesn't enjoy"
+        - STRONG_PREFERENCE: "really love", "absolutely hate"
+        - TEMPORAL_CHANGE: "used to like", "used to really enjoy"
+        - HEDGING: "maybe like", "kind of prefer"
+        - CONDITIONAL: "if I could", "would prefer"
+        """
+        if self._nlp is None or Matcher is None:
+            return
+        
+        self.matcher = Matcher(self._nlp.vocab)
+        
+        # NEGATED_PREFERENCE: Detect negative preferences
+        # Note: spaCy tokenizes "don't" as ["do", "n't"], so we need flexible patterns
+        self.matcher.add("NEGATED_PREFERENCE", [
+            [
+                {"LOWER": {"IN": ["do", "does", "did"]}},
+                {"LOWER": "n't"},
+                {"POS": "VERB"}
+            ],
+            [
+                {"LOWER": {"IN": ["dont", "don't", "doesnt", "doesn't", "didn't"]}},
+                {"POS": "VERB"}
+            ]
+        ])
+        
+        # STRONG_PREFERENCE: Detect intensified preferences
+        self.matcher.add("STRONG_PREFERENCE", [[
+            {"LOWER": {"IN": ["really", "absolutely", "totally", "extremely"]}},
+            {"POS": "VERB"}
+        ]])
+        
+        # TEMPORAL_CHANGE: Detect past preference changes
+        self.matcher.add("TEMPORAL_CHANGE", [[
+            {"LOWER": "used"},
+            {"LOWER": "to"},
+            {"POS": "ADV", "OP": "*"},  # Optional adverbs (zero or more)
+            {"POS": "VERB"}
+        ]])
+        
+        # HEDGING: Detect uncertain/hedged preferences
+        self.matcher.add("HEDGING", [[
+            {"LOWER": {"IN": ["maybe", "perhaps", "possibly", "might"]}},
+            {"POS": "VERB", "OP": "?"},  # Optional verb
+        ], [
+            {"LOWER": {"IN": ["kind", "sort"]}},
+            {"LOWER": "of"},
+            {"POS": "VERB"}
+        ]])
+        
+        # CONDITIONAL: Detect conditional preferences
+        self.matcher.add("CONDITIONAL", [[
+            {"LOWER": "if"},
+            {"POS": "PRON", "OP": "?"},  # Optional pronoun ("if I")
+            {"POS": "AUX", "OP": "?"},   # Optional auxiliary ("could", "would")
+        ], [
+            {"LEMMA": {"IN": ["would", "could", "should"]}},
+            {"POS": "VERB"}
+        ]])
+        
+        logger.info("✅ Custom matcher initialized for enrichment (5 pattern categories)")
+
+    def extract_preference_patterns(self, text: str, max_length: int = 10000) -> Dict[str, List[Dict[str, Any]]]:
+        """Extract preference patterns using custom matcher (Phase 2-E Task E.2).
+        
+        Args:
+            text: Input text to process
+            max_length: Maximum text length to process (default 10000 chars)
+            
+        Returns:
+            Dict with pattern categories as keys, each containing list of matches:
+            {
+                "NEGATED_PREFERENCE": [{"text": "don't like", "start": 0, "end": 10}],
+                "STRONG_PREFERENCE": [{"text": "really love", "start": 20, "end": 31}],
+                "TEMPORAL_CHANGE": [],
+                "HEDGING": [],
+                "CONDITIONAL": []
+            }
+        """
+        if not self._nlp or not self.matcher or not text:
+            return {
+                "NEGATED_PREFERENCE": [],
+                "STRONG_PREFERENCE": [],
+                "TEMPORAL_CHANGE": [],
+                "HEDGING": [],
+                "CONDITIONAL": []
+            }
+        
+        if len(text) > max_length:
+            logger.warning("Text length %d exceeds max %d, truncating for pattern extraction", len(text), max_length)
+            text = text[:max_length]
+        
+        doc = self._nlp(text)
+        matches = self.matcher(doc)
+        
+        # Group matches by pattern category
+        pattern_groups: Dict[str, List[Dict[str, Any]]] = {
+            "NEGATED_PREFERENCE": [],
+            "STRONG_PREFERENCE": [],
+            "TEMPORAL_CHANGE": [],
+            "HEDGING": [],
+            "CONDITIONAL": []
+        }
+        
+        for match_id, start, end in matches:
+            pattern_name = self._nlp.vocab.strings[match_id]
+            span = doc[start:end]
+            pattern_groups[pattern_name].append({
+                "text": span.text,
+                "start": span.start_char,
+                "end": span.end_char,
+                "lemma": " ".join([token.lemma_ for token in span])
+            })
+        
+        return pattern_groups
 
     def is_available(self) -> bool:
         return self._nlp is not None
@@ -79,15 +202,20 @@ class EnrichmentNLPPreprocessor:
         ]
         return entities
 
-    def extract_dependency_relationships(self, text: str, max_length: int = 10000) -> List[Dict[str, str]]:
-        """Heuristic SVO (subject-verb-object) candidates using dependency parse.
+    def extract_dependency_relationships(self, text: str, max_length: int = 10000) -> List[Dict[str, Any]]:
+        """Heuristic SVO (subject-verb-object) candidates using dependency parse with negation detection.
         
         Args:
             text: Input text to process
             max_length: Maximum text length to process (default 10000 chars)
             
         Returns:
-            List of dicts: {'subject': str, 'verb': str, 'object': str}
+            List of dicts: {'subject': str, 'verb': str, 'object': str, 'is_negated': bool, 'negation_marker': str|None}
+            
+        Examples:
+            "I love pizza" → {"subject": "I", "verb": "love", "object": "pizza", "is_negated": False, "negation_marker": None}
+            "I don't like coffee" → {"subject": "I", "verb": "like", "object": "coffee", "is_negated": True, "negation_marker": "not"}
+            "She never eats meat" → {"subject": "She", "verb": "eat", "object": "meat", "is_negated": True, "negation_marker": "never"}
         """
         if not self._nlp or not text:
             return []
@@ -95,21 +223,45 @@ class EnrichmentNLPPreprocessor:
             logger.warning("Text length %d exceeds max %d, truncating for relationship extraction", len(text), max_length)
             text = text[:max_length]
         doc = self._nlp(text)
-        relationships: List[Dict[str, str]] = []
+        relationships: List[Dict[str, Any]] = []
+        
+        # Negation markers to detect (lemmatized forms)
+        negation_markers = {"not", "no", "never", "neither", "nor", "none", "nobody", "nothing", "nowhere"}
+        
         for sent in doc.sents:
             for token in sent:
                 # Find candidate verbs
                 if token.pos_ == "VERB" and token.dep_ in ("ROOT", "conj"):
                     subj = None
                     dobj = None
+                    is_negated = False
+                    negation_marker = None
+                    
                     # Find subject and object tied to this verb
                     for child in token.children:
                         if child.dep_ in ("nsubj", "nsubjpass"):
                             subj = child.text
                         if child.dep_ in ("dobj", "obj"):
                             dobj = child.text
+                        # Check for negation markers (neg, advmod with negation words)
+                        if child.dep_ == "neg" or (child.dep_ == "advmod" and child.lemma_ in negation_markers):
+                            is_negated = True
+                            negation_marker = child.text
+                    
+                    # Also check for negation in auxiliaries (e.g., "doesn't", "won't")
+                    for child in token.children:
+                        if child.dep_ == "aux" and child.text.lower() in ("don't", "doesn't", "didn't", "won't", "wouldn't", "can't", "cannot", "couldn't"):
+                            is_negated = True
+                            negation_marker = child.text
+                    
                     if subj and dobj:
-                        relationships.append({"subject": subj, "verb": token.lemma_, "object": dobj})
+                        relationships.append({
+                            "subject": subj,
+                            "verb": token.lemma_,
+                            "object": dobj,
+                            "is_negated": is_negated,
+                            "negation_marker": negation_marker
+                        })
         return relationships
 
     # ---------------------------------------------------------------------
@@ -213,18 +365,19 @@ class EnrichmentNLPPreprocessor:
     # ---------------------------------------------------------------------
     # LLM Context Augmentation
     # ---------------------------------------------------------------------
-    def build_llm_context_prefix(self, text: str, max_length: int = 10000) -> str:
-        """Create a short preface string listing entities and SVO relationships.
+    def build_llm_context_prefix(self, text: str, max_length: int = 10000, include_patterns: bool = True) -> str:
+        """Create a short preface string listing entities, SVO relationships, and preference patterns.
         
         Intended to prefix fact extraction prompts to reduce token usage.
         
         Args:
             text: Input text to process
             max_length: Maximum text length to process (default 10000 chars)
+            include_patterns: Whether to include custom matcher patterns (default True)
             
         Returns:
             Compact string with format:
-            "Pre-identified signals (spaCy):\\n- Entities: [...]\\n- Relationships: [...]"
+            "Pre-identified signals (spaCy):\\n- Entities: [...]\\n- Relationships: [...] (✗ for negated)\\n- Patterns: [...]"
         """
         if not self._nlp or not text:
             return ""
@@ -232,10 +385,37 @@ class EnrichmentNLPPreprocessor:
         entities = self.extract_entities(text, max_length=max_length)
         relationships = self.extract_dependency_relationships(text, max_length=max_length)
         ent_str = ", ".join({f"{e['text']}:{e['label']}" for e in entities})
-        rel_str = "; ".join({f"{r['subject']} -{r['verb']}-> {r['object']}" for r in relationships})
+        
+        # Format relationships with negation markers
+        rel_parts = []
+        for r in relationships:
+            negation_prefix = "✗ " if r['is_negated'] else ""
+            rel_parts.append(f"{negation_prefix}{r['subject']} -{r['verb']}-> {r['object']}")
+        rel_str = "; ".join(rel_parts)
+        
         prefix = (
             "Pre-identified signals (spaCy):\n"
             f"- Entities: [{ent_str}]\n"
-            f"- Relationships: [{rel_str}]\n\n"
+            f"- Relationships: [{rel_str}]\n"
         )
+        
+        # Add preference patterns if requested (Phase 2-E Task E.2)
+        if include_patterns and self.matcher:
+            patterns = self.extract_preference_patterns(text, max_length=max_length)
+            pattern_indicators = []
+            if patterns.get("NEGATED_PREFERENCE"):
+                pattern_indicators.append("❌ Negated preferences detected")
+            if patterns.get("STRONG_PREFERENCE"):
+                pattern_indicators.append("⚡ Strong preferences detected")
+            if patterns.get("TEMPORAL_CHANGE"):
+                pattern_indicators.append("⏰ Past preference changes detected")
+            if patterns.get("HEDGING"):
+                pattern_indicators.append("🤔 Uncertain/hedged statements detected")
+            if patterns.get("CONDITIONAL"):
+                pattern_indicators.append("❓ Conditional statements detected")
+            
+            if pattern_indicators:
+                prefix += f"- Preference Patterns: {', '.join(pattern_indicators)}\n"
+        
+        prefix += "\n"
         return prefix

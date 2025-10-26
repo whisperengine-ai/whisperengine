@@ -191,42 +191,56 @@ class FactExtractionEngine:
         else:
             logger.info("ℹ️  FACT EXTRACTION: Using pure LLM (no spaCy preprocessing)")
 
-        # Build extraction prompt (MATCHES inline bot implementation for consistency)
-        # Simpler prompt = better LLM compliance and fact extraction. We prepend optional local signals.
-        extraction_prompt = f"""Analyze this conversation and extract ONLY clear, factual personal statements about the user.
+        # Build extraction prompt - IMPROVED VERSION (Oct 2025)
+        # Focus on positive examples and clear extraction criteria
+        # Removed confusing "DO NOT extract" rules that were blocking obvious facts
+        extraction_prompt = f"""Extract personal facts about the user from this conversation.
 
 {context_prefix}Conversation:
 {conversation_text}
 
-Instructions:
-- Extract personal preferences: Foods/drinks/hobbies they explicitly like/dislike/enjoy
-- Extract personal facts: Pets they own, places they've visited, hobbies they actively do
-- DO NOT extract: Conversational phrases, questions, abstract concepts, philosophical statements
-- DO NOT extract: Things the user asks about or discusses theoretically - only facts about themselves
+WHAT TO EXTRACT - Examples:
 
-Return JSON (return empty list if no clear facts found):
+1. NAMES & IDENTITY:
+   "My name is Alex" → {{"entity_name": "Alex", "entity_type": "name", "relationship_type": "is_named", "confidence": 0.95}}
+   "I'm Sarah" → {{"entity_name": "Sarah", "entity_type": "name", "relationship_type": "is_named", "confidence": 0.95}}
+
+2. LOCATIONS:
+   "I live in Portland" → {{"entity_name": "Portland", "entity_type": "location", "relationship_type": "lives_in", "confidence": 0.95}}
+   "I'm from Chicago" → {{"entity_name": "Chicago", "entity_type": "location", "relationship_type": "from", "confidence": 0.9}}
+
+3. OCCUPATIONS & EDUCATION:
+   "I work as a teacher" → {{"entity_name": "teacher", "entity_type": "occupation", "relationship_type": "works_as", "confidence": 0.95}}
+   "I studied at MIT" → {{"entity_name": "MIT", "entity_type": "education", "relationship_type": "studied_at", "confidence": 0.95}}
+
+4. HOBBIES & INTERESTS:
+   "I love hiking" → {{"entity_name": "hiking", "entity_type": "hobby", "relationship_type": "loves", "confidence": 0.9}}
+   "I enjoy photography" → {{"entity_name": "photography", "entity_type": "hobby", "relationship_type": "enjoys", "confidence": 0.9}}
+
+5. PREFERENCES:
+   "I really like pizza" → {{"entity_name": "pizza", "entity_type": "food", "relationship_type": "likes", "confidence": 0.85}}
+   "I hate cold weather" → {{"entity_name": "cold weather", "entity_type": "other", "relationship_type": "dislikes", "confidence": 0.9}}
+
+6. POSSESSIONS & EXPERIENCES:
+   "I have a dog" → {{"entity_name": "dog", "entity_type": "pet", "relationship_type": "owns", "confidence": 0.95}}
+   "I visited Japan" → {{"entity_name": "Japan", "entity_type": "place", "relationship_type": "visited", "confidence": 0.9}}
+
+EXTRACTION RULES:
+- Extract facts stated BY the user ABOUT themselves
+- Include explicit statements ("I am...", "I work as...", "I love...")
+- Include clear interests expressed through questions (asking about diving suggests interest in diving)
+- Use confidence 0.9-0.95 for explicit statements, 0.7-0.85 for implied interests
+- Skip vague or unclear statements
+
+Return JSON format:
 {{
     "facts": [
-        {{
-            "entity_name": "pizza",
-            "entity_type": "food",
-            "relationship_type": "likes",
-            "confidence": 0.9,
-            "reasoning": "User explicitly stated they love pizza"
-        }}
+        {{"entity_name": "hiking", "entity_type": "hobby", "relationship_type": "loves", "confidence": 0.9, "reasoning": "User said they love hiking"}}
     ]
 }}
 
-Valid entity_types: food, drink, hobby, place, pet, skill, goal, occupation, other
-Valid relationship_types: 
-- Preferences: likes, dislikes, enjoys, loves, hates, prefers
-- Possessions: owns, has, bought, sold, lost
-- Actions: visited, traveled_to, went_to, does, practices, plays
-- Aspirations: wants, needs, plans_to, hopes_to, dreams_of
-- Experiences: tried, learned, studied, worked_at, lived_in
-- Relationships: knows, friends_with, family_of, works_with
-
-Be conservative - only extract clear, unambiguous facts."""
+Valid entity_types: name, location, occupation, education, hobby, food, drink, place, pet, skill, goal, other
+Valid relationship_types: is_named, lives_in, from, works_as, studied_at, likes, loves, enjoys, dislikes, hates, owns, has, visited, does, practices, wants, needs, plans_to, learned, knows"""
         
         # 🔍 DEBUG: Log final prompt size
         logger.warning("🔍 EXTRACTION PROMPT SIZE: %d chars (conversation: %d chars)", 
@@ -347,15 +361,15 @@ Be conservative - only extract clear, unambiguous facts."""
         Build knowledge graph relationships between facts.
         
         Relationship types:
-        1. Semantic: "loves pizza" → "Italian food preference"
-        2. Temporal: "started hiking" → "moved to Colorado" (motivated move)
-        3. Causal: "has cooking skills" ← "makes homemade pizza"
-        4. Hierarchical: "plays guitar" → "musical skills" → "artistic interests"
+        1. Semantic: "loves pizza" -> "Italian food preference"
+        2. Temporal: "started hiking" -> "moved to Colorado" (motivated move)
+        3. Causal: "has cooking skills" <- "makes homemade pizza"
+        4. Hierarchical: "plays guitar" -> "musical skills" -> "artistic interests"
         
         This enables:
         - Richer fact queries: "What outdoor activities does user enjoy?"
         - Pattern detection: User has multiple "outdoor" interests
-        - Inference: If loves hiking + camping + biking → "outdoor lifestyle"
+        - Inference: If loves hiking + camping + biking -> "outdoor lifestyle"
         
         Args:
             facts: Extracted facts
@@ -504,7 +518,7 @@ Be conservative - only extract clear, unambiguous facts."""
                     }
                 ],
                 model=self.model,
-                temperature=0.2,  # Low temperature for consistency
+                temperature=0.3,  # Balanced: consistent but not overly conservative (increased from 0.2 - Oct 2025 fix)
                 max_tokens=max_tokens
             )
             
@@ -647,7 +661,7 @@ Be conservative - only extract clear, unambiguous facts."""
         fact2: ExtractedFact
     ) -> Optional[Dict]:
         """Identify semantic relationship between two facts"""
-        # Example: "loves pizza" + "makes homemade pizza" → causal relationship
+        # Example: "loves pizza" + "makes homemade pizza" -> causal relationship
         if fact1.entity_name.lower() in fact2.entity_name.lower() or \
            fact2.entity_name.lower() in fact1.entity_name.lower():
             return {
@@ -656,7 +670,7 @@ Be conservative - only extract clear, unambiguous facts."""
                 'reasoning': f"Related entities: {fact1.entity_name} and {fact2.entity_name}"
             }
         
-        # Example: "hiking" + "camping" + "biking" → lifestyle category
+        # Example: "hiking" + "camping" + "biking" -> lifestyle category
         outdoor_activities = ['hiking', 'camping', 'biking', 'climbing', 'trail running']
         if fact1.entity_name.lower() in outdoor_activities and \
            fact2.entity_name.lower() in outdoor_activities:

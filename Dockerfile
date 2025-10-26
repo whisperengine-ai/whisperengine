@@ -120,9 +120,16 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy spaCy model from model-downloader stage (installed as Python package)
-# The en_core_web_md model is in site-packages/en_core_web_md/
-COPY --from=model-downloader /usr/local/lib/python3.13/site-packages/en_core_web_md* /usr/local/lib/python3.13/site-packages/
+# Install spaCy models directly in production stage (most reliable method)
+# This ensures models are available even if COPY from model-downloader fails
+RUN python -m spacy download en_core_web_md && \
+    python -c "import spacy; nlp = spacy.load('en_core_web_md'); print(f'✅ Installed spaCy model: {nlp.meta[\"name\"]} with {nlp.vocab.vectors.shape[0]} word vectors')"
+
+# Copy spaCy model from model-downloader stage (backup - may not work due to COPY limitations)
+# CRITICAL: Must copy BOTH the model directory AND the .dist-info directory
+# The wildcard en_core_web_md* doesn't work as expected - need explicit paths
+COPY --from=model-downloader /usr/local/lib/python3.13/site-packages/en_core_web_md /usr/local/lib/python3.13/site-packages/en_core_web_md
+COPY --from=model-downloader /usr/local/lib/python3.13/site-packages/en_core_web_md-*.dist-info /usr/local/lib/python3.13/site-packages/
 
 # Copy pre-downloaded models from model-downloader stage
 COPY --from=model-downloader /app/models /app/models

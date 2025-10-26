@@ -726,7 +726,8 @@ class EnrichmentWorker:
                     await self._store_last_processed_timestamp(
                         user_id=user_id,
                         bot_name=bot_name,
-                        latest_message_timestamp=latest_message_timestamp
+                        latest_message_timestamp=latest_message_timestamp,
+                        marker_type='fact'
                     )
                     continue
                 
@@ -772,7 +773,8 @@ class EnrichmentWorker:
                 await self._store_last_processed_timestamp(
                     user_id=user_id,
                     bot_name=bot_name,
-                    latest_message_timestamp=latest_message_timestamp
+                    latest_message_timestamp=latest_message_timestamp,
+                    marker_type='fact'
                 )
                 
             except Exception as e:
@@ -823,16 +825,20 @@ class EnrichmentWorker:
         self,
         user_id: str,
         bot_name: str,
-        latest_message_timestamp: datetime
+        latest_message_timestamp: datetime,
+        marker_type: str = 'fact'  # 'fact' or 'preference' for separate tracking
     ):
         """
         Store the last processed message timestamp for incremental processing.
         
-        CRITICAL FIX: Even when NO facts are extracted, we must update this timestamp.
-        Otherwise, next cycle will reprocess the same messages again, making redundant LLM calls.
+        CRITICAL FIX (Oct 2025): Separate markers for facts and preferences.
+        Previously, both used same marker, causing preferences to skip if facts processed first.
+        
+        Args:
+            marker_type: 'fact' or 'preference' - determines which marker to update
         
         This creates/updates a marker record in user_fact_relationships with the latest_message_timestamp
-        in context_metadata, allowing _get_existing_facts() to find it and skip already-processed messages.
+        in context_metadata, allowing separate tracking for fact and preference extraction.
         """
         async with self.db_pool.acquire() as conn:
             async with conn.transaction():
@@ -844,14 +850,19 @@ class EnrichmentWorker:
                     ON CONFLICT (universal_id) DO UPDATE SET last_active = NOW()
                 """, user_id, f"user_{user_id[-8:]}", f"User {user_id[-6:]}")
                 
+                # Create separate marker entities for facts and preferences
+                # This allows independent tracking and prevents the skip-on-second-process bug
+                marker_entity_name = f"{bot_name}_{user_id}_{marker_type}"
+                marker_relationship_type = f'_enrichment_{marker_type}_marker'
+                
                 # Create a marker entity to track processing progress
                 marker_entity_id = await conn.fetchval("""
                     INSERT INTO fact_entities (entity_type, entity_name, category, attributes)
-                    VALUES ('_processing_marker', $1, '_marker', '{"type": "enrichment_progress"}'::jsonb)
+                    VALUES ('_processing_marker', $1, '_marker', $2::jsonb)
                     ON CONFLICT (entity_type, entity_name) 
                     DO UPDATE SET updated_at = NOW()
                     RETURNING id
-                """, f"{bot_name}_{user_id}")
+                """, marker_entity_name, json.dumps({"type": f"enrichment_{marker_type}_progress"}))
                 
                 # Store the timestamp in the marker's relationship
                 # CRITICAL: Ensure timestamp is naive UTC datetime for consistency
@@ -862,27 +873,27 @@ class EnrichmentWorker:
                 context_metadata = {
                     'latest_message_timestamp': ts_to_store.isoformat(),
                     'bot_name': bot_name,
-                    'marker_type': 'enrichment_progress'
+                    'marker_type': f'enrichment_{marker_type}_progress'
                 }
                 
                 logger.debug(
                     f"[TIMESTAMP_UPDATE] user_id={user_id}, bot_name={bot_name}, "
-                    f"timestamp={ts_to_store.isoformat()}, marker_id={marker_entity_id}"
+                    f"timestamp={ts_to_store.isoformat()}, marker_id={marker_entity_id}, type={marker_type}"
                 )
                 
                 # DEBUG: Log what we're about to insert
                 json_str = json.dumps(context_metadata)
-                logger.info(f"[TIMESTAMP_DEBUG] About to INSERT: user_id={user_id}, entity_id={marker_entity_id}, context_metadata={json_str}")
+                logger.info(f"[TIMESTAMP_DEBUG] About to INSERT: user_id={user_id}, entity_id={marker_entity_id}, context_metadata={json_str}, marker_type={marker_type}")
                 
                 result = await conn.execute("""
                     INSERT INTO user_fact_relationships 
                     (user_id, entity_id, relationship_type, confidence, context_metadata)
-                    VALUES ($1, $2, '_enrichment_progress_marker', 1.0, $3::jsonb)
+                    VALUES ($1, $2, $3, 1.0, $4::jsonb)
                     ON CONFLICT (user_id, entity_id, relationship_type)
                     DO UPDATE SET
-                        context_metadata = $3::jsonb,
+                        context_metadata = $4::jsonb,
                         updated_at = NOW()
-                """, user_id, marker_entity_id, json_str)
+                """, user_id, marker_entity_id, marker_relationship_type, json_str)
                 
                 logger.info(f"[TIMESTAMP_RESULT] Execute result: {result}")
                 
@@ -1436,7 +1447,8 @@ class EnrichmentWorker:
                     await self._store_last_processed_timestamp(
                         user_id=user_id,
                         bot_name=bot_name,
-                        latest_message_timestamp=latest_message_timestamp
+                        latest_message_timestamp=latest_message_timestamp,
+                        marker_type='preference'
                     )
                     continue
                 
@@ -1456,7 +1468,8 @@ class EnrichmentWorker:
                 await self._store_last_processed_timestamp(
                     user_id=user_id,
                     bot_name=bot_name,
-                    latest_message_timestamp=latest_message_timestamp
+                    latest_message_timestamp=latest_message_timestamp,
+                    marker_type='preference'
                 )
                 
             except Exception as e:
@@ -1470,24 +1483,24 @@ class EnrichmentWorker:
         """
         Get timestamp of last preference extraction for incremental processing.
         
-        CRITICAL: Uses SAME marker system as fact extraction (_enrichment_progress_marker).
-        This ensures both fact and preference extraction use consistent timestamps,
-        preventing redundant re-processing of the same messages.
+        CRITICAL FIX (Oct 2025): Uses PREFERENCE-SPECIFIC marker (_enrichment_preference_marker).
+        Previously used shared marker with facts, causing preferences to skip after facts processed.
+        Now facts and preferences track progress independently.
         
-        INCREMENTAL APPROACH (matches fact extraction pattern):
-        - Checks processing marker's latest_message_timestamp
-        - Only processes NEW messages since last marker update
-        - Avoids wasteful re-processing of old conversations
+        INCREMENTAL APPROACH:
+        - Checks preference marker's latest_message_timestamp
+        - Only processes NEW messages since last preference extraction
+        - Independent from fact extraction progress
         """
         async with self.db_pool.acquire() as conn:
-            # Check if user has a processing marker (same as fact extraction)
+            # Check if user has a preference processing marker (separate from facts)
             row = await conn.fetchrow("""
                 SELECT ufr.context_metadata, ufr.created_at
                 FROM user_fact_relationships ufr
                 JOIN fact_entities fe ON ufr.entity_id = fe.id
                 WHERE ufr.user_id = $1 
                   AND fe.entity_type = '_processing_marker'
-                  AND ufr.relationship_type = '_enrichment_progress_marker'
+                  AND ufr.relationship_type = '_enrichment_preference_marker'
                 LIMIT 1
             """, user_id)
             

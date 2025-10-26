@@ -80,20 +80,14 @@ class SemanticKnowledgeRouter:
         self.qdrant = qdrant_client
         self.influx = influx_client
         
-        # Initialize spaCy for entity extraction (optional - graceful fallback)
-        self.nlp = None
-        try:
-            import spacy
-            # Try loading medium model first (better accuracy with word vectors)
-            try:
-                self.nlp = spacy.load("en_core_web_md")
-                logger.info("✅ spaCy loaded for entity extraction (en_core_web_md - with word vectors)")
-            except OSError:
-                # Fallback to small model if medium not available
-                self.nlp = spacy.load("en_core_web_sm")
-                logger.info("✅ spaCy loaded for entity extraction (en_core_web_sm - basic)")
-        except (ImportError, OSError) as e:
-            logger.warning("⚠️ spaCy unavailable (will use keyword patterns): %s", str(e))
+        # Use shared spaCy instance for entity extraction (optional - graceful fallback)
+        from src.nlp.spacy_manager import get_spacy_nlp
+        
+        self.nlp = get_spacy_nlp()
+        if self.nlp:
+            logger.info("✅ SemanticKnowledgeRouter using shared spaCy instance for entity extraction")
+        else:
+            logger.warning("⚠️ SemanticKnowledgeRouter: spaCy unavailable (will use keyword patterns)")
         
         # Phase 2b: Initialize unified query classifier for intent analysis
         try:
