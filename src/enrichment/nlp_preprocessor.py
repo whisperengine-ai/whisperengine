@@ -283,35 +283,90 @@ class EnrichmentNLPPreprocessor:
     # =====================================================================
     
     def _extract_relationships_from_doc(self, doc: Any) -> List[Dict[str, Any]]:
-        """Extract SVO relationships from pre-processed doc (reuses doc, no new pipeline pass)"""
+        """
+        Extract SVO relationships from pre-processed doc with advanced dependency parsing.
+        
+        FEATURES:
+        ✅ ROOT + conj verbs (existing)
+        ✅ Clausal complements (xcomp, ccomp) - infinitives & content clauses
+        ✅ Phrasal verbs (particles: meet up, go out, come over)
+        ✅ Negation propagation - propagates parent negation to complements
+        ✅ Auxiliary verbs - extracts real action from "should try"
+        
+        EXAMPLES:
+        • "I want to visit Paris" → {verb: "want"} + {verb: "visit", object: "paris"}
+        • "I don't want to eat meat" → both marked negated
+        • "Let's meet up" → {verb: "meet_up", has_particles: true}
+        
+        No new pipeline passes - reuses cached doc.
+        """
         relationships: List[Dict[str, Any]] = []
         negation_markers = {"not", "no", "never", "neither", "nor", "none", "nobody", "nothing", "nowhere"}
         
+        def _process_verb_and_complements(verb_token: Any, parent_negation: bool = False, clause_type: str = "root") -> None:
+            """Process verb + extract relationships, then recursively process clausal complements."""
+            subj = None
+            dobj = None
+            is_negated = parent_negation
+            negation_marker = None
+            
+            # Extract subject and object from immediate children
+            for child in verb_token.children:
+                if child.dep_ in ("nsubj", "nsubjpass"):
+                    subj = child.text
+                if child.dep_ in ("dobj", "obj", "pobj"):
+                    dobj = child.text
+                # Detect local negation markers
+                if child.dep_ == "neg" or (child.dep_ == "advmod" and child.lemma_ in negation_markers):
+                    is_negated = True
+                    negation_marker = child.text
+            
+            # Extract particles for phrasal verbs (e.g., "meet up" → verb_form="meet_up")
+            particles = [child.lemma_ for child in verb_token.children if child.dep_ == 'prt']
+            verb_form = f"{verb_token.lemma_}_{'_'.join(particles)}" if particles else verb_token.lemma_
+            
+            # Add relationship if we have meaningful subject or object
+            if subj or dobj:
+                relationships.append({
+                    "subject": subj or "unknown",
+                    "verb": verb_form,
+                    "object": dobj or "unknown",
+                    "is_negated": is_negated,
+                    "negation_marker": negation_marker,
+                    "has_particles": len(particles) > 0,
+                    "clause_type": clause_type
+                })
+            
+            # ⭐ ENHANCEMENT: Process clausal complements (xcomp, ccomp)
+            # xcomp: Infinitive complements like "want to visit"
+            # ccomp: Content clauses like "think that you try"
+            for child in verb_token.children:
+                if child.dep_ in ['xcomp', 'ccomp']:
+                    if child.pos_ == 'VERB':
+                        # Direct complement is a verb: recursively extract it
+                        # Propagate negation from parent (e.g., "don't want to visit" → "visit" is negated)
+                        _process_verb_and_complements(
+                            child,
+                            parent_negation=is_negated,
+                            clause_type='xcomp' if child.dep_ == 'xcomp' else 'ccomp'
+                        )
+                    elif child.pos_ == 'AUX':
+                        # Auxiliary verb: "should try" → extract the real action "try"
+                        # Walk up from AUX to find its verb complement
+                        for aux_child in child.children:
+                            if aux_child.pos_ == 'VERB' and aux_child.dep_ in ['xcomp', 'ccomp']:
+                                _process_verb_and_complements(
+                                    aux_child,
+                                    parent_negation=is_negated,
+                                    clause_type='xcomp' if aux_child.dep_ == 'xcomp' else 'ccomp'
+                                )
+        
+        # Main loop: process all ROOT and coordinated verbs
         for sent in doc.sents:
             for token in sent:
                 if token.pos_ == "VERB" and token.dep_ in ("ROOT", "conj"):
-                    subj = None
-                    dobj = None
-                    is_negated = False
-                    negation_marker = None
-                    
-                    for child in token.children:
-                        if child.dep_ in ("nsubj", "nsubjpass"):
-                            subj = child.text
-                        if child.dep_ in ("dobj", "obj"):
-                            dobj = child.text
-                        if child.dep_ == "neg" or (child.dep_ == "advmod" and child.lemma_ in negation_markers):
-                            is_negated = True
-                            negation_marker = child.text
-                    
-                    if subj or dobj:
-                        relationships.append({
-                            "subject": subj or "unknown",
-                            "verb": token.lemma_,
-                            "object": dobj or "unknown",
-                            "is_negated": is_negated,
-                            "negation_marker": negation_marker
-                        })
+                    # Start recursive processing from each main verb
+                    _process_verb_and_complements(token, parent_negation=False, clause_type="root")
         
         return relationships
     
@@ -420,17 +475,31 @@ class EnrichmentNLPPreprocessor:
     def extract_dependency_relationships(self, text: str, max_length: int = 10000) -> List[Dict[str, Any]]:
         """Heuristic SVO (subject-verb-object) candidates using dependency parse with negation detection.
         
+        FEATURES (using enhanced _extract_relationships_from_doc):
+        ✅ Basic ROOT + conj verbs
+        ✅ Clausal complements (xcomp, ccomp) - infinitives & content clauses
+        ✅ Phrasal verbs (particles: meet up, go out, come over)
+        ✅ Negation propagation - propagates parent negation to complements
+        ✅ Auxiliary verbs - extracts real action from "should try"
+        
         Args:
             text: Input text to process
             max_length: Maximum text length to process (default 10000 chars)
             
         Returns:
-            List of dicts: {'subject': str, 'verb': str, 'object': str, 'is_negated': bool, 'negation_marker': str|None}
+            List of dicts with keys:
+            - subject: str (or "unknown")
+            - verb: str (or "verb_particle" for phrasal verbs)
+            - object: str (or "unknown")
+            - is_negated: bool
+            - negation_marker: str | None
+            - has_particles: bool
+            - clause_type: str ("root", "xcomp", "ccomp")
             
         Examples:
-            "I love pizza" → {"subject": "I", "verb": "love", "object": "pizza", "is_negated": False, "negation_marker": None}
-            "I don't like coffee" → {"subject": "I", "verb": "like", "object": "coffee", "is_negated": True, "negation_marker": "not"}
-            "She never eats meat" → {"subject": "She", "verb": "eat", "object": "meat", "is_negated": True, "negation_marker": "never"}
+            "I love pizza" → {"subject": "I", "verb": "love", "object": "pizza", "is_negated": False, ...}
+            "I don't like coffee" → {"subject": "I", "verb": "like", "object": "coffee", "is_negated": True, ...}
+            "I want to visit Paris" → [{"subject": "I", "verb": "want", ...}, {"verb": "visit", "object": "Paris", ...}]
         """
         if not self._nlp or not text:
             return []
@@ -438,46 +507,8 @@ class EnrichmentNLPPreprocessor:
             logger.warning("Text length %d exceeds max %d, truncating for relationship extraction", len(text), max_length)
             text = text[:max_length]
         doc = self._nlp(text)
-        relationships: List[Dict[str, Any]] = []
-        
-        # Negation markers to detect (lemmatized forms)
-        negation_markers = {"not", "no", "never", "neither", "nor", "none", "nobody", "nothing", "nowhere"}
-        
-        for sent in doc.sents:
-            for token in sent:
-                # Find candidate verbs
-                if token.pos_ == "VERB" and token.dep_ in ("ROOT", "conj"):
-                    subj = None
-                    dobj = None
-                    is_negated = False
-                    negation_marker = None
-                    
-                    # Find subject and object tied to this verb
-                    for child in token.children:
-                        if child.dep_ in ("nsubj", "nsubjpass"):
-                            subj = child.text
-                        if child.dep_ in ("dobj", "obj"):
-                            dobj = child.text
-                        # Check for negation markers (neg, advmod with negation words)
-                        if child.dep_ == "neg" or (child.dep_ == "advmod" and child.lemma_ in negation_markers):
-                            is_negated = True
-                            negation_marker = child.text
-                    
-                    # Also check for negation in auxiliaries (e.g., "doesn't", "won't")
-                    for child in token.children:
-                        if child.dep_ == "aux" and child.text.lower() in ("don't", "doesn't", "didn't", "won't", "wouldn't", "can't", "cannot", "couldn't"):
-                            is_negated = True
-                            negation_marker = child.text
-                    
-                    if subj and dobj:
-                        relationships.append({
-                            "subject": subj,
-                            "verb": token.lemma_,
-                            "object": dobj,
-                            "is_negated": is_negated,
-                            "negation_marker": negation_marker
-                        })
-        return relationships
+        # Use enhanced method with clausal complements, phrasal verbs, negation propagation
+        return self._extract_relationships_from_doc(doc)
 
     # ---------------------------------------------------------------------
     # Preference Indicators
