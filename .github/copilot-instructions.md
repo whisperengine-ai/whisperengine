@@ -316,6 +316,62 @@ memories = await memory_manager.retrieve_relevant_memories(
 - **Zero Impact**: Completely asynchronous - never blocks real-time message processing
 - **Note**: Available in separate docker-compose configurations for development/testing
 
+### **Universal User Facts & Preferences System (PostgreSQL)**
+- **CRITICAL**: User facts and preferences are stored in PostgreSQL `user_fact_relationships` + `fact_entities` + `universal_users.preferences` tables
+- **User Identification**: Platform user IDs (e.g., Discord IDs like `672814231002939413`) map to `universal_users.universal_id`
+- **Primary Tables**:
+  - `universal_users` - Cross-platform user identity with JSONB preferences field
+    - `universal_id` - Platform user ID (Discord ID, web user ID, etc.)
+    - `preferences` - JSONB field storing extracted preferences (name, location, timezone, food, topics, etc.)
+    - `primary_username`, `display_name`, `email`, `created_at`, `last_active`
+  - `platform_identities` - Maps platform-specific IDs to universal_id (Discord, web, future platforms)
+  - `user_fact_relationships` - User-to-entity relationships (owns pet, interested_in hobby, is_son_of person)
+  - `fact_entities` - Entity definitions (entity_type, entity_name, category, attributes)
+- **Querying User Facts Pattern**:
+  ```sql
+  -- Find all facts for a user (use platform user_id directly, e.g., Discord ID)
+  -- CRITICAL: Filter out enrichment markers (_processing_marker entity type)
+  SELECT ufr.relationship_type, fe.entity_type, fe.entity_name, fe.category, 
+         ufr.confidence, ufr.mentioned_by_character, ufr.created_at
+  FROM user_fact_relationships ufr
+  JOIN fact_entities fe ON ufr.entity_id = fe.id
+  WHERE ufr.user_id = '672814231002939413'  -- Platform user ID
+    AND fe.entity_type != '_processing_marker'  -- Exclude enrichment markers
+    AND ufr.relationship_type NOT LIKE '_enrichment%'  -- Exclude marker relationships
+  ORDER BY ufr.created_at DESC;
+  ```
+- **Querying User Preferences Pattern**:
+  ```sql
+  -- View all preferences for a user
+  SELECT jsonb_pretty(preferences) FROM universal_users WHERE universal_id = '672814231002939413';
+  
+  -- Clear all preferences (for fresh start)
+  UPDATE universal_users SET preferences = '{}'::jsonb WHERE universal_id = '672814231002939413';
+  
+  -- Check specific preference
+  SELECT preferences->'preferred_name'->>'value' as name FROM universal_users WHERE universal_id = '672814231002939413';
+  ```
+- **Preference Types Stored** (JSONB structure):
+  - `preferred_name` - User's name (e.g., "Mark")
+  - `location` - User's location (e.g., "La Jolla")
+  - `timezone` - User's timezone (watch for false positives from regex!)
+  - `food_preferences` - Food likes (array)
+  - `topic_preferences` - Interests (array)
+  - `communication_style` - Casual/formal preference
+  - `formality_level` - Friendly/professional
+  - `response_length` - Short/long preference
+  - Each has: `value`, `confidence`, `updated_at`, `metadata` (bot_name, reasoning, context)
+- **Common Operations**:
+  - Delete incorrect fact: `DELETE FROM user_fact_relationships WHERE id = '<uuid>';`
+  - Check user's pets: `WHERE ufr.user_id = '<user_id>' AND fe.entity_type = 'pet'`
+  - Check user's hobbies: `WHERE ufr.user_id = '<user_id>' AND fe.entity_type = 'hobby'`
+- **Enrichment Markers**: Internal `_processing_marker` entities track enrichment worker progress
+  - **Entity Type**: `_processing_marker`
+  - **Relationship Types**: `_enrichment_progress_marker`, `_enrichment_fact_marker`, `_enrichment_preference_marker`
+  - **CRITICAL**: Always filter these out when querying user facts for display/conversation context
+  - **Filter Pattern**: `WHERE fe.entity_type != '_processing_marker' AND ufr.relationship_type NOT LIKE '_enrichment%'`
+- **REMEMBER**: User facts are PostgreSQL-based, NOT in Qdrant vector memory (conversations in Qdrant, facts/preferences in PostgreSQL)
+
 ## 🚀 DEVELOPMENT WORKFLOW
 
 ### **Docker-First Development**

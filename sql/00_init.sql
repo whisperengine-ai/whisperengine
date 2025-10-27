@@ -240,6 +240,8 @@ BEGIN
         FROM user_fact_relationships ufr
         JOIN fact_entities fe ON ufr.entity_id = fe.id
         WHERE ufr.user_id = p_user_id
+          AND fe.entity_type != '_processing_marker'
+          AND ufr.relationship_type NOT LIKE '_enrichment%'
           AND (p_entity_type IS NULL OR fe.entity_type = p_entity_type)
           AND ufr.confidence >= p_min_confidence
     )

@@ -745,6 +745,8 @@ class SemanticKnowledgeRouter:
                 FROM user_fact_relationships ufr
                 JOIN fact_entities fe ON ufr.entity_id = fe.id
                 WHERE ufr.user_id = $1
+                  AND fe.entity_type != '_processing_marker'
+                  AND ufr.relationship_type NOT LIKE '_enrichment%'
                   AND ($2::TEXT IS NULL OR fe.entity_type = $2)
                   AND ($3::TEXT IS NULL OR ufr.relationship_type = $3)
                   AND ufr.confidence > 0.5
@@ -813,6 +815,8 @@ class SemanticKnowledgeRouter:
                 FROM user_fact_relationships ufr
                 JOIN fact_entities fe ON ufr.entity_id = fe.id
                 WHERE ufr.user_id = $1
+                  AND fe.entity_type != '_processing_marker'
+                  AND ufr.relationship_type NOT LIKE '_enrichment%'
                   AND ($3::TEXT IS NULL OR fe.entity_type = $3)
                   AND (ufr.mentioned_by_character = $2 OR ufr.mentioned_by_character IS NULL)
                 ORDER BY ufr.confidence DESC, ufr.created_at DESC
@@ -906,6 +910,8 @@ class SemanticKnowledgeRouter:
                 FROM user_fact_relationships ufr
                 JOIN fact_entities fe ON ufr.entity_id = fe.id
                 WHERE ufr.user_id = $1
+                AND fe.entity_type != '_processing_marker'
+                AND ufr.relationship_type NOT LIKE '_enrichment%'
                 AND ufr.updated_at > NOW() - ($2 || ' days')::INTERVAL
                 ORDER BY 
                     weighted_confidence DESC,
