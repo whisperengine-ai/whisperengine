@@ -928,7 +928,9 @@ class UnifiedQueryClassifier:
             query=query,
             query_doc=query_doc,
             matched_patterns=matched_patterns,
-            question_complexity=question_sophistication.get("complexity_score", 0)
+            question_complexity=question_sophistication.get("complexity_score", 0),
+            svo_relationships=svo_relationships,
+            negation_info=negation_info
         )
         
         # Override intent and add LLM_TOOLS data source if complexity threshold met
@@ -1372,7 +1374,9 @@ class UnifiedQueryClassifier:
         query: str,
         query_doc,
         matched_patterns: List[str],
-        question_complexity: int
+        question_complexity: int,
+        svo_relationships: Optional[List[Dict]] = None,
+        negation_info: Optional[Dict] = None
     ) -> float:
         """
         Assess whether query requires LLM tool calling for structured data retrieval.
@@ -1383,11 +1387,20 @@ class UnifiedQueryClassifier:
         - Temporal trend analysis
         - Entity-relationship discovery
         
+        Uses spaCy's full NLP pipeline:
+        - Dependency parsing (SVO relationships, negation, compound phrases)
+        - POS tagging (question sophistication, verb tenses)
+        - Lemmatization (normalized form matching)
+        - Named entity recognition (structured data needs)
+        - Token-level pattern matching (avoiding keyword/regex)
+        
         Args:
             query: User query string
             query_doc: spaCy Doc object (or None)
             matched_patterns: List of matched classification patterns
-            question_complexity: Question complexity score (0-10)
+            question_complexity: Question complexity score (0-10) from POS analysis
+            svo_relationships: Subject-verb-object triples from dependency parsing
+            negation_info: Negation detection results
         
         Returns:
             Complexity score (0.0-1.0). Above self.tool_complexity_threshold → use tools.
@@ -1395,52 +1408,189 @@ class UnifiedQueryClassifier:
         complexity = 0.0
         query_lower = query.lower()
         
-        # Multi-source requirements (facts + conversations + temporal)
-        multi_source_keywords = [
+        # =====================================================================
+        # MULTI-SOURCE REQUIREMENTS - Use spaCy lemmatization & POS
+        # =====================================================================
+        multi_source_lemmas = {
             "everything", "all", "complete", "comprehensive", "full",
-            "relationship", "history", "timeline", "journey", "story"
-        ]
-        if any(word in query_lower for word in multi_source_keywords):
+            "relationship", "history", "timeline", "journey", "story", "entire"
+        }
+        has_multi_source = False
+        
+        if query_doc:
+            # Check lemmatized forms (e.g., "relationships" → "relationship")
+            has_multi_source = any(
+                token.lemma_.lower() in multi_source_lemmas
+                for token in query_doc
+                if token.pos_ in ['NOUN', 'ADJ', 'DET', 'PRON']  # Relevant POS types
+            )
+        else:
+            # Fallback: keyword matching
+            has_multi_source = any(word in query_lower for word in multi_source_lemmas)
+        
+        if has_multi_source:
             complexity += 0.25
+            logger.debug("🔧 TOOL COMPLEXITY: Multi-source requirement (+0.25)")
         
-        # Temporal analysis needs (trends, changes, evolution)
-        temporal_analysis_keywords = [
-            "trend", "change", "over time", "evolution", "progress",
-            "how have", "how has", "compared to", "before and after"
-        ]
-        if any(word in query_lower for word in temporal_analysis_keywords):
+        # =====================================================================
+        # TEMPORAL ANALYSIS - Use spaCy dependency parsing for temporal phrases
+        # =====================================================================
+        temporal_lemmas = {"trend", "change", "evolution", "progress", "development"}
+        temporal_verbs = {"have", "has", "been", "become", "evolve", "change"}
+        has_temporal = False
+        
+        if query_doc:
+            # Look for temporal markers via lemmatization
+            has_temporal_noun = any(
+                token.lemma_.lower() in temporal_lemmas
+                for token in query_doc
+                if token.pos_ == 'NOUN'
+            )
+            
+            # Look for temporal verb patterns (e.g., "how have", "how has")
+            has_temporal_verb = any(
+                token.lemma_.lower() in temporal_verbs and
+                any(child.lemma_.lower() == "how" for child in token.children)
+                for token in query_doc
+                if token.pos_ in ['VERB', 'AUX']
+            )
+            
+            # Look for temporal prepositions/adverbs (over time, before, after)
+            has_temporal_prep = any(
+                token.lemma_.lower() in {"over", "before", "after", "during", "since"}
+                for token in query_doc
+                if token.pos_ in ['ADP', 'ADV']
+            )
+            
+            has_temporal = has_temporal_noun or has_temporal_verb or has_temporal_prep
+        else:
+            # Fallback: keyword matching
+            temporal_keywords = [
+                "trend", "change", "over time", "evolution", "progress",
+                "how have", "how has", "compared to", "before and after"
+            ]
+            has_temporal = any(word in query_lower for word in temporal_keywords)
+        
+        if has_temporal:
             complexity += 0.3
+            logger.debug("🔧 TOOL COMPLEXITY: Temporal analysis (+0.3)")
         
-        # Entity references via spaCy NER (indicates structured data needs)
+        # =====================================================================
+        # ENTITY REFERENCES - spaCy NER (structured data needs)
+        # =====================================================================
         if query_doc and len(query_doc.ents) > 0:
             complexity += 0.2
+            logger.debug("🔧 TOOL COMPLEXITY: Named entities (%d) (+0.2)", len(query_doc.ents))
         
-        # Complex question structure (multiple question words or clauses)
-        question_words = ["what", "where", "when", "why", "how", "which", "who"]
-        question_word_count = sum(1 for word in question_words if word in query_lower)
+        # =====================================================================
+        # COMPLEX SVO RELATIONSHIPS - Dependency parsing
+        # =====================================================================
+        if svo_relationships and len(svo_relationships) >= 2:
+            complexity += 0.15
+            logger.debug("🔧 TOOL COMPLEXITY: Multiple SVO relationships (+0.15)")
+        
+        # =====================================================================
+        # NEGATION - Dependency parsing
+        # =====================================================================
+        if negation_info and negation_info.get("has_negation", False):
+            complexity += 0.1
+            logger.debug("🔧 TOOL COMPLEXITY: Negation detected (+0.1)")
+        
+        # =====================================================================
+        # QUESTION STRUCTURE - POS tags for WH-words
+        # =====================================================================
+        question_word_count = 0
+        if query_doc:
+            # Count WH-words via POS tags (WDT, WP, WP$, WRB)
+            question_word_count = sum(
+                1 for token in query_doc 
+                if token.tag_ in ['WDT', 'WP', 'WP$', 'WRB']
+            )
+        else:
+            # Fallback: keyword matching
+            question_words = ["what", "where", "when", "why", "how", "which", "who"]
+            question_word_count = sum(1 for word in question_words if word in query_lower)
+        
         if question_word_count >= 2:
             complexity += 0.2
+            logger.debug("🔧 TOOL COMPLEXITY: Multiple question words (%d) (+0.2)", question_word_count)
         elif question_word_count >= 1:
             complexity += 0.1
         
-        # High question complexity from POS tagging
+        # =====================================================================
+        # QUESTION SOPHISTICATION - POS tagging analysis
+        # =====================================================================
         if question_complexity >= 5:
             complexity += 0.15
+            logger.debug("🔧 TOOL COMPLEXITY: High question sophistication (%d) (+0.15)", question_complexity)
         
-        # Long queries often need structured retrieval
-        word_count = len(query.split())
+        # =====================================================================
+        # QUERY LENGTH - spaCy token count
+        # =====================================================================
+        word_count = len(query_doc) if query_doc else len(query.split())
         if word_count > 15:
             complexity += 0.15
+            logger.debug("🔧 TOOL COMPLEXITY: Long query (%d tokens) (+0.15)", word_count)
         elif word_count > 10:
             complexity += 0.1
         
-        # Aggregation keywords (summarize, tell me about, what do you know)
-        aggregation_keywords = [
-            "summarize", "summary", "tell me about", "what do you know",
-            "give me", "show me", "list", "enumerate"
-        ]
-        if any(word in query_lower for word in aggregation_keywords):
+        # =====================================================================
+        # AGGREGATION REQUESTS - Lemmatization + dependency parsing
+        # =====================================================================
+        aggregation_verbs = {"summarize", "tell", "give", "show", "list", "enumerate"}
+        aggregation_nouns = {"summary", "overview", "breakdown"}
+        has_aggregation = False
+        
+        if query_doc:
+            # Check for aggregation verbs with relevant dependencies
+            has_agg_verb = any(
+                token.lemma_.lower() in aggregation_verbs and token.pos_ == 'VERB'
+                for token in query_doc
+            )
+            
+            # Check for aggregation nouns
+            has_agg_noun = any(
+                token.lemma_.lower() in aggregation_nouns and token.pos_ == 'NOUN'
+                for token in query_doc
+            )
+            
+            # Check for "what do you know" pattern via dependency parsing
+            has_know_pattern = any(
+                token.lemma_.lower() == "know" and
+                any(child.lemma_.lower() == "what" for child in token.children)
+                for token in query_doc
+                if token.pos_ == 'VERB'
+            )
+            
+            has_aggregation = has_agg_verb or has_agg_noun or has_know_pattern
+        else:
+            # Fallback: keyword matching
+            aggregation_keywords = [
+                "summarize", "summary", "tell me about", "what do you know",
+                "give me", "show me", "list", "enumerate"
+            ]
+            has_aggregation = any(word in query_lower for word in aggregation_keywords)
+        
+        if has_aggregation:
             complexity += 0.2
+            logger.debug("🔧 TOOL COMPLEXITY: Aggregation request (+0.2)")
+        
+        # =====================================================================
+        # FINAL COMPLEXITY SCORE
+        # =====================================================================
+        logger.info(
+            "🔧 TOOL COMPLEXITY FINAL: %.2f (threshold=%.2f) [entities=%d, svo=%d, negation=%s, questions=%d, pos_complexity=%d, words=%d, aggregation=%s, multi_source=%s, temporal=%s]",
+            complexity, self.tool_complexity_threshold,
+            len(query_doc.ents) if query_doc else 0,
+            len(svo_relationships) if svo_relationships else 0,
+            negation_info.get("has_negation", False) if negation_info else False,
+            question_word_count,
+            question_complexity,
+            word_count,
+            has_aggregation,
+            has_multi_source,
+            has_temporal
+        )
         
         return min(complexity, 1.0)
     

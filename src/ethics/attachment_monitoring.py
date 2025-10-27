@@ -82,7 +82,11 @@ class AttachmentMonitoringSystem:
     """
     
     def __init__(self, temporal_client: Optional[TemporalIntelligenceClient] = None):
-        self.temporal_client = temporal_client or TemporalIntelligenceClient()
+        if temporal_client is None:
+            from src.temporal.temporal_intelligence_client import get_temporal_client
+            self.temporal_client = get_temporal_client()  # Use singleton to avoid creating multiple InfluxDB clients
+        else:
+            self.temporal_client = temporal_client
         
         # Attachment risk thresholds (tuned based on testing)
         self.thresholds = {

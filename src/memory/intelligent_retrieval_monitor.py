@@ -61,8 +61,8 @@ class IntelligentRetrievalMonitor:
         
         # Try to get TemporalIntelligenceClient (which handles InfluxDB)
         try:
-            from src.temporal.temporal_intelligence_client import TemporalIntelligenceClient
-            self.temporal_client = TemporalIntelligenceClient()
+            from src.temporal.temporal_intelligence_client import get_temporal_client
+            self.temporal_client = get_temporal_client()  # Use singleton to avoid creating multiple InfluxDB clients
             
             # Check if InfluxDB is available
             if self.temporal_client and self.temporal_client.enabled:

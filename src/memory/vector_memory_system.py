@@ -3867,8 +3867,8 @@ class VectorMemoryManager:
         # Initialize temporal intelligence client for metrics recording
         self.temporal_client = None
         try:
-            from src.temporal.temporal_intelligence_client import TemporalIntelligenceClient
-            self.temporal_client = TemporalIntelligenceClient()
+            from src.temporal.temporal_intelligence_client import get_temporal_client
+            self.temporal_client = get_temporal_client()  # Use singleton to avoid creating multiple InfluxDB clients
         except ImportError:
             logger.warning("TemporalIntelligenceClient not available - metrics recording disabled")
         

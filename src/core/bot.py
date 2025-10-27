@@ -957,6 +957,18 @@ class DiscordBotCore:
                     self.memory_manager.emotion_manager.cleanup, priority=75
                 )
 
+            # Register temporal client cleanup to prevent InfluxDB retry loops
+            try:
+                from src.temporal.temporal_intelligence_client import get_temporal_client
+                temporal_client = get_temporal_client()
+                if temporal_client and temporal_client.enabled:
+                    self.shutdown_manager.register_cleanup(
+                        temporal_client.close, priority=70
+                    )
+                    self.logger.info("Temporal intelligence client cleanup registered")
+            except (ImportError, AttributeError) as e:
+                self.logger.debug("Temporal client cleanup not available: %s", e)
+
             self.logger.info("Cleanup functions registered with shutdown manager")
 
         except Exception as e:

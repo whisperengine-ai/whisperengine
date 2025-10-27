@@ -1917,7 +1917,7 @@ class SemanticKnowledgeRouter:
         
         try:
             # Use LLM tool calling to determine which tools to execute
-            tool_response = await llm_client.generate_chat_completion_with_tools(
+            tool_response = llm_client.generate_chat_completion_with_tools(
                 messages=[{
                     "role": "user",
                     "content": f"For the query: '{query}' - determine which data retrieval tools to use."
@@ -1947,7 +1947,9 @@ class SemanticKnowledgeRouter:
                     elif tool_name == "recall_conversation_context":
                         tool_arguments["user_id"] = user_id
                     elif tool_name == "query_character_backstory":
-                        tool_arguments["character_name"] = character_name
+                        # Tool 3 uses DISCORD_BOT_NAME environment variable directly
+                        # No character_name parameter needed
+                        pass
                     elif tool_name == "summarize_user_relationship":
                         tool_arguments["user_id"] = user_id
                     elif tool_name == "query_temporal_trends":
@@ -2327,36 +2329,142 @@ class SemanticKnowledgeRouter:
     # Tool 3: Query Character Backstory
     async def _tool_query_character_backstory(
         self,
-        character_name: str,
         query: str,
         source: str = "both"
     ) -> Dict[str, Any]:
         """
         Tool 3: Query PostgreSQL CDL database for character backstory.
         
-        Migrated from src/intelligence/tool_executor.py (placeholder)
+        Retrieves character biographical information from CDL tables:
+        - character_identity_details: name, age, occupation, description
+        - character_attributes: fears, dreams, quirks, values
+        - character_communication_patterns: tone, humor style, pacing
+        
+        Uses DISCORD_BOT_NAME environment variable as single source of truth for character identification.
+        
+        Args:
+            query: User's query about the character (for context/filtering)
+            source: Data source - "cdl_database", "self_memory", or "both"
+        
+        Returns:
+            Dict with character backstory information
+        
+        Migrated from src/intelligence/tool_executor.py
         """
+        import os
+        
         if not self.postgres:
             raise RuntimeError("PostgreSQL connection pool not available")
         
-        # TODO: Implement CDL database queries
-        logger.warning(
-            "query_character_backstory NOT FULLY IMPLEMENTED | "
-            "Character: %s | Query: '%s' | Source: %s",
-            character_name,
-            query[:50],
-            source
+        # Get character name from DISCORD_BOT_NAME environment variable (single source of truth)
+        bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown').lower()
+        
+        result = {
+            "character_name": bot_name,
+            "query": query,
+            "identity": {},
+            "attributes": [],
+            "communication": {},
+            "source": source,
+            "found": False
+        }
+        
+        async with self.postgres.acquire() as conn:
+            # Get character ID using normalized_name column (matches DISCORD_BOT_NAME)
+            char_row = await conn.fetchrow(
+                """
+                SELECT id, name
+                FROM characters 
+                WHERE normalized_name = $1
+                LIMIT 1
+                """,
+                bot_name
+            )
+            
+            if not char_row:
+                logger.warning(
+                    "query_character_backstory | Character not found: %s",
+                    bot_name
+                )
+                return result
+            
+            character_id = char_row["id"]
+            result["found"] = True
+            
+            # Query character identity details
+            identity_row = await conn.fetchrow(
+                """
+                SELECT full_name, nickname, gender, location
+                FROM character_identity_details
+                WHERE character_id = $1
+                """,
+                character_id
+            )
+            
+            if identity_row:
+                result["identity"] = {
+                    "full_name": identity_row["full_name"],
+                    "nickname": identity_row["nickname"],
+                    "gender": identity_row["gender"],
+                    "location": identity_row["location"]
+                }
+            
+            # Query character attributes (fears, dreams, quirks, values)
+            attribute_rows = await conn.fetch(
+                """
+                SELECT category, description, importance, display_order
+                FROM character_attributes
+                WHERE character_id = $1
+                    AND active = true
+                ORDER BY display_order, category
+                LIMIT 20
+                """,
+                character_id
+            )
+            
+            if attribute_rows:
+                result["attributes"] = [
+                    {
+                        "category": row["category"],
+                        "description": row["description"],
+                        "importance": row["importance"],
+                        "display_order": row["display_order"]
+                    }
+                    for row in attribute_rows
+                ]
+            
+            # Query communication patterns
+            comm_rows = await conn.fetch(
+                """
+                SELECT pattern_type, pattern_name, pattern_value
+                FROM character_communication_patterns
+                WHERE character_id = $1
+                LIMIT 10
+                """,
+                character_id
+            )
+            
+            if comm_rows:
+                result["communication"] = [
+                    {
+                        "pattern_type": row["pattern_type"],
+                        "pattern_name": row["pattern_name"],
+                        "pattern_value": row["pattern_value"]
+                    }
+                    for row in comm_rows
+                ]
+        
+        logger.debug(
+            "query_character_backstory | Character: %s (ID: %d) | "
+            "Identity: %s | Attributes: %d | Communication: %s",
+            bot_name,
+            character_id,
+            "found" if result["identity"] else "not found",
+            len(result["attributes"]),
+            "found" if result["communication"] else "not found"
         )
         
-        return {
-            "character_name": character_name,
-            "query": query,
-            "background": {},
-            "identity": {},
-            "interests": [],
-            "source": source,
-            "note": "Full implementation pending - requires CDL table schema analysis"
-        }
+        return result
     
     # Tool 4: Summarize User Relationship
     async def _tool_summarize_user_relationship(
@@ -2424,9 +2532,18 @@ class SemanticKnowledgeRouter:
         time_window: str = "7d"
     ) -> Dict[str, Any]:
         """
-        Tool 5: Query InfluxDB for conversation quality metrics.
+        Tool 5: Query InfluxDB for conversation quality metrics over time.
         
-        Migrated from src/intelligence/tool_executor.py (placeholder)
+        Queries the conversation_quality measurement in InfluxDB for user-specific
+        quality metrics (engagement_score, satisfaction_score, natural_flow_score, etc.)
+        
+        Args:
+            user_id: User identifier
+            metric: Metric to query ("all", "engagement_score", "satisfaction_score", "coherence_score")
+            time_window: Time window ("24h", "7d", "30d")
+        
+        Returns:
+            Dict with time-series data and summary statistics
         """
         if not self.influx:
             logger.warning(
@@ -2444,23 +2561,204 @@ class SemanticKnowledgeRouter:
                 "note": "InfluxDB client not available"
             }
         
-        # TODO: Implement InfluxDB queries
-        logger.warning(
-            "query_temporal_trends NOT FULLY IMPLEMENTED | "
-            "User: %s | Metric: %s | Window: %s",
-            user_id,
-            metric,
-            time_window
-        )
+        try:
+            # Get bot name from environment (single source of truth)
+            from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Parse time window
+            if time_window == "24h":
+                range_filter = "1d"
+            elif time_window == "7d":
+                range_filter = "7d"
+            elif time_window == "30d":
+                range_filter = "30d"
+            else:
+                range_filter = "7d"  # Default
+            
+            # Build field filter based on metric
+            if metric == "all":
+                field_filter = ""  # Get all fields
+            elif metric == "coherence_score":
+                # Map to actual field name (natural_flow_score)
+                field_filter = '|> filter(fn: (r) => r._field == "natural_flow_score")'
+            else:
+                # engagement_score, satisfaction_score, emotional_resonance, topic_relevance
+                field_filter = f'|> filter(fn: (r) => r._field == "{metric}")'
+            
+            # Build Flux query
+            import os
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET', 'whisperengine')}")
+                |> range(start: -{range_filter})
+                |> filter(fn: (r) => r._measurement == "conversation_quality")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> filter(fn: (r) => r.user_id == "{user_id}")
+                {field_filter}
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+            '''
+            
+            # Execute query
+            result = self.influx.query_api.query(query)
+            
+            # Process results
+            data_points = []
+            for table in result:
+                for record in table.records:
+                    point = {
+                        'timestamp': record.get_time().isoformat(),
+                    }
+                    
+                    # Add requested metrics
+                    if metric == "all":
+                        point['engagement_score'] = record.values.get('engagement_score')
+                        point['satisfaction_score'] = record.values.get('satisfaction_score')
+                        point['natural_flow_score'] = record.values.get('natural_flow_score')
+                        point['emotional_resonance'] = record.values.get('emotional_resonance')
+                        point['topic_relevance'] = record.values.get('topic_relevance')
+                    elif metric == "coherence_score":
+                        # Map coherence_score to natural_flow_score
+                        point['coherence_score'] = record.values.get('natural_flow_score')
+                    else:
+                        point[metric] = record.values.get(metric)
+                    
+                    data_points.append(point)
+            
+            # Calculate summary statistics
+            summary = self._calculate_trend_summary(data_points, metric)
+            
+            logger.info(
+                "✅ query_temporal_trends | User: %s | Metric: %s | Window: %s | Points: %d",
+                user_id,
+                metric,
+                time_window,
+                len(data_points)
+            )
+            
+            return {
+                "user_id": user_id,
+                "bot_name": bot_name,
+                "metric": metric,
+                "time_window": time_window,
+                "data_points": data_points,
+                "summary": summary,
+                "count": len(data_points)
+            }
+            
+        except Exception as e:
+            logger.error(
+                "❌ query_temporal_trends failed | User: %s | Metric: %s | Error: %s",
+                user_id,
+                metric,
+                str(e),
+                exc_info=True
+            )
+            
+            return {
+                "user_id": user_id,
+                "metric": metric,
+                "time_window": time_window,
+                "data_points": [],
+                "summary": {},
+                "error": str(e)
+            }
+    
+    def _calculate_trend_summary(
+        self,
+        data_points: List[Dict[str, Any]],
+        metric: str
+    ) -> Dict[str, Any]:
+        """
+        Calculate summary statistics for temporal trend data.
         
-        return {
-            "user_id": user_id,
-            "metric": metric,
-            "time_window": time_window,
-            "data_points": [],
-            "summary": {},
-            "note": "Full implementation pending - requires InfluxDB schema analysis"
-        }
+        Args:
+            data_points: List of time-series data points
+            metric: Metric being analyzed
+        
+        Returns:
+            Dict with summary statistics (average, trend, etc.)
+        """
+        if not data_points:
+            return {
+                "average": None,
+                "trend": "insufficient_data",
+                "data_points_count": 0
+            }
+        
+        try:
+            # Extract values for the requested metric(s)
+            if metric == "all":
+                # Calculate averages for all metrics
+                metrics = ['engagement_score', 'satisfaction_score', 'natural_flow_score', 
+                          'emotional_resonance', 'topic_relevance']
+                
+                summary = {
+                    "data_points_count": len(data_points)
+                }
+                
+                for m in metrics:
+                    raw_values = [p.get(m) for p in data_points if p.get(m) is not None]
+                    values: List[float] = [float(v) for v in raw_values]  # type: ignore
+                    if values:
+                        avg: float = sum(values) / len(values)
+                        summary[f"{m}_average"] = avg  # type: ignore
+                        summary[f"{m}_trend"] = self._calculate_simple_trend(values)  # type: ignore
+                
+                return summary
+            else:
+                # Single metric analysis
+                metric_key = "coherence_score" if metric == "coherence_score" else metric
+                raw_values = [p.get(metric_key) for p in data_points if p.get(metric_key) is not None]
+                values: List[float] = [float(v) for v in raw_values]  # type: ignore
+                
+                if not values:
+                    return {
+                        "average": None,
+                        "trend": "no_data",
+                        "data_points_count": len(data_points)
+                    }
+                
+                return {
+                    "average": sum(values) / len(values),
+                    "min": min(values),
+                    "max": max(values),
+                    "trend": self._calculate_simple_trend(values),
+                    "data_points_count": len(data_points)
+                }
+                
+        except Exception as e:
+            logger.error("Failed to calculate trend summary: %s", str(e))
+            return {
+                "error": str(e),
+                "data_points_count": len(data_points)
+            }
+    
+    def _calculate_simple_trend(self, values: List[float]) -> str:
+        """
+        Calculate simple trend direction from time-series values.
+        
+        Args:
+            values: List of numeric values in chronological order
+        
+        Returns:
+            Trend direction: "improving", "declining", "stable"
+        """
+        if len(values) < 2:
+            return "insufficient_data"
+        
+        # Compare first half to second half
+        midpoint = len(values) // 2
+        first_half_avg = sum(values[:midpoint]) / midpoint
+        second_half_avg = sum(values[midpoint:]) / (len(values) - midpoint)
+        
+        diff = second_half_avg - first_half_avg
+        
+        if diff > 0.05:  # 5% improvement threshold
+            return "improving"
+        elif diff < -0.05:  # 5% decline threshold
+            return "declining"
+        else:
+            return "stable"
 
 
 # Factory function for easy integration

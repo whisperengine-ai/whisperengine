@@ -739,13 +739,17 @@ class MessageProcessor:
             from src.memory.unified_query_classification import DataSource
             
             try:
+                # Get bot name from environment using standard utility
+                from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+                bot_name = get_normalized_bot_name_from_env()
+                
                 # Run unified classification to check for tool-assisted routing
                 if self._unified_query_classifier is not None:
                     unified_classification = await self._unified_query_classifier.classify(
                         query=message_context.content,
                         emotion_data=ai_components.get("emotion_data"),
                         user_id=message_context.user_id,
-                        character_name=self.bot_core.character_name if self.bot_core else None
+                        character_name=bot_name
                     )
                     
                     if DataSource.LLM_TOOLS in unified_classification.data_sources:
@@ -763,7 +767,7 @@ class MessageProcessor:
                             tool_execution_result = await knowledge_router.execute_tools(
                                 query=message_context.content,
                                 user_id=message_context.user_id,
-                                character_name=self.bot_core.character_name if self.bot_core else "unknown",
+                                character_name=bot_name,
                                 llm_client=self.llm_client
                             )
                             
