@@ -470,8 +470,10 @@ async def create_ai_identity_guidance_component(
                     'archetype': identity_data.get("archetype", "real-world"),
                     'name': identity_data.get("name", character_name)
                 })()
-                # Add allow_full_roleplay_immersion attribute for roleplay flexibility check
-                self.allow_full_roleplay_immersion = identity_data.get("archetype", "").lower() in ['fantasy', 'mythological']
+                # Use database allow_full_roleplay setting (falls back to archetype check if not set)
+                # Database returns this at top level: 'allow_full_roleplay_immersion': character_row['allow_full_roleplay']
+                self.allow_full_roleplay_immersion = data.get("allow_full_roleplay_immersion", 
+                    identity_data.get("archetype", "").lower() in ['fantasy', 'mythological'])
         
         character = MockCharacter(character_data)
         

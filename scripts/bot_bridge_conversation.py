@@ -161,7 +161,7 @@ class BotBridge:
         
         return None
 
-    async def exchange_messages(self, turns: int = 5) -> bool:
+    async def exchange_messages(self, turns: int = 10) -> bool:
         """Facilitate back-and-forth conversation"""
         current_speaker = self.bot1_name  # Bot1 responds to Bot2's opening response  
         current_user_id = self.bot1_user_id
@@ -309,7 +309,7 @@ async def main():
     parser = argparse.ArgumentParser(description="Bridge conversations between WhisperEngine bots")
     parser.add_argument("bot1", nargs='?', help="First bot name")
     parser.add_argument("bot2", nargs='?', help="Second bot name")
-    parser.add_argument("--turns", type=int, default=5, help="Number of conversation turns (default: 5)")
+    parser.add_argument("--turns", type=int, default=10, help="Number of conversation turns (default: 10)")
     parser.add_argument("--opening", type=str, help="Custom opening message (for first meetings)")
     parser.add_argument("--continuation-prompt", type=str, help="Custom continuation prompt (overrides --continuation defaults)")
     parser.add_argument("--output", type=str, help="Output file path")
@@ -376,8 +376,8 @@ async def main():
             elif args.bot1 == "elena" and args.bot2 == "marcus":
                 args.opening = f"Hi there! I'm Elena, a marine biologist. I heard you're Marcus, and you work in AI research? I'd love to chat about the intersection of technology and natural systems."
             else:
-                # Generic but thoughtful opening
-                args.opening = f"Hello, I'm {bot1_config['name']}. I understand you're {bot2_config['name']}, and I'm curious to learn more about your perspective and experiences. What defines your existence?"
+                # Generic but natural opening
+                args.opening = f"Hi! I'm {bot1_config['name']}. I've heard about you and thought it would be interesting to connect. How's your day going?"
     
     # Create bridge and run conversation
     pause_min = 0.0 if args.no_pause else args.pause_min

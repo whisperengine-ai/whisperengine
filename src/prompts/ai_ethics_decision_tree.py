@@ -647,9 +647,15 @@ Stay fully in character and share your backstory naturally without AI disclosure
         """
         Check if character allows full roleplay immersion.
         
-        **Fantasy/Mythological characters:** Allow full roleplay (no physical interaction ethics)
-        **Real-world characters:** Apply physical interaction ethics
+        **Fantasy/Mythological characters:** Allow full roleplay by default
+        **Real-world characters:** Check database allow_full_roleplay setting
+        **Database override:** allow_full_roleplay=true enables full immersion for any archetype
         """
+        # Check database setting first (explicit override)
+        if hasattr(character, 'allow_full_roleplay_immersion'):
+            return character.allow_full_roleplay_immersion
+        
+        # Fallback to archetype check (legacy behavior)
         archetype = getattr(character.identity, 'archetype', 'real_world')
         return archetype in ['fantasy', 'mythological']
 

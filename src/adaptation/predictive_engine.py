@@ -224,9 +224,8 @@ class PredictiveAdaptationEngine:
                         .field("total_predictions_lifetime", self._telemetry['total_predictions_generated']) \
                         .time(prediction_start)
                     
-                    # Use correct InfluxDB client method
-                    write_api = self.temporal_client.write_api()
-                    write_api.write(
+                    # Use write_api directly (it's already a WriteApi object, not a method)
+                    self.temporal_client.write_api.write(
                         bucket=self.temporal_client.bucket if hasattr(self.temporal_client, 'bucket') else 'whisperengine',
                         record=telemetry_point
                     )

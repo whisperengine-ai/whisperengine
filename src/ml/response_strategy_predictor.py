@@ -226,8 +226,8 @@ class ResponseStrategyPredictor:
               |> tail(n: 7)
             '''
             
-            # Use query_api directly (it's already a QueryApi object, not a method)
-            result = self.influxdb_client.query_api.query_data_frame(flux_query)
+            # Call query_api() method to get QueryApi object, then call query_data_frame
+            result = self.influxdb_client.query_api().query_data_frame(flux_query)
             
             if result.empty or len(result) < 7:
                 logger.debug(f"Insufficient data: {len(result) if not result.empty else 0} messages (need 7)")
