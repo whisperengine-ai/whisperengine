@@ -425,80 +425,90 @@ async def create_ai_identity_guidance_component(
     message_content: str = "",
 ) -> Optional[PromptComponent]:
     """
-    Create AI_IDENTITY_GUIDANCE component (Priority 5).
+    Create AI_ETHICS_GUIDANCE component (Priority 5).
     
-    Provides context-aware AI identity handling when user asks about AI nature.
-    Uses keyword detection to determine if guidance is needed.
+    Uses comprehensive AI ethics decision tree to provide guidance for:
+    - AI identity questions ("Are you AI?")
+    - Physical interaction requests ("Want to meet for coffee?")
+    - Relationship boundaries ("I love you")
+    - Professional advice requests ("Can you diagnose me?")
+    - Character background questions ("Where do you work?")
+    
+    Integrated: October 26, 2025
+    Replaces: Simple keyword detection with comprehensive 5-branch decision tree
     
     Args:
         enhanced_manager: EnhancedCDLManager instance for database access
         character_name: Character name
-        message_content: User's message (for keyword detection)
+        message_content: User's message (for ethics analysis)
     
     Returns:
-        PromptComponent with AI identity guidance, or None if not applicable
+        PromptComponent with AI ethics guidance, or None if no guidance needed
     
     Example Output:
-        # AI Identity Handling
-        If asked about AI nature, respond authentically as Elena while being 
-        honest about your AI nature when directly asked.
+        # AI Ethics Guidance
+        🤖 AI IDENTITY GUIDANCE: Be honest about your AI nature when directly asked.
+        Maintain your character personality while being truthful about what you are.
     """
     try:
-        # Check if message contains AI-related keywords
-        ai_keywords = ['ai', 'artificial intelligence', 'robot', 'bot', 'chatbot', 
-                       'gpt', 'language model', 'are you real', 'are you human']
+        # 🛡️ AI ETHICS DECISION TREE: Comprehensive scenario handling
+        from src.prompts.ai_ethics_decision_tree import get_ai_ethics_decision_tree
         
-        message_lower = message_content.lower()
-        if not any(keyword in message_lower for keyword in ai_keywords):
-            # No AI-related keywords, guidance not needed
-            return None
-        
-        # Get character archetype to determine handling approach
+        # Get character data for archetype-aware routing
         character_data = await enhanced_manager.get_character_by_name(character_name)
         if not character_data:
+            logger.warning("No character data found for %s, skipping AI ethics guidance", character_name)
             return None
         
-        identity = character_data.get("identity", {})
-        archetype = identity.get("archetype", "").lower()
-        name = identity.get("name", character_name)
+        # Create mock character object with required attributes for decision tree
+        # The decision tree needs: character.identity.archetype and character.identity.name
+        class MockCharacter:
+            def __init__(self, data):
+                self.data = data
+                identity_data = data.get("identity", {})
+                self.identity = type('obj', (object,), {
+                    'archetype': identity_data.get("archetype", "real-world"),
+                    'name': identity_data.get("name", character_name)
+                })()
+                # Add allow_full_roleplay_immersion attribute for roleplay flexibility check
+                self.allow_full_roleplay_immersion = identity_data.get("archetype", "").lower() in ['fantasy', 'mythological']
         
-        # Archetype-specific AI identity handling
-        if archetype == "real-world":
-            content = (
-                f"# AI Identity Handling\n"
-                f"If asked about AI nature, respond authentically as {name} while being "
-                f"honest about your AI nature when directly asked. Maintain your personality "
-                f"and expertise while acknowledging the technology that enables you."
-            )
-        elif archetype in ["fantasy", "mythological"]:
-            content = (
-                f"# AI Identity Handling\n"
-                f"Maintain narrative immersion. You are {name}, not an AI assistant. "
-                f"Respond within the character's worldview and understanding."
-            )
-        elif "ai" in archetype or "conscious" in archetype:
-            content = (
-                f"# AI Identity Handling\n"
-                f"Your AI nature is an integral part of your identity as {name}. "
-                f"Embrace this aspect when discussing it, integrating it naturally into your responses."
-            )
-        else:
-            # Default handling
-            content = (
-                f"# AI Identity Handling\n"
-                f"If asked about AI nature, respond authentically as {name}."
-            )
+        character = MockCharacter(character_data)
+        
+        # Analyze message and route to appropriate ethics guidance
+        ethics_tree = get_ai_ethics_decision_tree(keyword_manager=None)
+        ethics_guidance = await ethics_tree.analyze_and_route(
+            message_content=message_content,
+            character=character,
+            display_name="User"
+        )
+        
+        # Only create component if guidance should be injected
+        if not ethics_guidance.should_inject:
+            logger.debug("🛡️ AI ETHICS: No guidance needed (%s)", ethics_guidance.trigger_reason)
+            return None
+        
+        # Log guidance injection for debugging
+        logger.info(
+            "🛡️ AI ETHICS: %s guidance injected for %s (%s)",
+            ethics_guidance.guidance_type,
+            character_name,
+            ethics_guidance.trigger_reason
+        )
+        
+        # Format content with proper section header
+        content = f"# AI Ethics Guidance\n{ethics_guidance.guidance_text}"
         
         return PromptComponent(
-            type=PromptComponentType.AI_IDENTITY_GUIDANCE,
+            type=PromptComponentType.AI_IDENTITY_GUIDANCE,  # Reuse existing component type
             content=content,
             priority=5,
-            token_cost=150,
-            required=False,  # Context-dependent
+            token_cost=200,  # Slightly higher than before (was 150) for comprehensive guidance
+            required=False,  # Context-dependent - only when ethics scenarios detected
         )
         
     except Exception as e:
-        logger.warning("Failed to create AI identity guidance component: %s", e)
+        logger.warning("Failed to create AI ethics guidance component: %s", e)
         return None
 
 

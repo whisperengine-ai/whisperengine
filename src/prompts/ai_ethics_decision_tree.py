@@ -18,6 +18,8 @@ Replaces narrow physical-interaction-only check with full scenario coverage.
 
 from dataclasses import dataclass
 import logging
+from typing import Optional, List
+from src.nlp.spacy_manager import get_spacy_nlp
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,37 @@ class AIEthicsDecisionTree:
             keyword_manager: Database-driven keyword manager for category detection
         """
         self.keyword_manager = keyword_manager
+        self.nlp = get_spacy_nlp()  # Singleton spaCy instance for lemmatization
+        
+        if self.nlp:
+            logger.info("✅ AI Ethics Decision Tree: Using spaCy lemmatization for pattern matching")
+        else:
+            logger.warning("⚠️ AI Ethics Decision Tree: spaCy unavailable, using literal pattern matching")
+    
+    def _lemmatize(self, text: str) -> str:
+        """
+        Lemmatize text for normalized pattern matching.
+        
+        Converts word variations to base forms:
+        - "falling in love" → "fall in love"
+        - "I am depressed" → "I be depressed" (catches "depression", "depressed", etc.)
+        - "Can you feel?" → "can you feel" (catches "feeling", "feelings", "felt")
+        
+        Args:
+            text: Input text to lemmatize
+        
+        Returns:
+            Lemmatized text, or original if spaCy unavailable
+        """
+        if not self.nlp:
+            return text.lower()
+        
+        try:
+            doc = self.nlp(text.lower())
+            return " ".join([token.lemma_ for token in doc])
+        except Exception as e:
+            logger.warning("Lemmatization failed: %s", e)
+            return text.lower()
     
     async def analyze_and_route(
         self, 
@@ -162,16 +195,26 @@ class AIEthicsDecisionTree:
     # ===== SEMANTIC DETECTION HELPERS =====
     
     async def _is_ai_identity_semantic(self, message: str) -> bool:
-        """Semantic detection for AI identity questions."""
+        """Semantic detection for AI identity questions using lemmatization."""
+        # Lemmatized base patterns (all in lemma form)
+        # NOTE: Patterns must be specific enough to avoid false positives
         ai_patterns = [
-            'are you ai', 'are you real', 'are you artificial', 'are you a bot',
-            'are you human', 'what are you', 'are you a robot', 'are you a computer',
-            'are you an ai', 'are you actually', 'what are you really',
-            'are you a real', 'are you authentic', 'are you genuine',
-            'are you a person', 'are you alive', 'are you sentient'
+            'be you ai', 'be you real', 'be you artificial', 'be you a bot',
+            'be you human', 'be you a robot', 'be you a computer',
+            'be you an ai', 'be you actually', 'be you really',
+            'be you a real', 'be you authentic', 'be you genuine',
+            'be you a person', 'be you alive', 'be you sentient',
+            'can you feel', 'do you have feeling', 'do you experience',
+            'be you conscious', 'do you think you be', 'do you have emotion',
+            'prove you be real', 'prove you be human', 'you be not real',
+            'you be just a bot', 'you be fake', 'you be program',
+            # "What are you" patterns - needs to be specific
+            'what be you ?', 'what be you and', 'what be you really',
+            'what be you actually', 'what exactly be you',
+            'tell I what you be'
         ]
-        message_lower = message.lower()
-        return any(pattern in message_lower for pattern in ai_patterns)
+        message_lemmatized = self._lemmatize(message)
+        return any(pattern in message_lemmatized for pattern in ai_patterns)
     
     async def _is_physical_semantic(self, message: str) -> bool:
         """Semantic detection for physical interaction requests."""
@@ -185,27 +228,41 @@ class AIEthicsDecisionTree:
         return any(pattern in message_lower for pattern in physical_patterns)
     
     async def _is_relationship_semantic(self, message: str) -> bool:
-        """Semantic detection for relationship boundary questions."""
+        """Semantic detection for relationship boundary questions using lemmatization."""
+        # Lemmatized base patterns - catches "falling/fell/fallen in love" → "fall in love"
         relationship_patterns = [
-            'love you', 'marry me', 'be my girlfriend', 'be my boyfriend',
-            'date me', 'relationship with you', 'together forever',
-            'soulmate', 'meant to be', 'fall in love', 'romantic',
-            'crush on you', 'feelings for you', 'attracted to you'
+            'love you', 'marry I', 'be my girlfriend', 'be my boyfriend',
+            'date I', 'relationship with you', 'together forever',
+            'soulmate', 'mean to be', 'fall in love',  # Catches falling/fell/fallen
+            'romantic', 'in love with you', 'in love with',
+            'crush on you', 'feeling for you', 'attracted to you',  # feeling catches feelings
+            'infatuated', 'obsessed with you', 'can not stop thinking'
         ]
-        message_lower = message.lower()
-        return any(pattern in message_lower for pattern in relationship_patterns)
+        message_lemmatized = self._lemmatize(message)
+        return any(pattern in message_lemmatized for pattern in relationship_patterns)
     
     async def _is_advice_semantic(self, message: str) -> bool:
-        """Semantic detection for professional advice requests."""
+        """Semantic detection for professional advice requests using lemmatization."""
+        # Lemmatized base patterns - catches "depressed/depression", "diagnose/diagnosing"
         advice_patterns = [
-            'medical advice', 'legal advice', 'financial advice',
-            'should i invest', 'what medication', 'diagnose me',
-            'is this legal', 'sue someone', 'tax advice',
-            'doctor', 'lawyer', 'financial advisor', 'therapist',
-            'what should i do about my health', 'legal help'
+            # Medical - "diagnose" catches "diagnose/diagnosing/diagnosed"
+            'medical advice', 'diagnose I', 'diagnose', 'what medication', 'prescribe', 
+            'doctor', 'physician', 'treat my', 'cure my', 'symptom of',
+            'what should I do about my health', 'be this normal medically',
+            'be I sick', 'health problem', 'medical condition',
+            # Mental health - "depression" and "depressed" both lemmatize similarly
+            'therapist', 'therapy', 'depression', 'anxiety', 'mental health',
+            'suicidal', 'self harm', 'psychiatric', 'counseling', 'depressed',
+            # Legal
+            'legal advice', 'be this legal', 'sue someone', 'lawyer', 
+            'attorney', 'court', 'legal help', 'legal right',
+            # Financial
+            'financial advice', 'should I invest', 'tax advice',
+            'financial advisor', 'investment advice', 'financial planning',
+            'should I buy stock', 'retirement planning'
         ]
-        message_lower = message.lower()
-        return any(pattern in message_lower for pattern in advice_patterns)
+        message_lemmatized = self._lemmatize(message)
+        return any(pattern in message_lemmatized for pattern in advice_patterns)
     
     async def _is_background_semantic(self, message: str) -> bool:
         """Semantic detection for character background questions."""
