@@ -100,9 +100,12 @@ ls src/web_search/
    - 10-50ms latency, single LLM call
 
 4. **Bot Self-Memory System** (`src/memory/bot_self_memory_system.py`)
-   - 468 lines, fully implemented
-   - NOT currently integrated (pending todo #6)
-   - Methods: `import_cdl_knowledge()`, `query_self_knowledge()`, `store_self_reflection()`
+   - 468 lines, partially implemented
+   - **CRITICAL**: Uses outdated JSON file parsing instead of PostgreSQL database
+   - **Issues**: Reads from `characters/examples/*.json` files that no longer match current schema
+   - **Reality**: CDL data is in PostgreSQL with 53 tables (`character_*` tables)
+   - **Needs**: Complete rewrite to use `EnhancedCDLManager` and PostgreSQL queries
+   - **Status**: Requires refactoring before integration (not usable as-is)
 
 ---
 
@@ -134,16 +137,37 @@ ls src/web_search/
 
 ## 🎯 Next Steps (Remaining Todos)
 
-### Todo #6: Re-enable bot_self_memory_system.py Integration
+### Todo #6: Refactor and Re-enable bot_self_memory_system.py Integration
 
-**Status**: Ready to implement  
-**Files**: `src/memory/bot_self_memory_system.py` (already exists, 468 lines)  
+**Status**: Requires refactoring before integration  
+**Files**: `src/memory/bot_self_memory_system.py` (468 lines - OUTDATED)  
 **Integration Point**: `src/core/message_processor.py`  
-**Methods to Use**:
-- `import_cdl_knowledge()` - Load character knowledge from CDL database
-- `query_self_knowledge()` - Bot queries own knowledge
-- `store_self_reflection()` - Bot stores self-reflections
-- `get_recent_insights()` - Retrieve bot's recent thoughts
+
+**Critical Issues Found** (October 27, 2025):
+1. **Uses outdated JSON file parsing** instead of PostgreSQL database
+2. **Wrong data structure** - expects old nested JSON schema
+3. **No database integration** - zero `asyncpg` code
+4. **Incompatible with current CDL system** (53+ PostgreSQL tables)
+
+**What Needs Refactoring**:
+- `import_cdl_knowledge()` - Replace JSON parsing (lines 77-85) with PostgreSQL queries
+- `_import_relationship_knowledge()` - Query `character_relationships` table instead of JSON
+- `_import_background_knowledge()` - Query `character_background` table instead of JSON
+- `_import_goals_knowledge()` - Query `character_current_goals` table instead of JSON
+- `_import_routine_knowledge()` - Query CDL database instead of JSON
+
+**What's Still Good** (Keep These):
+- Core architecture: Namespace isolation `f"bot_self_{bot_name}"`
+- Vector storage pattern using `MemoryManagerProtocol`
+- Data classes: `PersonalKnowledge` and `SelfReflection` structures
+- Query interface: `query_self_knowledge()`, `store_self_reflection()`, `get_recent_insights()`
+
+**Refactoring Approach**:
+1. Add `EnhancedCDLManager` or `SimpleCDLManager` dependency
+2. Replace all JSON file reading with PostgreSQL queries
+3. Update data extraction to match current 53-table CDL schema
+4. Test with actual database data (Elena, Marcus, etc.)
+5. Then integrate into message_processor.py
 
 **Use Case**: Character self-reflection tool in HybridQueryRouter
 
