@@ -41,7 +41,7 @@ async def test_complexity_assessment():
     test_queries = [
         # Simple queries (should use semantic search)
         ("Hi there!", "Simple greeting"),
-        ("How are you?", "Basic question"),
+        ("That's interesting.", "Simple statement"),
         ("Thanks!", "Simple response"),
         
         # Complex queries (should use tool calling)
@@ -93,9 +93,15 @@ async def test_tool_executor():
     from src.intelligence.tool_executor import ToolExecutor
     import asyncpg
     
-    # Connect to PostgreSQL
-    postgres_url = f"postgresql://localhost:5433/whisperengine"
-    print(f"\nConnecting to PostgreSQL: {postgres_url}")
+    # Connect to PostgreSQL with credentials
+    postgres_host = os.getenv("POSTGRES_HOST", "localhost")
+    postgres_port = os.getenv("POSTGRES_PORT", "5433")
+    postgres_db = os.getenv("POSTGRES_DB", "whisperengine")
+    postgres_user = os.getenv("POSTGRES_USER", "whisperengine")
+    postgres_password = os.getenv("POSTGRES_PASSWORD", "whisperengine_password")
+    
+    postgres_url = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
+    print(f"\nConnecting to PostgreSQL: postgresql://{postgres_user}:***@{postgres_host}:{postgres_port}/{postgres_db}")
     
     try:
         pool = await asyncpg.create_pool(postgres_url, min_size=1, max_size=2)

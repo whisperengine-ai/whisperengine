@@ -77,6 +77,9 @@ class QueryIntent(Enum):
     
     # User analytics
     USER_ANALYTICS = "user_analytics"              # "What do you know about me?"
+    
+    # LLM-assisted structured retrieval (NEW: Week 1 hybrid routing)
+    TOOL_ASSISTED = "tool_assisted"                # "Tell me everything about my relationship with you"
 
 
 class VectorStrategy(Enum):
@@ -95,6 +98,7 @@ class DataSource(Enum):
     POSTGRESQL = "postgresql"                      # Structured facts
     INFLUXDB = "influxdb"                          # Temporal metrics
     CDL = "cdl"                                    # Character personality
+    LLM_TOOLS = "llm_tools"                        # LLM-assisted structured retrieval (NEW: Week 1 hybrid routing)
 
 
 # ============================================================================
@@ -217,6 +221,7 @@ class UnifiedQueryClassifier:
         
         # Configuration
         self.emotion_intensity_threshold = 0.3  # Below = non-emotional
+        self.tool_complexity_threshold = 0.3  # Above = use LLM tool calling
         
         # Initialize spaCy with word vectors for semantic matching
         self._init_spacy_vectors()
@@ -916,6 +921,27 @@ class UnifiedQueryClassifier:
         )
         
         # =====================================================================
+        # ASSESS TOOL COMPLEXITY (NEW: Week 1 hybrid routing)
+        # =====================================================================
+        
+        tool_complexity = self._assess_tool_complexity(
+            query=query,
+            query_doc=query_doc,
+            matched_patterns=matched_patterns,
+            question_complexity=question_sophistication.get("complexity_score", 0)
+        )
+        
+        # Override intent and add LLM_TOOLS data source if complexity threshold met
+        if tool_complexity > self.tool_complexity_threshold:
+            intent_type = QueryIntent.TOOL_ASSISTED
+            data_sources.add(DataSource.LLM_TOOLS)
+            matched_patterns.append("tool_assisted")
+            logger.info(
+                "🔧 TOOL ASSISTED: complexity=%.2f (threshold=%.2f) → using LLM tool calling",
+                tool_complexity, self.tool_complexity_threshold
+            )
+        
+        # =====================================================================
         # GENERATE REASONING
         # =====================================================================
         
@@ -1340,6 +1366,83 @@ class UnifiedQueryClassifier:
             )
         
         return pattern_matches
+    
+    def _assess_tool_complexity(
+        self,
+        query: str,
+        query_doc,
+        matched_patterns: List[str],
+        question_complexity: int
+    ) -> float:
+        """
+        Assess whether query requires LLM tool calling for structured data retrieval.
+        
+        Tool calling is recommended for queries that need:
+        - Multi-source data aggregation (facts + conversations + temporal)
+        - Complex relationship traversal
+        - Temporal trend analysis
+        - Entity-relationship discovery
+        
+        Args:
+            query: User query string
+            query_doc: spaCy Doc object (or None)
+            matched_patterns: List of matched classification patterns
+            question_complexity: Question complexity score (0-10)
+        
+        Returns:
+            Complexity score (0.0-1.0). Above self.tool_complexity_threshold → use tools.
+        """
+        complexity = 0.0
+        query_lower = query.lower()
+        
+        # Multi-source requirements (facts + conversations + temporal)
+        multi_source_keywords = [
+            "everything", "all", "complete", "comprehensive", "full",
+            "relationship", "history", "timeline", "journey", "story"
+        ]
+        if any(word in query_lower for word in multi_source_keywords):
+            complexity += 0.25
+        
+        # Temporal analysis needs (trends, changes, evolution)
+        temporal_analysis_keywords = [
+            "trend", "change", "over time", "evolution", "progress",
+            "how have", "how has", "compared to", "before and after"
+        ]
+        if any(word in query_lower for word in temporal_analysis_keywords):
+            complexity += 0.3
+        
+        # Entity references via spaCy NER (indicates structured data needs)
+        if query_doc and len(query_doc.ents) > 0:
+            complexity += 0.2
+        
+        # Complex question structure (multiple question words or clauses)
+        question_words = ["what", "where", "when", "why", "how", "which", "who"]
+        question_word_count = sum(1 for word in question_words if word in query_lower)
+        if question_word_count >= 2:
+            complexity += 0.2
+        elif question_word_count >= 1:
+            complexity += 0.1
+        
+        # High question complexity from POS tagging
+        if question_complexity >= 5:
+            complexity += 0.15
+        
+        # Long queries often need structured retrieval
+        word_count = len(query.split())
+        if word_count > 15:
+            complexity += 0.15
+        elif word_count > 10:
+            complexity += 0.1
+        
+        # Aggregation keywords (summarize, tell me about, what do you know)
+        aggregation_keywords = [
+            "summarize", "summary", "tell me about", "what do you know",
+            "give me", "show me", "list", "enumerate"
+        ]
+        if any(word in query_lower for word in aggregation_keywords):
+            complexity += 0.2
+        
+        return min(complexity, 1.0)
     
     def _generate_reasoning(
         self,

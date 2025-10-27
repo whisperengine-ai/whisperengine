@@ -9,6 +9,7 @@ Architecture:
 - 80% of queries route to semantic search (simple, fast)
 - 20% of queries route to LLM tool calling (complex, multi-source)
 - Configurable complexity threshold (default: 0.3)
+- Optional spaCy NER for improved entity detection
 
 Core Tools (5):
 1. query_user_facts - Query PostgreSQL user_fact_relationships
@@ -105,7 +106,8 @@ class HybridQueryRouter:
         self,
         complexity_threshold: float = 0.3,
         enable_tool_calling: bool = True,
-        log_assessments: bool = True
+        log_assessments: bool = True,
+        use_spacy: bool = True
     ):
         """
         Initialize the HybridQueryRouter.
@@ -114,16 +116,40 @@ class HybridQueryRouter:
             complexity_threshold: Score above which to use tool calling (0.0-1.0)
             enable_tool_calling: Master switch for tool calling (for A/B testing)
             log_assessments: Whether to log complexity assessments
+            use_spacy: Whether to use spaCy for enhanced entity detection (default: True)
         """
         self.complexity_threshold = complexity_threshold
         self.enable_tool_calling = enable_tool_calling
         self.log_assessments = log_assessments
+        self.use_spacy = use_spacy
         
-        logger.info(
-            f"HybridQueryRouter initialized: "
-            f"threshold={complexity_threshold}, "
-            f"tool_calling={'enabled' if enable_tool_calling else 'disabled'}"
-        )
+        # Initialize spaCy if requested
+        self.spacy_nlp = None
+        if use_spacy:
+            try:
+                from src.nlp.spacy_manager import get_spacy_nlp
+                self.spacy_nlp = get_spacy_nlp()
+                if self.spacy_nlp:
+                    logger.info(
+                        "HybridQueryRouter initialized: threshold=%.2f, tool_calling=%s, spacy=enabled",
+                        complexity_threshold,
+                        "enabled" if enable_tool_calling else "disabled"
+                    )
+                else:
+                    logger.info(
+                        "HybridQueryRouter initialized: threshold=%.2f, tool_calling=%s, spacy=unavailable (using regex)",
+                        complexity_threshold,
+                        "enabled" if enable_tool_calling else "disabled"
+                    )
+            except ImportError:
+                logger.warning("spaCy not available, using regex patterns for entity detection")
+                self.spacy_nlp = None
+        else:
+            logger.info(
+                "HybridQueryRouter initialized: threshold=%.2f, tool_calling=%s, spacy=disabled",
+                complexity_threshold,
+                "enabled" if enable_tool_calling else "disabled"
+            )
     
     def assess_query_complexity(
         self,
@@ -189,11 +215,77 @@ class HybridQueryRouter:
         
         # 3. Entity References Score (weight: 0.3)
         detected_entities = []
-        for entity_type, patterns in self.ENTITY_PATTERNS.items():
-            for pattern in patterns:
-                if re.search(pattern, message_lower, re.IGNORECASE):
-                    detected_entities.append(entity_type)
-                    break  # Only count each entity type once
+        
+        # Use spaCy NLP pipeline if available (following WhisperEngine patterns)
+        if self.spacy_nlp:
+            try:
+                doc = self.spacy_nlp(user_message)
+                
+                # spaCy NER - Named entities (PERSON, ORG, GPE, DATE, TIME, etc.)
+                spacy_entity_types = set()
+                for ent in doc.ents:
+                    if ent.label_ in ["PERSON", "ORG", "GPE", "LOC"]:
+                        spacy_entity_types.add("named_entity")
+                    elif ent.label_ in ["DATE", "TIME"]:
+                        spacy_entity_types.add("temporal_reference")
+                
+                detected_entities.extend(list(spacy_entity_types))
+                
+                # Lemmatization - Check for user/character references using lemmas
+                # This catches variations: "you're", "yourself", "yours" → "you"
+                query_lemmas = [token.lemma_.lower() for token in doc if not token.is_punct]
+                
+                # User reference patterns (lemmatized)
+                user_lemmas = ["i", "me", "my", "mine", "myself"]
+                if any(lemma in user_lemmas for lemma in query_lemmas):
+                    if "user_reference" not in detected_entities:
+                        detected_entities.append("user_reference")
+                
+                # Character reference patterns (lemmatized)
+                character_lemmas = ["you", "your", "yourself", "yours"]
+                if any(lemma in character_lemmas for lemma in query_lemmas):
+                    if "character_reference" not in detected_entities:
+                        detected_entities.append("character_reference")
+                
+                # Relationship patterns (lemmatized + dependency parsing)
+                relationship_lemmas = ["we", "us", "our", "together"]
+                if any(lemma in relationship_lemmas for lemma in query_lemmas):
+                    if "relationship_reference" not in detected_entities:
+                        detected_entities.append("relationship_reference")
+                
+                # Temporal patterns using lemmatization
+                temporal_lemmas = ["last", "recent", "late", "ago", "earlier", "before", 
+                                  "yesterday", "today", "when", "time"]
+                if any(lemma in temporal_lemmas for lemma in query_lemmas):
+                    if "temporal_reference" not in detected_entities:
+                        detected_entities.append("temporal_reference")
+                
+                # POS tagging - Detect verbs for action-oriented queries
+                # Action verbs indicate complex queries requiring tool calling
+                verbs = [token.lemma_ for token in doc if token.pos_ == "VERB"]
+                action_verbs = {"remember", "recall", "tell", "show", "find", "explain", 
+                               "describe", "summarize", "list", "know", "understand"}
+                if any(verb in action_verbs for verb in verbs):
+                    if "action_query" not in detected_entities:
+                        detected_entities.append("action_query")
+                
+            except Exception as e:
+                logger.debug("spaCy NLP pipeline failed, falling back to regex: %s", e)
+                # Fallback to regex-only detection
+                message_lower = user_message.lower()
+                for entity_type, patterns in self.ENTITY_PATTERNS.items():
+                    for pattern in patterns:
+                        if re.search(pattern, message_lower, re.IGNORECASE):
+                            detected_entities.append(entity_type)
+                            break
+        else:
+            # Regex-only entity detection (fallback)
+            message_lower = user_message.lower()
+            for entity_type, patterns in self.ENTITY_PATTERNS.items():
+                for pattern in patterns:
+                    if re.search(pattern, message_lower, re.IGNORECASE):
+                        detected_entities.append(entity_type)
+                        break  # Only count each entity type once
         
         entity_count = len(detected_entities)
         if entity_count == 0:
@@ -240,8 +332,10 @@ class HybridQueryRouter:
         
         if self.log_assessments:
             logger.info(
-                f"Query complexity assessment | User: {user_id} | "
-                f"Character: {character_name} | {reasoning}"
+                "Query complexity assessment | User: %s | Character: %s | %s",
+                user_id,
+                character_name,
+                reasoning
             )
         
         return assessment
