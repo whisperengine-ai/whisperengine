@@ -735,19 +735,54 @@ class MessageProcessor:
                     logger.debug("Failed to retrieve character emotional state: %s", e)
             
             # Phase 6.9: Hybrid Query Routing (LLM Tool Calling)
-            # Assess query complexity and route to tools if needed
-            tool_results = await self._process_hybrid_query_routing(
-                message_context, conversation_context, ai_components
-            )
-            if tool_results:
-                # Add tool results to conversation context for LLM
-                conversation_context = await self._enrich_context_with_tool_results(
-                    conversation_context, tool_results
-                )
-                logger.info(
-                    "🔧 HYBRID ROUTING: Tool results added to context | User: %s | Tools: %d",
-                    message_context.user_id,
-                    len(tool_results)
+            # Check if UnifiedQueryClassifier detects TOOL_ASSISTED intent
+            from src.memory.unified_query_classification import DataSource
+            
+            try:
+                # Run unified classification to check for tool-assisted routing
+                if self._unified_query_classifier is not None:
+                    unified_classification = await self._unified_query_classifier.classify(
+                        query=message_context.content,
+                        emotion_data=ai_components.get("emotion_data"),
+                        user_id=message_context.user_id,
+                        character_name=self.bot_core.character_name if self.bot_core else None
+                    )
+                    
+                    if DataSource.LLM_TOOLS in unified_classification.data_sources:
+                        logger.info(
+                            "🔧 TOOL ASSISTED: Unified classifier detected tool-worthy query | "
+                            "Intent: %s | Confidence: %.2f",
+                            unified_classification.intent_type.value,
+                            unified_classification.intent_confidence
+                        )
+                        
+                        # Execute tools via bot_core's knowledge_router (SemanticKnowledgeRouter)
+                        knowledge_router = getattr(self.bot_core, 'knowledge_router', None) if self.bot_core else None
+                        
+                        if knowledge_router is not None:
+                            tool_execution_result = await knowledge_router.execute_tools(
+                                query=message_context.content,
+                                user_id=message_context.user_id,
+                                character_name=self.bot_core.character_name if self.bot_core else "unknown",
+                                llm_client=self.llm_client
+                            )
+                            
+                            if tool_execution_result.get("enriched_context"):
+                                # Add tool results to conversation context
+                                conversation_context += "\n\n" + tool_execution_result["enriched_context"]
+                                
+                                logger.info(
+                                    "🔧 TOOL EXECUTION: Added enriched context | User: %s | Tools: %s",
+                                    message_context.user_id,
+                                    ', '.join(tool_execution_result.get("tools_used", []))
+                                )
+                        else:
+                            logger.warning("🔧 TOOL ASSISTED: SemanticKnowledgeRouter not available")
+            except Exception as e:
+                logger.error(
+                    "🔧 TOOL EXECUTION FAILED: %s | Continuing with standard context",
+                    str(e),
+                    exc_info=True
                 )
             
             # Phase 7: Response generation
