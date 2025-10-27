@@ -3,7 +3,53 @@
 **Status**: 🔴 DEFERRED - Needs architectural re-design  
 **Priority**: MEDIUM - Core functionality works, but quality/semantics need improvement  
 **Created**: 2025-10-18  
+**Last Updated**: 2025-10-26  
 **Investigation Session**: Session with MarkAnthony testing Elena bot
+
+---
+
+## 📅 Update October 26, 2025
+
+**Related improvements made but core issue remains unresolved:**
+
+### ✅ Related Enhancements (Oct 18-25):
+
+**Key Commits:**
+- `64f6210` (Oct 25) - Phase 2-E NLP enhancements + critical bug fixes
+- `9b4fa71` (Oct 24) - Enhance Dockerfile and requirements for spaCy integration
+- `7bbab38` (Oct 23) - Add spaCy integration for NLP preprocessing
+
+1. **Phase 2-E NLP Enhancements** (commit 64f6210, Oct 25):
+   - ✅ Negation-aware SVO extraction (detects "don't like" vs "like")
+   - ✅ Custom matcher patterns for preferences (NEGATED, STRONG, TEMPORAL, HEDGING, CONDITIONAL)
+   - ✅ Better dependency parsing with negation markers
+   - ❌ **BUT**: No adjective-noun/attribute extraction implemented
+
+2. **spaCy Integration** (commits 7bbab38, 9b4fa71):
+   - ✅ Shared spaCy instance for entity extraction (`src/nlp/spacy_manager.py`)
+   - ✅ Dependency parsing infrastructure (`src/enrichment/nlp_preprocessor.py`)
+   - ✅ Entity extraction with label mapping
+   - ❌ **BUT**: Not using `amod` (adjectival modifier) or `compound` dependencies for attributes
+
+3. **Fact Extraction Bug Fixes** (commit 64f6210):
+   - ✅ Fixed zero results bug (better LLM prompts with positive examples)
+   - ✅ Fixed shared timestamp marker bug (separate fact vs preference markers)
+   - ✅ Improved confidence scoring
+   - ❌ **BUT**: Didn't address semantic quality of entity splitting
+
+### ❌ Core Issues Still Present:
+- **Attribute-Entity Confusion**: "green car" still creates 2 disconnected entities
+- **Nonsensical Relationships**: "The user none green" formatting still possible
+- **Lost Semantic Context**: Bot can't naturally reference "your green car" as a coherent concept
+- **No Composite Entities**: Multi-word entities not preserved (e.g., "green car" as single unit)
+
+### 🔧 What Would Be Needed:
+1. **Adjective-Noun Parsing**: Use spaCy's `amod` dependency to detect modifiers
+2. **Attribute Storage**: Populate `fact_entities.attributes` JSONB field (e.g., `{"color": "green"}`)
+3. **Entity Grouping**: Cluster related entities from same message via `related_entities` field
+4. **Relationship Type Mapping**: Better formatting or filtering of "none" relationship types
+
+**Conclusion**: The dependency parsing and spaCy infrastructure is now in place, but the specific logic for attribute extraction and composite entities has not been implemented. The TODO remains valid and DEFERRED.
 
 ---
 
@@ -165,43 +211,97 @@ ls -lt logs/prompts/elena_*.json | head -1
 2. **Hunting and Pecking**: Previous session involved too much trial-and-error without strategy
 3. **Core Works**: Facts ARE being stored and retrieved - quality improvement can wait
 4. **Other Priorities**: Hallucination fixes and LLM spam reduction were higher priority
+5. **Infrastructure Ready**: spaCy integration (Oct 2025) provides the foundation, but implementing attribute extraction requires careful design to avoid breaking existing fact storage
+6. **Low User Impact**: While semantically imperfect, current system successfully stores and retrieves facts - users haven't reported this as a blocking issue
 
 ---
 
 ## 📋 Next Steps When Resuming
 
+### Infrastructure Now Available (as of Oct 2025):
+- ✅ **spaCy Integration**: `src/nlp/spacy_manager.py` - Shared spaCy instance
+- ✅ **Dependency Parsing**: `src/enrichment/nlp_preprocessor.py` - SVO extraction with negation
+- ✅ **Entity Extraction**: `extract_entities()` method with label mapping
+- ✅ **Database Schema**: `fact_entities.attributes` JSONB field ready for use
+- ✅ **Relationship Storage**: `entity_relationships` table exists but unused
+
+### Implementation Steps:
+
 1. **Map Current Code**: Find where entity extraction happens
-   - Search for "Stored fact" log messages
-   - Trace from message → fact extraction → database storage
+   - ✅ **Found**: `src/knowledge/semantic_router.py` - Main fact storage
+   - ✅ **Found**: `src/enrichment/fact_extraction_engine.py` - LLM-based extraction
+   - ✅ **Found**: `src/enrichment/nlp_preprocessor.py` - spaCy preprocessing
+   - Search for "Stored fact" log messages to trace flow
    
 2. **Review Extraction Logic**: Understand current parsing approach
-   - Is it using spaCy NLP?
-   - Is it using LLM extraction?
-   - Where are entities split from relationships?
+   - ✅ **Confirmed**: Uses spaCy NLP for entity extraction
+   - ✅ **Confirmed**: Uses LLM for relationship extraction
+   - **TODO**: Where are entities split from relationships? (needs investigation)
 
 3. **Design Solution**: Before coding, document the approach
-   - How should "green car" be represented in database?
+   - **Key Decision**: How should "green car" be represented in database?
+     - Option A: Single entity "car" with `attributes: {"color": "green"}`
+     - Option B: Two entities with relationship "car" -[has_attribute]-> "green"
+     - Option C: Composite entity "green car" as single entity_name
    - What changes to schema (if any)?
    - How to preserve backward compatibility with existing facts?
 
-4. **Test-Driven Development**: Create test cases FIRST
+4. **Leverage spaCy Dependency Tags**: Use existing infrastructure
+   - **TODO**: Extract `amod` dependencies (adjectival modifiers): "green" -> "car"
+   - **TODO**: Extract `compound` dependencies: "ice" -> "cream" = "ice cream"
+   - **TODO**: Extract `nmod` dependencies (noun modifiers): "cup" -> "coffee"
+   - **Implementation Location**: Add to `nlp_preprocessor.py` or create new method
+
+5. **Test-Driven Development**: Create test cases FIRST
    - "I have a green car" → Expected database state
    - "My son Logan is 5 years old" → Expected entity relationships
    - "I love Thai food" → Expected fact format
+   - "I drive a red Tesla Model 3" → Complex multi-attribute entity
 
-5. **Implement Incrementally**: Small, testable changes
-   - Phase 1: Fix attribute detection
-   - Phase 2: Improve relationship formatting
-   - Phase 3: Add entity clustering
+6. **Implement Incrementally**: Small, testable changes
+   - Phase 1: Add attribute extraction to `nlp_preprocessor.py`
+   - Phase 2: Update fact storage to populate `attributes` field
+   - Phase 3: Improve prompt rendering to use attributes naturally
+   - Phase 4: Add entity clustering for related entities
 
 ---
 
 ## 📚 Related Files
 
-- `src/knowledge/semantic_router.py` - Likely contains fact extraction
+### Core Fact Storage:
+- `src/knowledge/semantic_router.py` - Main fact storage and retrieval (1,753 lines)
+  - `store_user_fact()` method - Stores entities to `fact_entities` table
+  - `retrieve_user_facts()` method - Retrieves facts for prompt injection
+  - Uses spaCy for entity type extraction
+
+### Enrichment Pipeline:
+- `src/enrichment/fact_extraction_engine.py` - LLM-based fact extraction
+  - `extract_facts_from_conversation()` - Batch fact extraction
+  - `build_knowledge_graph_relationships()` - Relationship building (unused)
+  
+### NLP Infrastructure (Added Oct 2025):
+- `src/enrichment/nlp_preprocessor.py` - spaCy preprocessing (422 lines)
+  - `extract_entities()` - Entity extraction with NER
+  - `extract_dependency_relationships()` - SVO extraction with negation
+  - `extract_preference_patterns()` - Custom matcher patterns
+  - **TODO**: Add adjective-noun attribute extraction here
+
+- `src/nlp/spacy_manager.py` - Shared spaCy instance manager
+  - Singleton pattern for memory efficiency
+  - Graceful fallback if model unavailable
+
+### Prompt Building:
 - `src/prompts/cdl_ai_integration.py` - Prompt building with facts
-- Database tables: `fact_entities`, `user_fact_relationships`, `entity_relationships`
-- Logs: `logs/prompts/*.json` - See how facts appear in prompts
+  - Injects stored facts into character prompts
+  - **TODO**: Format relationships better (avoid "The user none green")
+
+### Database Tables:
+- `fact_entities` - Entity storage with JSONB `attributes` field
+- `user_fact_relationships` - User-entity relationships
+- `entity_relationships` - Entity-to-entity relationships (largely unused)
+
+### Logs:
+- `logs/prompts/*.json` - See how facts appear in prompts
 
 ---
 
