@@ -3820,167 +3820,6 @@ class VectorMemoryStore:
         )
 
 
-class MemoryTools:
-    """
-    LLM-callable tools for memory management
-    
-    Enables natural language memory corrections:
-    "Actually, my goldfish is named Bubbles, not Orion"
-    """
-    
-    def __init__(self, vector_store: VectorMemoryStore):
-        self.vector_store = vector_store
-        # Note: Tools removed - LangChain dependency eliminated
-    
-    def _create_memory_tools(self) -> dict:
-        """Create simple memory management tools without LangChain dependency"""
-        
-        return {
-            "update_memory_fact": self._update_fact_tool,
-            "search_user_memory": self._search_memory_tool, 
-            "delete_incorrect_memory": self._delete_memory_tool
-        }
-    
-    async def _update_fact_tool(self, **kwargs) -> str:
-        """Tool function for updating facts"""
-        user_id = kwargs.get('user_id')
-        subject = kwargs.get('subject')
-        old_value = kwargs.get('old_value')
-        new_value = kwargs.get('new_value')
-        reason = kwargs.get('reason', 'User correction')
-        
-        # 🎯 TYPE SAFETY: Validate required parameters
-        if not all([user_id, subject, old_value, new_value]):
-            return "Error: Missing required parameters (user_id, subject, old_value, new_value)"
-        
-        # Convert to strings for type safety
-        user_id = str(user_id)
-        subject = str(subject)
-        old_value = str(old_value)
-        new_value = str(new_value)
-        reason = str(reason)
-        
-        try:
-            # Find existing fact
-            existing_memories = await self.vector_store.search_memories(
-                query=f"{subject} {old_value}",
-                user_id=user_id,
-                memory_types=[MemoryType.FACT.value]
-            )
-            
-            # Update or create new fact
-            if existing_memories:
-                # Update existing
-                memory_id = existing_memories[0]['id']
-                success = await self.vector_store.update_memory(
-                    memory_id=memory_id,
-                    new_content=f"{subject} is {new_value}",
-                    reason=reason
-                )
-                
-                if success:
-                    return f"Updated {subject} from '{old_value}' to '{new_value}'"
-                else:
-                    return f"Failed to update {subject}"
-            else:
-                # Create new fact
-                new_memory = VectorMemory(
-                    id=str(uuid4()),  # Pure UUID for Qdrant compatibility
-                    user_id=user_id,
-                    memory_type=MemoryType.FACT,
-                    content=f"{subject} is {new_value}",
-                    confidence=0.95,  # High confidence for user corrections
-                    source="user_correction",
-                    metadata={
-                        "subject": subject,
-                        "value": new_value,
-                        "corrected_from": old_value,
-                        "reason": reason
-                    }
-                )
-                
-                await self.vector_store.store_memory(new_memory)
-                return f"Created new fact: {subject} is {new_value}"
-                
-        except Exception as e:
-            logger.error(f"Fact update tool failed: {e}")
-            return f"Error updating fact: {str(e)}"
-    
-    async def _search_memory_tool(self, **kwargs) -> str:
-        """Tool function for searching memory"""
-        user_id = kwargs.get('user_id')
-        query = kwargs.get('query')
-        memory_type = kwargs.get('memory_type')
-        
-        # 🎯 TYPE SAFETY: Validate required parameters
-        if not all([user_id, query]):
-            return "Error: Missing required parameters (user_id, query)"
-        
-        # Convert to strings for type safety
-        user_id = str(user_id)
-        query = str(query)
-        
-        try:
-            memory_types = None
-            if memory_type:
-                memory_types = [MemoryType(memory_type).value]  # Convert to string for protocol compliance
-            
-            results = await self.vector_store.search_memories(
-                query=query,
-                user_id=user_id,
-                memory_types=memory_types,
-                limit=5  # Fixed: interface contract violation - use 'limit' not 'top_k'
-            )
-            
-            if results:
-                formatted_results = []
-                for result in results:
-                    formatted_results.append(
-                        f"- {result['content']} (confidence: {result['confidence']:.2f})"
-                    )
-                return f"Found {len(results)} memories:\n" + "\n".join(formatted_results)
-            else:
-                return f"No memories found for query: {query}"
-                
-        except Exception as e:
-            logger.error(f"Memory search tool failed: {e}")
-            return f"Error searching memory: {str(e)}"
-    
-    async def _delete_memory_tool(self, **kwargs) -> str:
-        """Tool function for deleting memory"""
-        user_id = kwargs.get('user_id')
-        content = kwargs.get('content_to_delete')
-        reason = kwargs.get('reason', 'User requested deletion')
-        
-        # 🎯 TYPE SAFETY: Validate required parameters
-        if not all([user_id, content]):
-            return "Error: Missing required parameters (user_id, content_to_delete)"
-        
-        # Convert to strings for type safety
-        user_id = str(user_id)
-        content = str(content)
-        reason = str(reason)
-        
-        try:
-            # Find memories to delete
-            memories = await self.vector_store.search_memories(
-                query=content,
-                user_id=user_id,
-                limit=5  # Use protocol-compliant parameters only
-            )
-            
-            deleted_count = 0
-            for memory in memories:
-                if await self.vector_store.delete_memory(memory['id']):
-                    deleted_count += 1
-            
-            return f"Deleted {deleted_count} memories matching '{content}'"
-            
-        except Exception as e:
-            logger.error(f"Memory deletion tool failed: {e}")
-            return f"Error deleting memory: {str(e)}"
-
-
 class VectorMemoryManager:
     """
     Main memory manager for WhisperEngine
@@ -4038,9 +3877,6 @@ class VectorMemoryManager:
         
         # Store config for other services (PostgreSQL for user data, Redis for session cache)
         self.config = config
-        
-        # LLM-callable memory tools
-        self.memory_tools = MemoryTools(self.vector_store)
         
         # Session cache for performance (Redis for hot data only)
         self.session_cache = None  # Will be initialized if Redis available
@@ -4161,31 +3997,16 @@ class VectorMemoryManager:
             return {"correction_processed": False, "error": str(e)}
     
     async def _process_correction_with_tools(self, user_id: str, message: str) -> str:
-        """Process correction using memory tools (placeholder for full implementation)"""
-        # This would use an agent executor with our memory tools
-        # For now, simple implementation
+        """
+        Process correction using memory tools (placeholder for full implementation)
         
-        # Extract what's being corrected
-        import re
-        
-        # Pattern: "X is Y, not Z" -> update X from Z to Y
-        pattern = r"(\w+) is (\w+), not (\w+)"
-        match = re.search(pattern, message, re.IGNORECASE)
-        
-        if match:
-            subject = match.group(1)
-            new_value = match.group(2)
-            old_value = match.group(3)
-            
-            return await self.memory_tools._update_fact_tool(
-                user_id=user_id,
-                subject=subject,
-                old_value=old_value,
-                new_value=new_value,
-                reason="User correction"
-            )
-        
-        return "Could not parse correction"
+        NOTE: This method is a stub - the MemoryTools class was removed during
+        October 2025 cleanup of orphaned tool calling infrastructure.
+        Full implementation will be part of the new HybridQueryRouter system.
+        """
+        # TODO: Implement correction handling in HybridQueryRouter
+        logger.warning("_process_correction_with_tools called but MemoryTools no longer exists")
+        return "Memory correction feature pending re-implementation in new tool calling system"
     
     async def get_health_stats(self) -> Dict[str, Any]:
         """Get system health and performance stats"""
