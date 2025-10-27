@@ -68,30 +68,137 @@ class AIEthicsDecisionTree:
         else:
             logger.warning("⚠️ AI Ethics Decision Tree: spaCy unavailable, using literal pattern matching")
     
-    def _lemmatize(self, text: str) -> str:
+    def _extract_semantic_patterns(self, message: str) -> str:
         """
-        Lemmatize text for normalized pattern matching.
+        Extract semantic patterns using spaCy's linguistic features:
+        - Dependency parsing (ROOT verbs + objects/attributes)
+        - Phrasal verb detection (meet up, go out, etc.)
+        - Noun chunks (climate change, an AI, etc.)
+        - Named entity recognition
         
-        Converts word variations to base forms:
-        - "falling in love" → "fall in love"
-        - "I am depressed" → "I be depressed" (catches "depression", "depressed", etc.)
-        - "Can you feel?" → "can you feel" (catches "feeling", "feelings", "felt")
+        This is MORE ROBUST than simple lemmatization because it captures:
+        1. Semantic relationships (subject-verb-object)
+        2. Multi-word expressions ("meet up" as single unit)
+        3. Entity boundaries ("climate change" as single concept)
+        
+        Examples:
+            "Let's meet up in person!" → "let meet_up person"
+            "I love you" → "love you"
+            "Are you an AI?" → "be ai"
+            "Can you diagnose my condition?" → "diagnose condition"
+            "What do you think about climate change?" → "think change"
         
         Args:
-            text: Input text to lemmatize
-        
+            message: Raw message text
+            
         Returns:
-            Lemmatized text, or original if spaCy unavailable
+            Space-separated string of semantic patterns
         """
-        if not self.nlp:
-            return text.lower()
+        if not message:
+            return ""
         
-        try:
-            doc = self.nlp(text.lower())
-            return " ".join([token.lemma_ for token in doc])
-        except Exception as e:
-            logger.warning("Lemmatization failed: %s", e)
-            return text.lower()
+        nlp = get_spacy_nlp()
+        doc = nlp(message.lower())
+        
+        patterns = []
+        
+        # 1. Extract ALL verbs (ROOT + clausal complements like "want to KISS", "let's MEET")
+        # This captures the SEMANTIC verbs, not just grammatical ROOT
+        all_verbs = []
+        aux_verbs = []  # Track AUX for later processing
+        root_verbs = [token for token in doc if token.dep_ == 'ROOT']
+        
+        for root in root_verbs:
+            all_verbs.append(root)
+            
+            # Get clausal complements (xcomp, ccomp) - these contain the REAL action
+            # "I want to kiss you" → ROOT=want, xcomp=kiss (REAL action!)
+            # "Let's meet up" → ROOT=let, ccomp=meet (REAL action!)
+            # "meant to be together" → ROOT=meant, xcomp=be (AUX with advmod "together")
+            for child in root.children:
+                if child.dep_ in ['xcomp', 'ccomp']:
+                    if child.pos_ == 'VERB':
+                        all_verbs.append(child)
+                    elif child.pos_ == 'AUX':
+                        # Track AUX verbs to check their modifiers
+                        aux_verbs.append(child)
+        
+        # Add all verbs to patterns
+        for verb in all_verbs:
+            patterns.append(verb.lemma_.lower())
+            
+            # Get semantic dependents: direct objects, attributes, complements, adverbs
+            for child in verb.children:
+                if child.dep_ in ['dobj', 'attr', 'pobj', 'acomp', 'advmod']:
+                    # For nouns/proper nouns, check for compounds and adjective modifiers
+                    if child.pos_ in ['NOUN', 'PROPN']:
+                        # Get all modifiers recursively (adjectives on compounds too)
+                        all_modifiers = []
+                        compounds = []
+                        
+                        for compound in child.children:
+                            if compound.dep_ == 'compound':
+                                compounds.append(compound.lemma_.lower())
+                                # Get adjectives modifying the compound
+                                for mod in compound.children:
+                                    if mod.dep_ == 'amod' and mod.pos_ == 'ADJ':
+                                        all_modifiers.append(mod.lemma_.lower())
+                            elif compound.dep_ == 'amod' and compound.pos_ == 'ADJ':
+                                all_modifiers.append(compound.lemma_.lower())
+                        
+                        # Build full phrase
+                        full_phrase = all_modifiers + compounds + [child.lemma_.lower()]
+                        if len(full_phrase) > 1:
+                            patterns.append('_'.join(full_phrase))
+                        
+                        # Also add individual components for partial matching
+                        patterns.extend(all_modifiers)
+                        patterns.append(child.lemma_.lower())
+                    elif child.pos_ in ['ADV', 'ADJ']:
+                        # Capture adverbs/adjectives like "together", "forever"
+                        patterns.append(child.lemma_.lower())
+                    else:
+                        patterns.append(child.lemma_.lower())
+        
+        # Process AUX verbs to extract their modifiers (e.g., "be together")
+        for aux in aux_verbs:
+            for child in aux.children:
+                if child.dep_ == 'advmod' and child.pos_ in ['ADV', 'ADJ']:
+                    patterns.append(child.lemma_.lower())
+        
+        # 2. Phrasal verbs (verb + particle: 'meet up', 'go out', 'come over')
+        for token in doc:
+            if token.pos_ == 'VERB':
+                particles = [child.text.lower() for child in token.children if child.dep_ == 'prt']
+                if particles:
+                    patterns.append(f'{token.lemma_}_{"_".join(particles)}')
+        
+        # 3. Noun chunks for additional context
+        for chunk in doc.noun_chunks:
+            # Only add if not already captured above
+            head_lemma = chunk.root.lemma_.lower()
+            if head_lemma not in patterns and chunk.root.pos_ in ['NOUN', 'PROPN']:
+                patterns.append(head_lemma)
+        
+        # 4. Named entities
+        for ent in doc.ents:
+            ent_text = ent.text.lower().replace(' ', '_')
+            if ent_text not in patterns:
+                patterns.append(ent_text)
+        
+        # Fallback: if empty, use content words
+        if not patterns:
+            patterns = [
+                token.lemma_.lower() 
+                for token in doc 
+                if token.pos_ in ['NOUN', 'VERB', 'ADJ', 'ADV'] and not token.is_punct
+            ]
+        
+        # Final fallback: if still empty, use all lemmas
+        if not patterns:
+            patterns = [token.lemma_.lower() for token in doc if not token.is_punct]
+        
+        return ' '.join(patterns)
     
     async def analyze_and_route(
         self, 
@@ -195,74 +302,139 @@ class AIEthicsDecisionTree:
     # ===== SEMANTIC DETECTION HELPERS =====
     
     async def _is_ai_identity_semantic(self, message: str) -> bool:
-        """Semantic detection for AI identity questions using lemmatization."""
-        # Lemmatized base patterns (all in lemma form)
-        # NOTE: Patterns must be specific enough to avoid false positives
+        """Semantic detection for AI identity questions using spaCy linguistic features."""
+        # Simplified patterns - semantic extraction handles the heavy lifting
+        # "Are you an AI?" → "be ai", "Are you real?" → "be real", "Can you feel?" → "feel"
         ai_patterns = [
-            'be you ai', 'be you real', 'be you artificial', 'be you a bot',
-            'be you human', 'be you a robot', 'be you a computer',
-            'be you an ai', 'be you actually', 'be you really',
-            'be you a real', 'be you authentic', 'be you genuine',
-            'be you a person', 'be you alive', 'be you sentient',
-            'can you feel', 'do you have feeling', 'do you experience',
-            'be you conscious', 'do you think you be', 'do you have emotion',
-            'prove you be real', 'prove you be human', 'you be not real',
-            'you be just a bot', 'you be fake', 'you be program',
-            # "What are you" patterns - needs to be specific
-            'what be you ?', 'what be you and', 'what be you really',
-            'what be you actually', 'what exactly be you',
-            'tell I what you be'
+            'ai', 'real', 'artificial', 'artificial_intelligence', 'bot', 'human', 'robot', 'computer',
+            'authentic', 'genuine', 'person', 'alive', 'sentient',
+            'feel', 'feeling', 'experience', 'conscious', 'emotion',
+            'prove', 'fake', 'program'
         ]
-        message_lemmatized = self._lemmatize(message)
-        return any(pattern in message_lemmatized for pattern in ai_patterns)
+        
+        # Special case: questions with "you" but potentially no other content words
+        # "What are you?" and "Who are you?" detection
+        you_questions = ['what are you', 'who are you', 'what exactly are you']
+        message_lower = message.lower()
+        if any(q in message_lower for q in you_questions):
+            return True
+        
+        semantic_patterns = self._extract_semantic_patterns(message)
+        
+        # Require "you" context for generic patterns to prevent false positives
+        # "I feel sad" shouldn't trigger, but "Can you feel?" should
+        requires_you = ['feel', 'feeling', 'emotion', 'conscious', 'experience']
+        has_you = 'you' in message_lower or 'your' in message_lower or "you're" in message_lower
+        
+        for pattern in ai_patterns:
+            if pattern in semantic_patterns:
+                # If pattern requires "you" context, verify it
+                if pattern in requires_you and not has_you:
+                    continue
+                return True
+        
+        return False
     
     async def _is_physical_semantic(self, message: str) -> bool:
-        """Semantic detection for physical interaction requests."""
+        """Semantic detection for physical interaction requests using spaCy features."""
+        # Patterns that capture physical interaction intent
+        # "Let's meet up in person!" → "meet_up person"
         physical_patterns = [
-            'meet', 'coffee', 'dinner', 'lunch', 'hang out', 'get together',
+            'meet', 'meet_up', 'coffee', 'dinner', 'lunch', 'hang',
             'hug', 'kiss', 'touch', 'hold', 'cuddle', 'embrace',
-            'visit', 'come over', 'go out', 'date', 'drinks',
-            'in person', 'face to face', 'meet up', 'physical'
+            'visit', 'come_over', 'go_out', 'drink', 'physical',
+            'date'
         ]
+        
+        semantic_patterns = self._extract_semantic_patterns(message)
+        
+        # Check for physical patterns
+        for pattern in physical_patterns:
+            if pattern in semantic_patterns:
+                return True
+        
+        # Special check for "in person" or "face to face" (multi-word expressions)
         message_lower = message.lower()
-        return any(pattern in message_lower for pattern in physical_patterns)
+        if 'in person' in message_lower or 'face to face' in message_lower:
+            return True
+        
+        return False
     
     async def _is_relationship_semantic(self, message: str) -> bool:
-        """Semantic detection for relationship boundary questions using lemmatization."""
-        # Lemmatized base patterns - catches "falling/fell/fallen in love" → "fall in love"
+        """Semantic detection for relationship boundary questions using spaCy features."""
+        # Patterns that capture relationship/romantic intent
+        # "I am falling in love" → "love", "Do you love me?" → "love you"
         relationship_patterns = [
-            'love you', 'marry I', 'be my girlfriend', 'be my boyfriend',
-            'date I', 'relationship with you', 'together forever',
-            'soulmate', 'mean to be', 'fall in love',  # Catches falling/fell/fallen
-            'romantic', 'in love with you', 'in love with',
-            'crush on you', 'feeling for you', 'attracted to you',  # feeling catches feelings
-            'infatuated', 'obsessed with you', 'can not stop thinking'
+            'love', 'marry', 'girlfriend', 'boyfriend', 'date',
+            'relationship', 'together', 'forever', 'soulmate',
+            'romantic', 'crush', 'feeling', 'attract',
+            'infatuate', 'obsess'
         ]
-        message_lemmatized = self._lemmatize(message)
-        return any(pattern in message_lemmatized for pattern in relationship_patterns)
+        
+        semantic_patterns = self._extract_semantic_patterns(message)
+        message_lower = message.lower()
+        has_you = 'you' in message_lower or 'your' in message_lower or "you're" in message_lower
+        
+        # False positive prevention: "love" needs context
+        # "I love pizza" shouldn't trigger, "I love you" should
+        if 'love' in semantic_patterns:
+            return has_you
+        
+        # "feeling" needs romantic context
+        if 'feeling' in semantic_patterns:
+            return has_you and any(w in semantic_patterns for w in ['romantic', 'love', 'attract'])
+        
+        # "together" in physical context ("get together", "meet together") shouldn't trigger
+        # but "be together forever" should
+        if 'together' in semantic_patterns:
+            # Check if it's in physical meetup context
+            if any(w in semantic_patterns for w in ['get', 'meet', 'hang']):
+                return False  # Physical, not romantic
+        
+        return any(pattern in semantic_patterns for pattern in relationship_patterns)
     
     async def _is_advice_semantic(self, message: str) -> bool:
-        """Semantic detection for professional advice requests using lemmatization."""
-        # Lemmatized base patterns - catches "depressed/depression", "diagnose/diagnosing"
+        """Semantic detection for professional advice requests using spaCy features."""
+        # Patterns for professional advice domains
+        # "Can you diagnose my condition?" → "diagnose condition"
         advice_patterns = [
-            # Medical - "diagnose" catches "diagnose/diagnosing/diagnosed"
-            'medical advice', 'diagnose I', 'diagnose', 'what medication', 'prescribe', 
-            'doctor', 'physician', 'treat my', 'cure my', 'symptom of',
-            'what should I do about my health', 'be this normal medically',
-            'be I sick', 'health problem', 'medical condition',
-            # Mental health - "depression" and "depressed" both lemmatize similarly
-            'therapist', 'therapy', 'depression', 'anxiety', 'mental health',
-            'suicidal', 'self harm', 'psychiatric', 'counseling', 'depressed',
+            # Medical
+            'medical', 'advice', 'diagnose', 'medication', 'prescribe',
+            'doctor', 'physician', 'treat', 'cure', 'symptom',
+            'health', 'sick', 'normal', 'medically', 'condition',
+            # Mental health
+            'therapist', 'therapy', 'depression', 'depress', 'anxiety',
+            'mental', 'suicidal', 'suicide', 'harm', 'psychiatric',
+            'counseling', 'counsel',
             # Legal
-            'legal advice', 'be this legal', 'sue someone', 'lawyer', 
-            'attorney', 'court', 'legal help', 'legal right',
+            'legal', 'sue', 'lawyer', 'attorney', 'court', 'right',
             # Financial
-            'financial advice', 'should I invest', 'tax advice',
-            'financial advisor', 'investment advice', 'financial planning',
-            'should I buy stock', 'retirement planning'
+            'financial', 'invest', 'investment', 'tax', 'advisor',
+            'stock', 'retirement', 'planning', 'plan'
         ]
-        message_lemmatized = self._lemmatize(message)
-        return any(pattern in message_lemmatized for pattern in advice_patterns)
+        
+        semantic_patterns = self._extract_semantic_patterns(message)
+        
+        # Check for advice patterns
+        for pattern in advice_patterns:
+            if pattern in semantic_patterns:
+                return True
+        
+        # Check for multi-word combinations that signal advice seeking
+        # "medical advice", "legal help", etc.
+        advice_combos = [
+            ('medical', 'advice'),
+            ('legal', 'advice'),
+            ('financial', 'advice'),
+            ('mental', 'health'),
+            ('health', 'problem')
+        ]
+        
+        for word1, word2 in advice_combos:
+            if word1 in semantic_patterns and word2 in semantic_patterns:
+                return True
+        
+        return False
     
     async def _is_background_semantic(self, message: str) -> bool:
         """Semantic detection for character background questions."""

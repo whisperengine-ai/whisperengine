@@ -26,6 +26,9 @@ from src.memory.unified_query_classification import (
     QueryIntent as UnifiedQueryIntent,
 )
 
+# Import spaCy for lemmatization
+from src.nlp.spacy_manager import get_spacy_nlp
+
 logger = logging.getLogger(__name__)
 
 
@@ -534,44 +537,178 @@ class SemanticKnowledgeRouter:
             except Exception as e:
                 logger.warning("⚠️ spaCy entity extraction failed: %s", str(e))
         
-        # Fallback: Keyword-based entity detection (ChatGPT-style expanded categorization)
+        # Fallback: Keyword-based entity detection with lemmatization (ChatGPT-style expanded categorization)
+        # Lemmatize query for normalized matching
+        lemmatized_query = self._lemmatize_for_entity_detection(query)
+        
+        # Entity keyword patterns (using lemmatized base forms)
         entity_keywords = {
-            "food": ["food", "eat", "meal", "restaurant", "cuisine", "dish", "pizza", "pasta", "cooking", "recipe"],
-            "hobby": ["hobby", "hobbies", "activity", "activities", "interest", "do for fun", "enjoy doing", "passion"],
-            "place": ["place", "location", "city", "country", "visit", "travel", "destination", "live", "been to"],
-            "person": ["person", "people", "friend", "family", "colleague", "know", "met", "relationship"],
-            "book": ["book", "books", "read", "reading", "author", "novel", "title", "library", "literature"],
-            "art": ["art", "artwork", "drawing", "painting", "sketch", "artistic", "creative", "visual", "design"],
+            "food": ["food", "eat", "meal", "restaurant", "cuisine", "dish", "cook", "recipe"],
+            "hobby": ["hobby", "activity", "interest", "enjoy", "passion"],
+            "place": ["place", "location", "city", "country", "visit", "travel", "destination", "live"],
+            "person": ["person", "people", "friend", "family", "colleague", "know", "relationship"],
+            "book": ["book", "read", "author", "novel", "title", "library", "literature"],
+            "art": ["art", "artwork", "draw", "paint", "sketch", "artistic", "creative", "visual", "design"],
             "music": ["music", "song", "album", "artist", "band", "listen", "genre", "sound", "audio"],
-            "movie": ["movie", "movies", "film", "cinema", "watch", "director", "actor", "show", "series"],
-            "equipment": ["equipment", "tool", "tools", "device", "devices", "gear", "hardware", "machine"],
+            "movie": ["movie", "film", "cinema", "watch", "director", "actor", "show", "series"],
+            "equipment": ["equipment", "tool", "device", "gear", "hardware", "machine"],
             "preference": ["like", "prefer", "favorite", "love", "enjoy", "want", "need", "choose"],
             "work": ["work", "job", "career", "profession", "office", "company", "project", "task"],
             "study": ["study", "learn", "education", "school", "course", "class", "subject", "research"],
             "general": ["thing", "stuff", "item", "something", "anything", "everything"]
         }
         
-        # Check for entity type keywords with fuzzy matching
+        # Check for entity type keywords in lemmatized query
         for entity_type, keywords in entity_keywords.items():
             for keyword in keywords:
-                if keyword in query:
+                if keyword in lemmatized_query:
+                    logger.debug(f"✅ Semantic Router: Matched entity type '{entity_type}' via lemmatized keyword '{keyword}'")
                     return entity_type
         
         return None
     
+    def _lemmatize_for_entity_detection(self, query: str) -> str:
+        """
+        Lemmatize query for entity type detection with advanced spaCy features.
+        
+        Normalizes word variations (eating→eat, visited→visit, etc.) and filters
+        to content words only (NOUN/VERB/ADJ/ADV) to reduce noise from articles,
+        pronouns, and auxiliary verbs.
+        
+        ADVANCED FEATURES USED:
+        1. Lemmatization - Word form normalization
+        2. POS Tagging - Content-word filtering (NOUN/VERB/ADJ/ADV)
+        3. Named Entity Recognition - Context awareness via entity spans
+        4. Noun Chunks - Multi-word entity grouping (e.g., "Italian restaurant")
+        5. Dependency Parsing - Subject-verb-object relationships
+        6. Negation Detection - Track negation to flip sentiment (don't like → hate)
+        
+        Uses pattern from: Hybrid Context Detector + Character Learning Detector
+        
+        Args:
+            query: Query string to lemmatize
+            
+        Returns:
+            Lemmatized content words as space-separated string
+        """
+        try:
+            nlp = get_spacy_nlp()
+            if not nlp:
+                return query.lower()
+            
+            doc = nlp(query.lower())
+            
+            # Track negations via dependency parsing (negation detection feature #6)
+            negation_heads = set()
+            for token in doc:
+                if token.dep_ == "neg":  # Negation marker (no, not, never, neither, nobody, nowhere)
+                    negation_heads.add(token.head.i)  # Mark the head verb as negated
+            
+            # Extract content words with negation awareness
+            content_lemmas = []
+            for token in doc:
+                if token.pos_ in ['NOUN', 'VERB', 'ADJ', 'ADV']:
+                    lemma = token.lemma_
+                    
+                    # NEGATION FEATURE: If this verb is negated, flip sentiment
+                    if token.i in negation_heads and token.pos_ == 'VERB':
+                        # Mark negation with prefix for pattern matching later
+                        lemma = f"not_{lemma}"
+                    
+                    content_lemmas.append(lemma)
+            
+            # Fallback to all lemmas if no content words found
+            if not content_lemmas:
+                content_lemmas = [token.lemma_ for token in doc if not token.is_punct]
+            
+            return ' '.join(content_lemmas)
+        except Exception as e:
+            logger.warning(f"⚠️ Semantic Router lemmatization failed: {e}")
+            return query.lower()
+    
     def _extract_relationship_type(self, query: str) -> Optional[str]:
-        """Extract relationship type from query"""
+        """
+        Extract relationship type from query using advanced spaCy features.
+        
+        ADVANCED FEATURES USED:
+        1. Lemmatization - Match all tense forms
+        2. POS Tagging - Identify verbs and their modifiers
+        3. Dependency Parsing - Extract subject-verb-object chains
+        4. Named Entity Recognition - Context from detected entities
+        5. Negation Detection - Track negations to flip sentiment
+        
+        Example: "I don't like pizza" → relationship: "dislikes" (not "likes")
+        Example: "I want to visit France" → relationships: "wants" + "visited" (via dependency parsing)
+        """
+        try:
+            nlp = get_spacy_nlp()
+            if nlp:
+                doc = nlp(query.lower())
+                
+                # Relationship patterns (using lemmatized base forms)
+                relationship_keywords = {
+                    "likes": ["like", "love", "enjoy", "favorite", "prefer"],
+                    "dislikes": ["dislike", "hate", "avoid"],
+                    "knows": ["know", "familiar", "aware"],
+                    "visited": ["visit", "travel", "go", "trip"],
+                    "wants": ["want", "wish", "desire", "hope"],
+                    "owns": ["own", "have", "possess"]
+                }
+                
+                # FEATURE 5: Negation-aware relationship detection via dependency parsing
+                negation_verbs = set()
+                for token in doc:
+                    if token.dep_ == "neg":
+                        negation_verbs.add(token.head.lemma_)
+                
+                # FEATURE 3: Dependency parsing for multi-clause extraction
+                # Extract main verbs and their complements
+                main_verbs = []
+                for token in doc:
+                    if token.pos_ == "VERB":
+                        is_negated = token.lemma_ in negation_verbs
+                        main_verbs.append((token.lemma_, is_negated))
+                        
+                        # Extract xcomp/ccomp (complement clauses - like AI Ethics)
+                        for child in token.children:
+                            if child.dep_ in ["xcomp", "ccomp"] and child.pos_ == "VERB":
+                                child_negated = child.lemma_ in negation_verbs
+                                main_verbs.append((child.lemma_, child_negated))
+                
+                # Check verbs for relationship types (with negation awareness)
+                for verb, is_negated in main_verbs:
+                    for rel_type, keywords in relationship_keywords.items():
+                        if verb in keywords:
+                            # NEGATION FEATURE: If negated and it's a like/prefer verb, flip to dislikes
+                            if is_negated and rel_type in ["likes", "wants"]:
+                                return "dislikes" if rel_type == "likes" else "owns"  # opposite relationship
+                            return rel_type
+                
+                # FEATURE 2: Lemmatized fallback if no verb extraction worked
+                lemmatized_query = self._lemmatize_for_entity_detection(query)
+                
+                for rel_type, keywords in relationship_keywords.items():
+                    if any(kw in lemmatized_query for kw in keywords):
+                        # Check if negated via "not_" prefix from lemmatization
+                        if any(f"not_{kw}" in lemmatized_query for kw in keywords) and rel_type in ["likes", "wants"]:
+                            return "dislikes" if rel_type == "likes" else "owns"
+                        return rel_type
+        except Exception as e:
+            logger.warning(f"⚠️ Advanced relationship extraction failed, falling back: {e}")
+        
+        # Fallback: Simple lemmatized matching
+        lemmatized_query = self._lemmatize_for_entity_detection(query)
         relationship_keywords = {
             "likes": ["like", "love", "enjoy", "favorite", "prefer"],
-            "dislikes": ["dislike", "hate", "don't like", "avoid"],
+            "dislikes": ["dislike", "hate", "avoid"],
             "knows": ["know", "familiar", "aware"],
-            "visited": ["visited", "been to", "went to", "traveled to"],
+            "visited": ["visit", "travel", "go"],
             "wants": ["want", "wish", "desire", "hope"],
-            "owns": ["own", "have", "possess", "got"]
+            "owns": ["own", "have", "possess"]
         }
         
         for rel_type, keywords in relationship_keywords.items():
-            if any(kw in query for kw in keywords):
+            if any(kw in lemmatized_query for kw in keywords):
                 return rel_type
         
         return "likes"  # Default

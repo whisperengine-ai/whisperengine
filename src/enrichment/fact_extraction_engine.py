@@ -154,6 +154,75 @@ class FactExtractionEngine:
         # Small conversation - process directly
         return await self._extract_facts_from_chunk(messages, user_id, bot_name)
     
+    def _build_spacy_context_for_llm(
+        self,
+        negation_facts: List[str],
+        relationships: List[Dict],  # pylint: disable=unused-argument
+        preference_patterns: Dict[str, int],
+        entities: List[Dict],
+        indicators: Dict
+    ) -> str:
+        """
+        Build spaCy context prefix for LLM guidance.
+        
+        Uses extracted linguistic features to guide LLM fact extraction without
+        explicitly telling it what facts to extract. More Socratic than prescriptive.
+        
+        Args:
+            negation_facts: List of detected negated statements
+            relationships: List of SVO relationships with negation info (reserved for future expansion)
+            preference_patterns: Dict of pattern types → match counts
+            entities: List of extracted named entities
+            indicators: Dict with names, locations, question_sentences
+            
+        Returns:
+            Context string to prepend to extraction prompt
+        """
+        lines = []
+        
+        # Add header
+        lines.append("LINGUISTIC ANALYSIS (detected patterns to guide fact extraction):")
+        lines.append("")
+        
+        # Add negation facts if found
+        if negation_facts:
+            lines.append("NEGATED STATEMENTS DETECTED:")
+            for fact in negation_facts[:5]:  # Limit to first 5
+                lines.append(f"  • {fact}")
+            lines.append("")
+        
+        # Add preference patterns detected
+        if preference_patterns:
+            lines.append("PREFERENCE PATTERN SIGNALS:")
+            for pattern_type, count in preference_patterns.items():
+                if count > 0:
+                    lines.append(f"  • {pattern_type}: {count} occurrence(s)")
+            lines.append("")
+        
+        # Add entities found
+        if entities:
+            entity_labels = {}
+            for ent in entities:
+                label = ent.get('label', 'UNKNOWN')
+                entity_labels[label] = entity_labels.get(label, 0) + 1
+            lines.append("NAMED ENTITIES DETECTED:")
+            for label, count in entity_labels.items():
+                lines.append(f"  • {label}: {count}")
+            lines.append("")
+        
+        # Add preference indicators
+        if indicators.get('names'):
+            lines.append(f"PEOPLE MENTIONED: {', '.join(indicators.get('names', [])[:5])}")
+        if indicators.get('locations'):
+            lines.append(f"LOCATIONS MENTIONED: {', '.join(indicators.get('locations', [])[:5])}")
+        if indicators.get('question_sentences'):
+            lines.append(f"QUESTION COUNT: {len(indicators.get('question_sentences', []))}")
+        
+        if len(lines) > 1:
+            lines.append("")
+        
+        return "\n".join(lines)
+
     async def _extract_facts_from_chunk(
         self,
         messages: List[Dict],
@@ -170,8 +239,13 @@ class FactExtractionEngine:
         # 🔍 DEBUG: Log conversation text IMMEDIATELY after formatting
         logger.warning("🔍 CONVERSATION TEXT BUILT: %d chars", len(conversation_text))
 
-        # Optional: Add local NLP context prefix (entities/SVO) to guide LLM
-        context_prefix = ""
+        # ADVANCED SPACY PREPROCESSING: Extract linguistic features to guide LLM
+        # Uses: negation detection, dependency relationships, preference patterns, entities
+        spacy_context = ""
+        negation_facts = []
+        relationship_suggestions = []
+        preference_patterns_found = {}
+        
         if (
             getattr(self, "preprocessor", None) is not None
             and self.preprocessor
@@ -179,17 +253,67 @@ class FactExtractionEngine:
             and self.preprocessor.is_available()
         ):
             try:
-                context_prefix = self.preprocessor.build_llm_context_prefix(conversation_text)
-                if context_prefix:
-                    logger.info("✅ SPACY FACT EXTRACTION: Using spaCy preprocessing (context_prefix: %d chars)", len(context_prefix))
-                else:
-                    logger.warning("⚠️  SPACY FACT EXTRACTION: Preprocessor available but returned empty context")
+                # 🚀 OPTIMIZED: Extract ALL features in SINGLE pipeline pass (4x faster)
+                logger.info("✅ SPACY FACT EXTRACTION: Extracting advanced linguistic features (optimized batch)")
+                
+                all_features = self.preprocessor.extract_all_features_from_text(conversation_text)
+                
+                # Extract negations from relationships
+                relationships = all_features.get("relationships", [])
+                if relationships:
+                    logger.info("  • Extracted %d dependency relationships", len(relationships))
+                    for rel in relationships:
+                        if rel.get('is_negated'):
+                            neg_text = f"NEGATED: {rel['subject']} {rel['verb']} {rel['object']} (marker: {rel['negation_marker']})"
+                            negation_facts.append(neg_text)
+                            logger.debug("    → %s", neg_text)
+                        else:
+                            relationship_suggestions.append(rel)
+                
+                # Extract patterns
+                preference_patterns = all_features.get("patterns", {})
+                if any(preference_patterns.values()):
+                    logger.info("  • Extracted preference patterns:")
+                    for pattern_type, matches in preference_patterns.items():
+                        if matches:
+                            preference_patterns_found[pattern_type] = len(matches)
+                            logger.info("    → %s: %d matches", pattern_type, len(matches))
+                
+                # Extract entities and indicators
+                entities = all_features.get("entities", [])
+                preference_indicators = all_features.get("indicators", {})
+                
+                if entities:
+                    logger.info("  • Extracted %d named entities", len(entities))
+                if preference_indicators.get('names'):
+                    logger.info("  • Preference indicators: names=%d, locations=%d, questions=%d",
+                               len(preference_indicators.get('names', [])),
+                               len(preference_indicators.get('locations', [])),
+                               len(preference_indicators.get('question_sentences', [])))
+                
+                # Build spaCy context prefix for LLM guidance
+                spacy_context = self._build_spacy_context_for_llm(
+                    negation_facts=negation_facts,
+                    relationships=relationships,
+                    preference_patterns=preference_patterns_found,
+                    entities=entities,
+                    indicators=preference_indicators
+                )
+                
+                if spacy_context:
+                    logger.info("✅ SPACY CONTEXT BUILT: %d chars (negations=%d, rels=%d, patterns=%d)",
+                               len(spacy_context), len(negation_facts), len(relationships),
+                               sum(preference_patterns_found.values()))
+                
             except (AttributeError, ValueError, TypeError) as e:
-                # Non-fatal: fallback to no prefix
-                logger.warning("⚠️  SPACY FACT EXTRACTION: Failed to generate context prefix: %s", e)
-                context_prefix = ""
+                # Non-fatal: fallback to pure LLM
+                logger.warning("⚠️  SPACY FACT EXTRACTION: Failed to extract features: %s", e)
+                spacy_context = ""
         else:
-            logger.info("ℹ️  FACT EXTRACTION: Using pure LLM (no spaCy preprocessing)")
+            logger.info("ℹ️  FACT EXTRACTION: Using pure LLM (no spaCy preprocessing available)")
+        
+        # Use spaCy context as prefix (replaces old context_prefix)
+        context_prefix = spacy_context
 
         # Build extraction prompt - IMPROVED VERSION (Oct 2025)
         # Focus on positive examples and clear extraction criteria

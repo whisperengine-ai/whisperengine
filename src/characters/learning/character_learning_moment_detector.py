@@ -1,7 +1,7 @@
 """
 Character Learning Moment Detector
 WhisperEngine Character Learning Visibility Enhancement
-Version: 1.1 - October 2025 - Enhanced Memory Surprise Integration
+Version: 1.2 - October 2025 - Enhanced with spaCy Lemmatization
 
 Detects opportunities for characters to surface learning moments, growth insights,
 and memory surprises in natural conversation flow. Makes the existing character
@@ -12,12 +12,14 @@ Core Capabilities:
 - Growth insight triggers based on character evolution
 - Enhanced memory surprise activation using vector similarity
 - Natural integration with existing character intelligence systems
+- spaCy lemmatization for robust pattern matching (Oct 26, 2025)
 """
 
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
+from src.nlp.spacy_manager import get_spacy_nlp
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,13 @@ class CharacterLearningMomentDetector:
         self.emotion_analyzer = emotion_analyzer
         self.memory_manager = memory_manager
         
+        # Initialize spaCy singleton for lemmatization
+        self.nlp = get_spacy_nlp()
+        if self.nlp:
+            logger.info("✅ Character Learning Moment Detector: Using spaCy lemmatization for pattern matching")
+        else:
+            logger.warning("⚠️ Character Learning Moment Detector: spaCy unavailable, using literal pattern matching")
+        
         # Initialize enhanced memory surprise trigger
         try:
             from src.characters.learning.enhanced_memory_surprise_trigger import create_enhanced_memory_surprise_trigger
@@ -91,21 +100,59 @@ class CharacterLearningMomentDetector:
         self.memory_similarity_threshold = 0.8
         self.conversation_depth_threshold = 3  # Multiple exchanges needed
         
-        # Natural trigger patterns for learning moments
+        # Natural trigger patterns for learning moments (CONTENT WORDS - NOUN/VERB/ADJ/ADV only)
+        # Articles, pronouns, and auxiliary verbs are filtered out automatically
+        # "I am growing as a person" → "grow person"
+        # "I have grown so much" → "grow so much"
         self.growth_triggers = [
-            'confidence', 'understanding', 'learning', 'growing', 'evolving',
-            'better at', 'more comfortable', 'improved', 'developed'
+            'grow', 'change', 'improve', 'develop', 'transform', 'evolve',  # Core growth verbs
+            'confidence', 'understanding', 'learn', 'comfortable', 'good'  # Growth nouns/adjectives
         ]
         
         self.observation_triggers = [
-            'notice', 'see that', 'seem to', 'appears', 'looks like',
-            'patterns', 'when you talk about', 'your enthusiasm'
+            'notice', 'realize', 'see', 'appear', 'look',  # Observation verbs
+            'pattern', 'tend', 'always', 'usually'  # Observation nouns/adverbs
         ]
         
         self.memory_triggers = [
-            'reminds me', 'remember when', 'like you mentioned', 'back to',
-            'similar to', 'just like', 'makes me think of'
+            'remind', 'remember', 'recall', 'mention', 'say', 'talk'  # Memory verbs (clean!)
         ]
+    
+    def _lemmatize(self, text: Optional[str]) -> str:
+        """
+        Lemmatize text to normalize word variations using spaCy.
+        
+        Uses content words only (NOUN, VERB, ADJ, ADV) to filter out articles,
+        pronouns, and auxiliary verbs that create pattern matching noise.
+        
+        Args:
+            text: The text to lemmatize
+            
+        Returns:
+            Lemmatized content words in base form (e.g., "I am growing" → "grow")
+        """
+        if not text:
+            return ""
+            
+        try:
+            if not self.nlp:
+                return text.lower()
+                
+            # Use spaCy to lemmatize and extract content words
+            doc = self.nlp(text.lower())
+            
+            # Extract only content words (filters out articles, pronouns, aux verbs)
+            content_words = [token.lemma_ for token in doc 
+                           if token.pos_ in ['NOUN', 'VERB', 'ADJ', 'ADV']]
+            
+            # If no content words found, fall back to all lemmas (safety net)
+            if not content_words:
+                content_words = [token.lemma_ for token in doc if not token.is_punct]
+            
+            return ' '.join(content_words)
+        except Exception as e:
+            logger.warning("Lemmatization failed for learning moment detection: %s", str(e))
+            return text.lower() if text else ""
 
     async def detect_learning_moments(self, context: LearningMomentContext) -> List[LearningMoment]:
         """
@@ -151,7 +198,22 @@ class CharacterLearningMomentDetector:
         moments = []
         
         try:
-            # Check if temporal evolution data is available
+            # **PATTERN-BASED DETECTION**: Check current message for growth trigger patterns
+            if context.current_message and self._matches_trigger_pattern(
+                context.current_message, self.growth_triggers
+            ):
+                moment = LearningMoment(
+                    moment_type=LearningMomentType.GROWTH_INSIGHT,
+                    trigger_content="User mentioned personal growth or change",
+                    suggested_response="That resonates with me - I've noticed growth in our conversations too",
+                    confidence=0.7,
+                    supporting_data={'trigger': 'pattern_match', 'message': context.current_message[:100]},
+                    natural_integration_point="When user discusses personal growth or change",
+                    character_voice_adaptation="Reflect on character's own growth in their voice"
+                )
+                moments.append(moment)
+            
+            # **TEMPORAL ANALYSIS**: Check if temporal evolution data is available
             if not context.temporal_data:
                 return moments
             
@@ -200,7 +262,22 @@ class CharacterLearningMomentDetector:
         moments = []
         
         try:
-            # Analyze user's emotional patterns across conversations
+            # **PATTERN-BASED DETECTION**: Check current message for observation trigger patterns
+            if context.current_message and self._matches_trigger_pattern(
+                context.current_message, self.observation_triggers
+            ):
+                moment = LearningMoment(
+                    moment_type=LearningMomentType.USER_OBSERVATION,
+                    trigger_content="User shared personal observation or insight",
+                    suggested_response="I've noticed that pattern too - it's interesting how we both pick up on these things",
+                    confidence=0.7,
+                    supporting_data={'trigger': 'pattern_match', 'message': context.current_message[:100]},
+                    natural_integration_point="When user shares observations about themselves or patterns",
+                    character_voice_adaptation="Share observation in character's observational style"
+                )
+                moments.append(moment)
+            
+            # **EMOTIONAL ANALYSIS**: Analyze user's emotional patterns across conversations
             if not context.emotional_context:
                 return moments
             
@@ -233,7 +310,22 @@ class CharacterLearningMomentDetector:
         moments = []
         
         try:
-            # Try enhanced memory surprise detection first
+            # **PATTERN-BASED DETECTION**: Check current message for memory trigger patterns
+            if context.current_message and self._matches_trigger_pattern(
+                context.current_message, self.memory_triggers
+            ):
+                moment = LearningMoment(
+                    moment_type=LearningMomentType.MEMORY_SURPRISE,
+                    trigger_content="User asked about past conversation or memory",
+                    suggested_response="Oh that's interesting you bring that up - it connects to something we discussed before",
+                    confidence=0.7,
+                    supporting_data={'trigger': 'pattern_match', 'message': context.current_message[:100]},
+                    natural_integration_point="When user asks about remembering past conversations",
+                    character_voice_adaptation="Express memory connection in character's voice"
+                )
+                moments.append(moment)
+            
+            # **ENHANCED VECTOR ANALYSIS**: Try enhanced memory surprise detection
             if self.enhanced_memory_trigger:
                 enhanced_surprises = await self.enhanced_memory_trigger.detect_memory_surprises(
                     user_id=context.user_id,
@@ -265,7 +357,7 @@ class CharacterLearningMomentDetector:
                 logger.info("Enhanced memory surprise detection found %d moments", len(moments))
                 return moments
             
-            # Fallback to original simple detection if enhanced system not available
+            # **FALLBACK DETECTION**: Use episodic memories if enhanced system not available
             logger.debug("Using fallback memory surprise detection")
             
             # Use episodic memories if available
@@ -368,6 +460,30 @@ class CharacterLearningMomentDetector:
                     topics.append(topic_keyword)
         
         return list(set(topics))
+
+    def _matches_trigger_pattern(self, text: str, trigger_patterns: List[str]) -> bool:
+        """
+        Check if text matches any trigger patterns using lemmatization.
+        
+        Args:
+            text: The text to check
+            trigger_patterns: List of lemmatized trigger patterns
+            
+        Returns:
+            True if any pattern matches the lemmatized text
+        """
+        if not text:
+            return False
+            
+        # Lemmatize the input text
+        lemmatized_text = self._lemmatize(text)
+        
+        # Check if any trigger pattern appears in the lemmatized text
+        for pattern in trigger_patterns:
+            if pattern in lemmatized_text:
+                return True
+                
+        return False
 
     def _is_learning_topic(self, topic: str) -> bool:
         """Check if a topic represents potential character learning."""

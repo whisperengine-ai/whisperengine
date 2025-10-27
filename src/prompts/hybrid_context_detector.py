@@ -17,6 +17,8 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from collections import Counter
 
+from src.nlp.spacy_manager import get_spacy_nlp
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,61 +43,152 @@ class HybridContextDetector:
     2. Linguistic features (POS-like analysis without full parsing)
     3. Structural heuristics
     4. Semantic similarity using word vectors (optional, cached)
+    5. spaCy lemmatization for normalized pattern matching
     """
     
     def __init__(self, memory_manager=None):
         self.memory_manager = memory_manager
         self.logger = logging.getLogger(__name__)
+        
+        # Initialize spaCy singleton for lemmatization
+        self.nlp = get_spacy_nlp()
+        if self.nlp:
+            logger.info("✅ Hybrid Context Detector: Using spaCy lemmatization for pattern matching")
+        else:
+            logger.warning("⚠️ Hybrid Context Detector: spaCy unavailable, using literal pattern matching")
+        
         self._compile_patterns()
         self._setup_linguistic_features()
     
+    def _lemmatize(self, text: Optional[str]) -> str:
+        """
+        Lemmatize text to normalize word variations using spaCy.
+        
+        Uses content words only (NOUN, VERB, ADJ, ADV) to filter out articles,
+        pronouns, and auxiliary verbs that create pattern matching noise.
+        
+        Args:
+            text: The text to lemmatize
+            
+        Returns:
+            Lemmatized content words in base form (cleaner pattern matching)
+        """
+        if not text:
+            return ""
+            
+        try:
+            if not self.nlp:
+                return text.lower()
+                
+            # Use spaCy to lemmatize and extract content words
+            doc = self.nlp(text.lower())
+            
+            # Extract only content words (filters out articles, pronouns, aux verbs)
+            content_words = [token.lemma_ for token in doc 
+                           if token.pos_ in ['NOUN', 'VERB', 'ADJ', 'ADV']]
+            
+            # If no content words found, fall back to all lemmas (safety net)
+            if not content_words:
+                content_words = [token.lemma_ for token in doc if not token.is_punct]
+            
+            return ' '.join(content_words)
+        except Exception as e:
+            logger.warning("Lemmatization failed for hybrid context detection: %s", str(e))
+            return text.lower() if text else ""
+    
     def _compile_patterns(self):
-        """Compile optimized regex patterns with confidence weights"""
+        """
+        Compile lemmatized pattern lists with confidence weights.
         
-        # High-confidence AI identity patterns
+        Patterns are in lemmatized content-word form (NOUN/VERB/ADJ/ADV only).
+        Articles, pronouns, and auxiliary verbs are filtered out automatically.
+        This creates much cleaner, more reliable pattern matching.
+        """
+        
+        # AI identity patterns (content words only)
+        # "Are you an AI?" → "ai"
+        # "Are you a robot?" → "robot"
         self.ai_patterns_high = [
-            (re.compile(r'\b(?:are\s+you\s+(?:an?\s+)?(?:ai|artificial|robot|bot|machine))\b', re.IGNORECASE), 0.9),
-            (re.compile(r'\b(?:what\s+are\s+you)\b.*\?', re.IGNORECASE), 0.7),
-            (re.compile(r'\b(?:human\s+or\s+(?:ai|artificial))\b', re.IGNORECASE), 0.8),
+            ('ai', 0.9),
+            ('artificial', 0.9),
+            ('robot', 0.9),
+            ('bot', 0.9),
+            ('machine', 0.9),
         ]
         
-        # Medium-confidence AI patterns
         self.ai_patterns_medium = [
-            (re.compile(r'\b(?:conscious|sentient|self.aware)\b', re.IGNORECASE), 0.6),
-            (re.compile(r'\b(?:real\s+person|actually\s+real)\b', re.IGNORECASE), 0.5),
+            ('conscious', 0.6),
+            ('sentient', 0.6),
+            ('self aware', 0.6),
+            ('real person', 0.5),
+            ('real', 0.4),  # Lower confidence for just "real"
         ]
         
-        # Relationship boundary patterns
+        # Relationship boundary patterns (content words)
+        # "I love you" → "love"
+        # "I'm falling in love with you" → "fall love"
+        # "We're dating" → "date"
         self.ai_relationship_patterns = [
-            (re.compile(r'\b(?:love\s+you|i\s+love|dating?|relationship)\b', re.IGNORECASE), 0.7),
-            (re.compile(r'\b(?:meet\s+(?:up|for|in\s+person)|coffee|dinner)\b', re.IGNORECASE), 0.6),
+            ('love', 0.7),
+            ('fall love', 0.8),  # "falling in love" → "fall love"
+            ('date', 0.7),
+            ('relationship', 0.7),
+            ('meet', 0.6),
+            ('coffee', 0.6),
+            ('dinner', 0.6),
         ]
         
-        # Memory reference patterns with confidence
-        self.memory_patterns = [
-            # Explicit references (high confidence)
-            (re.compile(r'\b(?:remember|recall|mentioned|said|talked\s+about)\b', re.IGNORECASE), 0.9),
-            (re.compile(r'\b(?:last\s+time|before|earlier|previously)\b', re.IGNORECASE), 0.8),
-            (re.compile(r'\b(?:responding\s+to|reacting\s+to|about\s+what)\b', re.IGNORECASE), 0.8),
-            
-            # Reaction patterns (medium-high confidence)
-            (re.compile(r'^(?:what!?\?*|really\?*|seriously\?*|no\s+way!?|wow!?|amazing!?)$', re.IGNORECASE), 0.8),
-            
-            # Pronoun references (context dependent, lower confidence)
-            (re.compile(r'\b(?:that|it|this)\b(?!\s+(?:is|was|will|would|could|should))', re.IGNORECASE), 0.4),
+        # Memory reference patterns (content words)
+        # "Do you remember?" → "remember"
+        # "You mentioned that" → "mention"
+        self.memory_patterns_explicit = [
+            ('remember', 0.9),
+            ('recall', 0.9),
+            ('mention', 0.9),
+            ('say', 0.9),
+            ('talk', 0.9),
         ]
         
-        # Personality inquiry patterns
+        self.memory_patterns_temporal = [
+            ('last', 0.7),  # "last time" → "last"
+            ('earlier', 0.8),
+            ('previously', 0.8),
+            ('before', 0.7),
+        ]
+        
+        self.memory_patterns_reaction = [
+            ('respond', 0.8),
+            ('react', 0.8),
+        ]
+        
+        # Reaction exclamations (exact matches on original text)
+        self.reaction_exclamations = [
+            'what', 'really', 'seriously', 'no way', 'wow', 'amazing', 'incredible'
+        ]
+        
+        # Personality inquiry patterns (content words)
+        # "Tell me about yourself" → "tell"
+        # "Who are you?" → empty (no content words!) → need special handling
+        # "Describe yourself" → "describe"
         self.personality_patterns = [
-            (re.compile(r'\b(?:tell\s+me\s+about\s+(?:yourself|you))\b', re.IGNORECASE), 0.9),
-            (re.compile(r'\b(?:what.*(?:like|personality|character)|who\s+are\s+you)\b', re.IGNORECASE), 0.8),
-            (re.compile(r'\b(?:describe\s+yourself|your\s+(?:background|interests))\b', re.IGNORECASE), 0.7),
+            ('tell', 0.7),  # "tell me about yourself" → "tell"
+            ('describe', 0.7),
+            ('background', 0.7),
+            ('interest', 0.7),
+            ('personality', 0.8),
         ]
         
-        # Voice/communication patterns
+        # Voice/communication patterns (content words)
+        # "How do you talk?" → "talk"
+        # "What's your communication style?" → "communication style"
         self.voice_patterns = [
-            (re.compile(r'\b(?:how\s+do\s+you\s+(?:talk|speak|communicate))\b', re.IGNORECASE), 0.9),
-            (re.compile(r'\b(?:your\s+(?:voice|style|accent|way\s+of))\b', re.IGNORECASE), 0.7),
+            ('talk', 0.7),
+            ('speak', 0.9),
+            ('communicate', 0.9),
+            ('communication', 0.7),
+            ('voice', 0.7),
+            ('style', 0.6),  # Lower confidence - too generic alone
+            ('accent', 0.7),
         ]
     
     def _setup_linguistic_features(self):
@@ -244,25 +337,38 @@ class HybridContextDetector:
         return {'scores': scores, 'methods': methods}
     
     def _analyze_ai_patterns(self, message: str) -> Tuple[float, str]:
-        """Analyze AI-related patterns with confidence scoring"""
+        """Analyze AI-related patterns with confidence scoring using lemmatization"""
         total_confidence = 0.0
         methods = []
         
-        # Check high-confidence patterns
+        # Lemmatize message once for all pattern checks (content words only)
+        lemmatized_message = self._lemmatize(message)
+        message_lower = message.lower()
+        
+        # Special case: "What are you?" has no content words but is high-confidence AI query
+        if 'what' in message_lower and 'you' in message_lower and '?' in message:
+            if len(message.split()) <= 4:  # Short question
+                total_confidence += 0.7
+                methods.append('what_are_you_pattern')
+        
+        # Check high-confidence patterns (content word matching)
         for pattern, weight in self.ai_patterns_high:
-            if pattern.search(message):
+            if pattern in lemmatized_message:
                 total_confidence += weight
                 methods.append('high_pattern')
         
         # Check medium-confidence patterns
         for pattern, weight in self.ai_patterns_medium:
-            if pattern.search(message):
+            if pattern in lemmatized_message:
                 total_confidence += weight * 0.8  # Slight discount
                 methods.append('medium_pattern')
         
         # Check relationship patterns
         for pattern, weight in self.ai_relationship_patterns:
-            if pattern.search(message):
+            if pattern in lemmatized_message:
+                # Filter out false positives like "I love pizza"
+                if pattern == 'love' and 'you' not in message_lower:
+                    continue  # "love" without "you" is probably not about AI relationship
                 total_confidence += weight
                 methods.append('relationship_pattern')
         
@@ -274,43 +380,81 @@ class HybridContextDetector:
         return total_confidence, method_str
     
     def _analyze_memory_patterns(self, message: str) -> Tuple[float, str]:
-        """Analyze memory reference patterns"""
+        """Analyze memory reference patterns using lemmatization"""
         total_confidence = 0.0
         methods = []
         
-        for pattern, weight in self.memory_patterns:
-            matches = pattern.findall(message)
-            if matches:
+        # Lemmatize message once
+        lemmatized_message = self._lemmatize(message)
+        message_lower = message.lower()
+        
+        # Check explicit memory patterns
+        for pattern, weight in self.memory_patterns_explicit:
+            if pattern in lemmatized_message:
                 total_confidence += weight
-                
-                if 'remember' in pattern.pattern:
-                    methods.append('explicit_memory')
-                elif 'what!' in pattern.pattern:
-                    methods.append('reaction')
-                elif 'that|it|this' in pattern.pattern:
-                    methods.append('pronoun_ref')
-                else:
-                    methods.append('temporal_ref')
+                methods.append('explicit_memory')
+        
+        # Check temporal patterns
+        for pattern, weight in self.memory_patterns_temporal:
+            if pattern in lemmatized_message:
+                total_confidence += weight
+                methods.append('temporal_ref')
+        
+        # Check reaction patterns
+        for pattern, weight in self.memory_patterns_reaction:
+            if pattern in lemmatized_message:
+                total_confidence += weight
+                methods.append('reaction')
+        
+        # Check reaction exclamations (exact match on lowercase)
+        for exclamation in self.reaction_exclamations:
+            if message_lower.strip().rstrip('!?') == exclamation:
+                total_confidence += 0.8
+                methods.append('reaction')
+                break
+        
+        # Pronoun references (simple check - doesn't need lemmatization)
+        if any(word in message_lower for word in ['that', 'it', 'this']):
+            # Only add low confidence if not followed by "is/was/will"
+            if not any(phrase in message_lower for phrase in ['that is', 'that was', 'it is', 'it was', 'this is', 'this was']):
+                total_confidence += 0.4
+                methods.append('pronoun_ref')
         
         method_str = '+'.join(set(methods)) if methods else 'none'
         return total_confidence, method_str
     
     def _analyze_personality_patterns(self, message: str) -> Tuple[float, str]:
-        """Analyze personality inquiry patterns"""
+        """Analyze personality inquiry patterns using lemmatization"""
         total_confidence = 0.0
         
+        # Lemmatize message once (content words only)
+        lemmatized_message = self._lemmatize(message)
+        message_lower = message.lower()
+        
+        # Special case: "Who are you?" has no content words but is high-confidence personality query
+        if 'who' in message_lower and 'you' in message_lower and '?' in message:
+            if len(message.split()) <= 4:  # Short question
+                total_confidence += 0.8
+        
+        # Special case: "Tell me about yourself/you" - "tell" alone is good signal
+        if 'tell' in message_lower and ('yourself' in message_lower or 'about you' in message_lower):
+            total_confidence += 0.9
+        
         for pattern, weight in self.personality_patterns:
-            if pattern.search(message):
+            if pattern in lemmatized_message:
                 total_confidence += weight
         
         return total_confidence, 'pattern_match' if total_confidence > 0 else 'none'
     
     def _analyze_voice_patterns(self, message: str) -> Tuple[float, str]:
-        """Analyze voice/communication patterns"""
+        """Analyze voice/communication patterns using lemmatization"""
         total_confidence = 0.0
         
+        # Lemmatize message once
+        lemmatized_message = self._lemmatize(message)
+        
         for pattern, weight in self.voice_patterns:
-            if pattern.search(message):
+            if pattern in lemmatized_message:
                 total_confidence += weight
         
         return total_confidence, 'pattern_match' if total_confidence > 0 else 'none'
