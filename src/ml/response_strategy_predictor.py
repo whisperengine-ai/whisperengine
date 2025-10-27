@@ -60,8 +60,16 @@ class ResponseStrategyPredictor:
         Args:
             model_path: Path to trained Random Forest model (.pkl file). If None, auto-detects latest.
             influxdb_client: InfluxDB client for feature extraction from conversation metrics
+                            Can be either a raw InfluxDBClient or TemporalIntelligenceClient
         """
-        self.influxdb_client = influxdb_client
+        # Handle both TemporalIntelligenceClient wrapper and raw InfluxDBClient
+        if influxdb_client and hasattr(influxdb_client, 'client'):
+            # It's a TemporalIntelligenceClient, extract the raw client
+            self.influxdb_client = influxdb_client.client
+        else:
+            # It's a raw InfluxDBClient or None
+            self.influxdb_client = influxdb_client
+        
         self.model = None
         self.feature_names = None  # Will be loaded from model
         
@@ -189,14 +197,22 @@ class ResponseStrategyPredictor:
     
     async def _extract_features(self, user_id: str, bot_name: str) -> Optional[Dict[str, float]]:
         """
-        Extract ML features from InfluxDB conversation quality metrics.
+        Extract 14 features from InfluxDB for model inference.
         
-        Requires: At least 7 messages of history for moving averages
+        Features extracted:
+        - Time: hour, day_of_week
+        - Current scores: engagement_score, satisfaction_score, natural_flow_score, emotional_resonance, topic_relevance
+        - 7-msg moving averages: {above}_ma7
+        - 3-msg trends: engagement_score_trend3, satisfaction_score_trend3
         
         Returns:
             Dictionary of 14 features matching model training data
             None if insufficient data (< 7 messages)
         """
+        if not self.influxdb_client:
+            logger.debug("InfluxDB client not available - cannot extract features")
+            return None
+            
         try:
             # Query last 7 messages for moving average calculation
             flux_query = f'''
@@ -210,7 +226,8 @@ class ResponseStrategyPredictor:
               |> tail(n: 7)
             '''
             
-            result = self.influxdb_client.query_api().query_data_frame(flux_query)
+            # Use query_api directly (it's already a QueryApi object, not a method)
+            result = self.influxdb_client.query_api.query_data_frame(flux_query)
             
             if result.empty or len(result) < 7:
                 logger.debug(f"Insufficient data: {len(result) if not result.empty else 0} messages (need 7)")
