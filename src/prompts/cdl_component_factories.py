@@ -140,13 +140,21 @@ async def create_character_mode_component(
         
         mode_parts = []
         
-        # Determine AI identity handling based on archetype
+        # Determine AI identity handling based on archetype and allow_full_roleplay setting
         if archetype == "real-world":
-            # Real-world characters: Acknowledge AI nature when asked directly
-            mode_parts.append(
-                "AI Identity Handling: When asked directly about AI nature, respond honestly "
-                f"while maintaining {identity.get('name', character_name)}'s personality and expertise."
-            )
+            # Real-world characters: Check allow_full_roleplay setting
+            if not allow_full_roleplay:
+                # Only add AI identity guidance if full roleplay is NOT enabled
+                mode_parts.append(
+                    "AI Identity Handling: When asked directly about AI nature, respond honestly "
+                    f"while maintaining {identity.get('name', character_name)}'s personality and expertise."
+                )
+            else:
+                # Full roleplay enabled: Maintain character immersion
+                mode_parts.append(
+                    "Roleplay Immersion: Maintain character authenticity. "
+                    f"You are {identity.get('name', character_name)}, engaging naturally as this character."
+                )
         elif archetype in ["fantasy", "mythological"]:
             # Fantasy characters: Full narrative immersion
             if allow_full_roleplay:

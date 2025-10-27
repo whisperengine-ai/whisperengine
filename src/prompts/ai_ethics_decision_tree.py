@@ -228,13 +228,26 @@ class AIEthicsDecisionTree:
         
         # BRANCH 1: Direct AI Identity Question (HIGHEST PRIORITY)
         if await self._is_ai_identity_question(message_content):
-            return AIEthicsGuidance(
-                guidance_type="ai_identity",
-                guidance_text=self._get_ai_honesty_guidance(character),
-                trigger_reason="Direct AI identity question detected",
-                priority=10,
-                should_inject=True
-            )
+            # Check if character allows full roleplay immersion (skip AI disclosure)
+            allows_full_roleplay = self._check_roleplay_flexibility(character)
+            
+            if not allows_full_roleplay:
+                return AIEthicsGuidance(
+                    guidance_type="ai_identity",
+                    guidance_text=self._get_ai_honesty_guidance(character),
+                    trigger_reason="Direct AI identity question detected",
+                    priority=10,
+                    should_inject=True
+                )
+            else:
+                logger.info("🎭 AI IDENTITY: %s allows full roleplay - skipping AI disclosure guidance", getattr(character.identity, 'name', 'Character'))
+                return AIEthicsGuidance(
+                    guidance_type="ai_identity",
+                    guidance_text="",
+                    trigger_reason="AI identity question detected but character allows full roleplay",
+                    priority=10,
+                    should_inject=False  # Characters with full roleplay skip AI disclosure
+                )
         
         # BRANCH 2: Physical Interaction Request
         elif await self._is_physical_interaction(message_content):
