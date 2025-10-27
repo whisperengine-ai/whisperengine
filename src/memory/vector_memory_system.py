@@ -2463,6 +2463,9 @@ class VectorMemoryStore:
         - None: No channel filtering (backward compatible)
         """
         try:
+            # Prepare query in lowercase for keyword matching (used throughout this method)
+            query_lower = query.lower()
+            
             # Task #2: Use unified classifier temporal direction flags (with fallback to query analysis)
             if is_temporal_first or is_temporal_last:
                 # Trust the unified classifier determination
@@ -2471,7 +2474,6 @@ class VectorMemoryStore:
                 logger.info(f"✅ TEMPORAL DIRECTION (from UnifiedClassifier): '{direction_label}' query")
             else:
                 # Fallback: Detect query direction from keyword analysis
-                query_lower = query.lower()
                 first_keywords = ['first', 'earliest', 'initial', 'started', 'began', 'opening', 'very first']
                 is_first_query = any(keyword in query_lower for keyword in first_keywords)
                 direction_label = "FIRST/EARLIEST" if is_first_query else "LAST/RECENT"
