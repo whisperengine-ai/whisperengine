@@ -157,7 +157,7 @@ class FactExtractionEngine:
     def _build_spacy_context_for_llm(
         self,
         negation_facts: List[str],
-        relationships: List[Dict],  # pylint: disable=unused-argument
+        relationships: List[Dict],
         preference_patterns: Dict[str, int],
         entities: List[Dict],
         indicators: Dict
@@ -170,7 +170,7 @@ class FactExtractionEngine:
         
         Args:
             negation_facts: List of detected negated statements
-            relationships: List of SVO relationships with negation info (reserved for future expansion)
+            relationships: List of SVO relationships with negation info + metadata
             preference_patterns: Dict of pattern types → match counts
             entities: List of extracted named entities
             indicators: Dict with names, locations, question_sentences
@@ -189,6 +189,28 @@ class FactExtractionEngine:
             lines.append("NEGATED STATEMENTS DETECTED:")
             for fact in negation_facts[:5]:  # Limit to first 5
                 lines.append(f"  • {fact}")
+            lines.append("")
+        
+        # ⭐ NEW: Add extracted SVO relationships (Session 2 enhancement)
+        # These are dependency-parsed relationships: basic SVO + clausal complements
+        if relationships:
+            lines.append("DEPENDENCY RELATIONSHIPS (subject-verb-object patterns):")
+            for rel in relationships[:8]:  # Limit to first 8 to avoid too much context
+                subject = rel.get('subject', 'unknown').title()
+                verb = rel.get('verb', 'unknown')
+                obj = rel.get('object', 'unknown').title()
+                clause_type = rel.get('clause_type', 'root')
+                has_particles = rel.get('has_particles', False)
+                
+                # Format based on relationship type
+                if clause_type == 'xcomp':
+                    lines.append(f"  • {subject} {verb} to [infinitive action] (e.g., '{subject} wants to {obj}')")
+                elif clause_type == 'ccomp':
+                    lines.append(f"  • {subject} thinks/believes/says that [action] (e.g., '{subject} thinks {obj}')")
+                elif has_particles:
+                    lines.append(f"  • {subject} {verb} + particle (e.g., '{subject} {verb}' - phrasal verb)")
+                else:
+                    lines.append(f"  • {subject} {verb} {obj}")
             lines.append("")
         
         # Add preference patterns detected
