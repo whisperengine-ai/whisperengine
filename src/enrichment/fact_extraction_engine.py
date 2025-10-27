@@ -251,7 +251,43 @@ class FactExtractionEngine:
         user_id: str,
         bot_name: str
     ) -> List[ExtractedFact]:
-        """Extract facts from a single conversation chunk (internal helper)"""
+        """
+        Extract facts from a single conversation chunk (internal helper)
+        
+        DATA FLOW (Complete):
+        1. SPACY EXTRACTION (nlp_preprocessor.py:extract_all_features_from_text)
+           ├─ relationships: SVO triplets + xcomp/ccomp + phrasal verbs + negation
+           ├─ patterns: STRONG_PREFERENCE, NEGATED_PREFERENCE, TEMPORAL_CHANGE, etc
+           ├─ entities: PERSON, GPE, ORG (NER from spaCy)
+           ├─ indicators: names[], locations[], pronoun_counts, question_sentences
+           └─ noun_chunks: Multi-word entities like "marine research"
+        
+        2. SPACY CONTEXT BUILDING (_build_spacy_context_for_llm):
+           ├─ relationships → formatted as "subject verb object" guidance
+           ├─ negation_facts → "NEGATED: subject verb object (marker)"
+           ├─ preference_patterns → pattern type counts
+           ├─ entities → NER label counts
+           └─ indicators → names, locations, question count
+           → Result: String context prepended to LLM prompt
+        
+        3. LLM FACT EXTRACTION:
+           ├─ Receives: spacy_context + conversation_text + extraction_prompt
+           ├─ Uses: relationship guidance + negation context + entity hints
+           ├─ Extracts: entity_name, entity_type, relationship_type, confidence
+           └─ Returns: JSON with facts array
+        
+        4. FACT STORAGE (worker.py:_store_facts_in_postgres):
+           ├─ facts → fact_entities table (with attributes JSONB)
+           ├─ facts → user_fact_relationships table (with context_metadata JSONB)
+           ├─ relationships → entity_relationships table (knowledge graph)
+           └─ Result: All data stored in PostgreSQL
+        
+        5. DOWNSTREAM USAGE:
+           ├─ semantic_router.py → queries facts for intent detection
+           ├─ message_processor.py → uses facts for context building
+           ├─ CDL system → personalizes character responses with facts
+           └─ Knowledge graph → enables relationship-based queries
+        """
         if not messages:
             return []
         
