@@ -1869,6 +1869,598 @@ class SemanticKnowledgeRouter:
         except Exception as e:
             logger.error(f"❌ Failed to restore deprecated facts: {e}")
             return 0
+    
+    # ========================================================================
+    # LLM TOOL CALLING - Week 1 Hybrid Routing Integration
+    # ========================================================================
+    
+    async def execute_tools(
+        self,
+        query: str,
+        user_id: str,
+        character_name: str,
+        llm_client=None
+    ) -> Dict[str, Any]:
+        """
+        Execute LLM tool calling for structured data retrieval.
+        
+        This method integrates with the UnifiedQueryClassifier's TOOL_ASSISTED
+        intent to provide LLM-assisted multi-source data aggregation.
+        
+        Migrated from src/intelligence/tool_executor.py as part of Week 1
+        hybrid routing refactoring.
+        
+        Args:
+            query: User's query string
+            user_id: User's unique identifier
+            character_name: Current character name
+            llm_client: Optional LLM client (will create if not provided)
+        
+        Returns:
+            Dict with tool execution results:
+                {
+                    "tool_results": List[Dict],  # Raw tool results
+                    "enriched_context": str,  # Formatted context for LLM
+                    "tools_used": List[str],  # Names of tools executed
+                    "execution_time_ms": float
+                }
+        """
+        start_time = datetime.now()
+        
+        # Get tool definitions
+        tools = self._get_tool_definitions()
+        
+        # Create LLM client if not provided
+        if llm_client is None:
+            from src.llm.llm_protocol import create_llm_client
+            llm_client = create_llm_client(llm_client_type="openrouter")
+        
+        try:
+            # Use LLM tool calling to determine which tools to execute
+            tool_response = await llm_client.generate_chat_completion_with_tools(
+                messages=[{
+                    "role": "user",
+                    "content": f"For the query: '{query}' - determine which data retrieval tools to use."
+                }],
+                tools=tools,
+                tool_choice="auto"
+            )
+            
+            # Execute called tools
+            tool_results = []
+            tools_used = []
+            
+            if hasattr(tool_response, 'tool_calls') and tool_response.tool_calls:
+                for tool_call in tool_response.tool_calls:
+                    tool_name = tool_call.function.name
+                    
+                    # Parse arguments (handle both string and dict)
+                    if isinstance(tool_call.function.arguments, str):
+                        import json
+                        tool_arguments = json.loads(tool_call.function.arguments)
+                    else:
+                        tool_arguments = tool_call.function.arguments
+                    
+                    # Add required arguments
+                    if tool_name == "query_user_facts":
+                        tool_arguments["user_id"] = user_id
+                    elif tool_name == "recall_conversation_context":
+                        tool_arguments["user_id"] = user_id
+                    elif tool_name == "query_character_backstory":
+                        tool_arguments["character_name"] = character_name
+                    elif tool_name == "summarize_user_relationship":
+                        tool_arguments["user_id"] = user_id
+                    elif tool_name == "query_temporal_trends":
+                        tool_arguments["user_id"] = user_id
+                    
+                    # Execute tool
+                    result = await self._execute_single_tool(
+                        tool_name=tool_name,
+                        arguments=tool_arguments
+                    )
+                    
+                    tool_results.append(result)
+                    tools_used.append(tool_name)
+            
+            # Format results for LLM consumption
+            enriched_context = self._format_tool_results(tool_results)
+            
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            logger.info(
+                "🔧 TOOL EXECUTION: query='%s...' → %d tools used (%s) | Time: %.2fms",
+                query[:40],
+                len(tools_used),
+                ', '.join(tools_used),
+                execution_time
+            )
+            
+            return {
+                "tool_results": tool_results,
+                "enriched_context": enriched_context,
+                "tools_used": tools_used,
+                "execution_time_ms": execution_time
+            }
+            
+        except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.error(
+                "❌ TOOL EXECUTION FAILED: %s | Time: %.2fms",
+                str(e),
+                execution_time,
+                exc_info=True
+            )
+            
+            return {
+                "tool_results": [],
+                "enriched_context": "",
+                "tools_used": [],
+                "execution_time_ms": execution_time,
+                "error": str(e)
+            }
+    
+    async def _execute_single_tool(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Execute a single tool and return results.
+        
+        Routes to the appropriate tool execution method based on tool_name.
+        
+        Args:
+            tool_name: Name of the tool to execute
+            arguments: Dictionary of tool arguments
+        
+        Returns:
+            Dict with tool results
+        """
+        start_time = datetime.now()
+        
+        try:
+            # Route to appropriate tool method
+            if tool_name == "query_user_facts":
+                data = await self._tool_query_user_facts(**arguments)
+            elif tool_name == "recall_conversation_context":
+                data = await self._tool_recall_conversation_context(**arguments)
+            elif tool_name == "query_character_backstory":
+                data = await self._tool_query_character_backstory(**arguments)
+            elif tool_name == "summarize_user_relationship":
+                data = await self._tool_summarize_user_relationship(**arguments)
+            elif tool_name == "query_temporal_trends":
+                data = await self._tool_query_temporal_trends(**arguments)
+            else:
+                raise ValueError(f"Unknown tool: {tool_name}")
+            
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "data": data,
+                "error": None,
+                "execution_time_ms": execution_time
+            }
+            
+        except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            
+            logger.error(
+                "Tool execution failed: %s | Error: %s | Time: %.2fms",
+                tool_name,
+                error_msg,
+                execution_time
+            )
+            
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "data": None,
+                "error": error_msg,
+                "execution_time_ms": execution_time
+            }
+    
+    def _get_tool_definitions(self) -> List[Dict[str, Any]]:
+        """
+        Get LLM tool calling definitions for all 5 core tools.
+        
+        Returns:
+            List of tool definitions in OpenAI function calling format
+        """
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_user_facts",
+                    "description": "Query structured user facts and preferences from PostgreSQL (pets, hobbies, family, preferences, location, etc.)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "fact_type": {
+                                "type": "string",
+                                "enum": ["all", "pet", "hobby", "family", "preference", "location"],
+                                "description": "Type of facts to query (default: 'all')"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of facts to return (default: 10)"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "recall_conversation_context",
+                    "description": "Retrieve relevant conversation history using semantic search on Qdrant vector memory",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Semantic search query to find relevant conversations"
+                            },
+                            "time_window": {
+                                "type": "string",
+                                "enum": ["24h", "7d", "30d", "all"],
+                                "description": "Time window filter (default: 'all')"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of memories to return (default: 5)"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_character_backstory",
+                    "description": "Query PostgreSQL CDL database for character backstory, personality, and designer-defined facts",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "What to query about the character's background"
+                            },
+                            "source": {
+                                "type": "string",
+                                "enum": ["cdl_database", "self_memory", "both"],
+                                "description": "Data source to query (default: 'both')"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "summarize_user_relationship",
+                    "description": "Generate comprehensive relationship summary by aggregating user facts and conversation history",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "include_facts": {
+                                "type": "boolean",
+                                "description": "Include user facts from PostgreSQL (default: true)"
+                            },
+                            "include_conversations": {
+                                "type": "boolean",
+                                "description": "Include conversation history from Qdrant (default: true)"
+                            },
+                            "time_window": {
+                                "type": "string",
+                                "enum": ["24h", "7d", "30d", "all"],
+                                "description": "Time window for conversations (default: 'all')"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_temporal_trends",
+                    "description": "Query InfluxDB for conversation quality metrics over time (engagement, satisfaction, coherence)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "metric": {
+                                "type": "string",
+                                "enum": ["all", "engagement_score", "satisfaction_score", "coherence_score"],
+                                "description": "Metric to query (default: 'all')"
+                            },
+                            "time_window": {
+                                "type": "string",
+                                "enum": ["24h", "7d", "30d"],
+                                "description": "Time window for trends (default: '7d')"
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    
+    def _format_tool_results(self, tool_results: List[Dict[str, Any]]) -> str:
+        """
+        Format tool results into enriched context string for LLM.
+        
+        Args:
+            tool_results: List of tool execution results
+        
+        Returns:
+            Formatted context string
+        """
+        if not tool_results:
+            return ""
+        
+        context_parts = ["=== TOOL RESULTS ==="]
+        
+        for result in tool_results:
+            if not result.get("success"):
+                continue
+            
+            tool_name = result["tool_name"]
+            data = result["data"]
+            
+            context_parts.append(f"\n--- {tool_name} ---")
+            
+            if isinstance(data, list) and data:
+                context_parts.append(f"Found {len(data)} items:")
+                for item in data[:5]:  # Limit to first 5 for context
+                    context_parts.append(f"  • {json.dumps(item, indent=2)}")
+            elif isinstance(data, dict):
+                context_parts.append(json.dumps(data, indent=2))
+            else:
+                context_parts.append(str(data))
+        
+        context_parts.append("\n===================")
+        
+        return "\n".join(context_parts)
+    
+    # Tool 1: Query User Facts
+    async def _tool_query_user_facts(
+        self,
+        user_id: str,
+        fact_type: str = "all",
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Tool 1: Query PostgreSQL for user facts and preferences.
+        
+        Migrated from src/intelligence/tool_executor.py
+        """
+        if not self.postgres:
+            raise RuntimeError("PostgreSQL connection pool not available")
+        
+        # Build query based on fact_type filter
+        if fact_type == "all":
+            type_filter = "AND fe.entity_type != '_processing_marker'"
+        else:
+            type_filter = f"AND fe.entity_type = '{fact_type}'"
+        
+        query = f"""
+            SELECT 
+                ufr.relationship_type,
+                fe.entity_type,
+                fe.entity_name,
+                fe.category,
+                ufr.confidence,
+                ufr.mentioned_by_character,
+                ufr.created_at
+            FROM user_fact_relationships ufr
+            JOIN fact_entities fe ON ufr.entity_id = fe.id
+            WHERE ufr.user_id = $1
+                {type_filter}
+                AND ufr.relationship_type NOT LIKE '_enrichment%'
+            ORDER BY ufr.created_at DESC
+            LIMIT $2
+        """
+        
+        async with self.postgres.acquire() as conn:
+            rows = await conn.fetch(query, user_id, limit)
+        
+        facts = [
+            {
+                "relationship_type": row["relationship_type"],
+                "entity_type": row["entity_type"],
+                "entity_name": row["entity_name"],
+                "category": row["category"],
+                "confidence": float(row["confidence"]) if row["confidence"] else 1.0,
+                "mentioned_by_character": row["mentioned_by_character"],
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None
+            }
+            for row in rows
+        ]
+        
+        logger.debug(
+            "query_user_facts | User: %s | Type: %s | Found: %d facts",
+            user_id,
+            fact_type,
+            len(facts)
+        )
+        
+        return facts
+    
+    # Tool 2: Recall Conversation Context
+    async def _tool_recall_conversation_context(
+        self,
+        user_id: str,
+        query: str,
+        time_window: str = "all",
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Tool 2: Query Qdrant for relevant conversation history.
+        
+        Migrated from src/intelligence/tool_executor.py
+        """
+        if not self.qdrant:
+            raise RuntimeError("Qdrant client not available")
+        
+        # Calculate time filter if needed
+        time_filter = None
+        if time_window != "all":
+            window_hours = {
+                "24h": 24,
+                "7d": 24 * 7,
+                "30d": 24 * 30
+            }
+            hours = window_hours.get(time_window, 24 * 365)
+            time_filter = datetime.now() - timedelta(hours=hours)
+        
+        # Use existing vector memory retrieval
+        # Note: This requires VectorMemorySystem instance - TODO: integrate properly
+        logger.warning(
+            "_tool_recall_conversation_context requires VectorMemorySystem integration"
+        )
+        
+        return []
+    
+    # Tool 3: Query Character Backstory
+    async def _tool_query_character_backstory(
+        self,
+        character_name: str,
+        query: str,
+        source: str = "both"
+    ) -> Dict[str, Any]:
+        """
+        Tool 3: Query PostgreSQL CDL database for character backstory.
+        
+        Migrated from src/intelligence/tool_executor.py (placeholder)
+        """
+        if not self.postgres:
+            raise RuntimeError("PostgreSQL connection pool not available")
+        
+        # TODO: Implement CDL database queries
+        logger.warning(
+            "query_character_backstory NOT FULLY IMPLEMENTED | "
+            "Character: %s | Query: '%s' | Source: %s",
+            character_name,
+            query[:50],
+            source
+        )
+        
+        return {
+            "character_name": character_name,
+            "query": query,
+            "background": {},
+            "identity": {},
+            "interests": [],
+            "source": source,
+            "note": "Full implementation pending - requires CDL table schema analysis"
+        }
+    
+    # Tool 4: Summarize User Relationship
+    async def _tool_summarize_user_relationship(
+        self,
+        user_id: str,
+        include_facts: bool = True,
+        include_conversations: bool = True,
+        time_window: str = "all"
+    ) -> Dict[str, Any]:
+        """
+        Tool 4: Generate comprehensive user relationship summary.
+        
+        Migrated from src/intelligence/tool_executor.py
+        """
+        summary = {
+            "user_id": user_id,
+            "facts": [],
+            "conversation_summary": {},
+            "relationship_duration": None,
+            "total_interactions": 0,
+            "most_discussed_topics": []
+        }
+        
+        # Get user facts if requested
+        if include_facts and self.postgres:
+            summary["facts"] = await self._tool_query_user_facts(
+                user_id=user_id,
+                fact_type="all",
+                limit=20
+            )
+        
+        # Get conversation summary if requested
+        if include_conversations and self.qdrant:
+            memories = await self._tool_recall_conversation_context(
+                user_id=user_id,
+                query="general conversation",
+                time_window=time_window,
+                limit=10
+            )
+            
+            if memories:
+                summary["conversation_summary"] = {
+                    "recent_conversations": len(memories),
+                    "time_window": time_window,
+                    "sample_interactions": memories[:3]
+                }
+                summary["total_interactions"] = len(memories)
+        
+        logger.debug(
+            "summarize_user_relationship | User: %s | Facts: %d | "
+            "Conversations: %d | Window: %s",
+            user_id,
+            len(summary["facts"]),
+            summary["total_interactions"],
+            time_window
+        )
+        
+        return summary
+    
+    # Tool 5: Query Temporal Trends
+    async def _tool_query_temporal_trends(
+        self,
+        user_id: str,
+        metric: str = "all",
+        time_window: str = "7d"
+    ) -> Dict[str, Any]:
+        """
+        Tool 5: Query InfluxDB for conversation quality metrics.
+        
+        Migrated from src/intelligence/tool_executor.py (placeholder)
+        """
+        if not self.influx:
+            logger.warning(
+                "query_temporal_trends | InfluxDB not available | "
+                "User: %s | Metric: %s",
+                user_id,
+                metric
+            )
+            return {
+                "user_id": user_id,
+                "metric": metric,
+                "time_window": time_window,
+                "data_points": [],
+                "summary": {},
+                "note": "InfluxDB client not available"
+            }
+        
+        # TODO: Implement InfluxDB queries
+        logger.warning(
+            "query_temporal_trends NOT FULLY IMPLEMENTED | "
+            "User: %s | Metric: %s | Window: %s",
+            user_id,
+            metric,
+            time_window
+        )
+        
+        return {
+            "user_id": user_id,
+            "metric": metric,
+            "time_window": time_window,
+            "data_points": [],
+            "summary": {},
+            "note": "Full implementation pending - requires InfluxDB schema analysis"
+        }
 
 
 # Factory function for easy integration
