@@ -1018,6 +1018,113 @@ async def create_knowledge_context_component(
 # ⏳ RESPONSE_STYLE (Priority 17) - TODO
 
 
+async def create_response_guidelines_component(
+    enhanced_manager,
+    character_name: str,
+    priority: int = 16,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[PromptComponent]:
+    """Create RESPONSE_GUIDELINES component from database.
+    
+    Contains character-specific response formatting rules, length constraints,
+    and critical personality-first principles from character_response_guidelines table.
+    
+    Args:
+        enhanced_manager: EnhancedCDLManager instance for database access
+        character_name: Character name (e.g., "nottaylor", "elena")
+        priority: Priority (default: 16 - after personality, before final guidance)
+        metadata: Optional metadata dict
+        
+    Returns:
+        PromptComponent with response guidelines, or None if no guidelines found
+    
+    Example Output:
+        🎯 Character First, Format Second: When personality style conflicts with formatting 
+        instructions, PERSONALITY WINS. Stay chaotic/authentic over structured/comprehensive.
+        
+        📝 Never Break Character for Format: NEVER use lists without personality, clinical 
+        analysis sections, or "### Headings" without dramatic flair.
+    """
+    try:
+        # Get response guidelines from database
+        guidelines = await enhanced_manager.get_response_guidelines(character_name)
+        
+        if not guidelines:
+            logger.debug(f"📝 RESPONSE GUIDELINES: No guidelines found for {character_name} (optional)")
+            return None
+        
+        # Separate critical vs non-critical guidelines
+        critical_guidelines = []
+        other_guidelines = []
+        
+        for guideline in guidelines:
+            # Add emoji prefix based on type for readability
+            type_emoji = {
+                'response_length': '📏',
+                'core_principle': '🎯',
+                'personality_priority': '🎯',
+                'formatting_rule': '📝',
+                'formatting': '📝',
+                'formatting_antipattern': '📝',
+                'emotional_tone': '💝',
+                'style': '🎨',
+                'detail_calibration': '⚖️',
+            }.get(guideline.guideline_type, '▪️')
+            
+            formatted_guideline = f"{type_emoji} **{guideline.guideline_name}**: {guideline.guideline_content}"
+            
+            # Separate critical vs non-critical for prioritization
+            if guideline.is_critical:
+                critical_guidelines.append(formatted_guideline)
+            else:
+                other_guidelines.append(formatted_guideline)
+        
+        # Build guidelines text with critical first
+        guidelines_text = []
+        
+        if critical_guidelines:
+            guidelines_text.append("# 🎯 CRITICAL RESPONSE GUIDELINES")
+            guidelines_text.extend(critical_guidelines)
+            guidelines_text.append("")  # Blank line separator
+        
+        # Add up to 5 non-critical guidelines (to avoid prompt bloat)
+        if other_guidelines:
+            guidelines_text.append("# 📝 Response Style Guidelines")
+            guidelines_text.extend(other_guidelines[:5])
+        
+        if not guidelines_text:
+            return None
+        
+        content = "\n".join(guidelines_text)
+        
+        component_metadata = {
+            "cdl_type": "RESPONSE_GUIDELINES",
+            "character_name": character_name,
+            "priority": priority,
+            "critical_count": len(critical_guidelines),
+            "total_count": len(guidelines),
+            "estimated_tokens": len(content) // 4  # Rough token estimate
+        }
+        
+        if metadata:
+            component_metadata.update(metadata)
+        
+        logger.info(f"✅ RESPONSE GUIDELINES: Added {len(critical_guidelines)} critical + {len(other_guidelines[:5])} additional guidelines for {character_name}")
+        
+        return PromptComponent(
+            type=PromptComponentType.GUIDANCE,
+            content=content,
+            priority=priority,
+            token_cost=len(content) // 4,
+            required=False,  # Guidelines are optional enhancement
+            metadata=component_metadata
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ RESPONSE GUIDELINES: Error creating component for {character_name}: {e}")
+        return None
+
+
 async def create_final_response_guidance_component(
     enhanced_manager,
     character_name: str,

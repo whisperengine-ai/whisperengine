@@ -180,11 +180,13 @@ class MessageProcessor:
         if self.temporal_client:
             try:
                 from src.analytics.trend_analyzer import create_trend_analyzer
-                from src.adaptation.confidence_adapter import create_confidence_adapter
+                # DISABLED: ConfidenceAdapter was contaminating character personalities with overly-detailed instructions
+                # from src.adaptation.confidence_adapter import create_confidence_adapter
                 
                 self.trend_analyzer = create_trend_analyzer(self.temporal_client)
-                self.confidence_adapter = create_confidence_adapter(self.trend_analyzer)
-                logger.info("TrendWise Adaptive Learning: Trend analysis and confidence adaptation initialized")
+                # self.confidence_adapter = create_confidence_adapter(self.trend_analyzer)
+                self.confidence_adapter = None  # DISABLED - was causing flat, literary responses
+                logger.info("TrendWise Adaptive Learning: Trend analysis initialized (ConfidenceAdapter disabled)")
             except ImportError as e:
                 logger.warning("TrendWise components not available: %s", e)
                 self.trend_analyzer = None
@@ -3078,6 +3080,24 @@ class MessageProcessor:
                 # Estimated tokens: 400
                 # Blocked by: Relationship management system not yet implemented
                 # Note: This would enable characters to reference shared history and relationship depth
+                
+                # ================================
+                # COMPONENT 16: Response Guidelines (Priority 16)
+                # ================================
+                # Character-specific response formatting rules and personality-first principles
+                # from character_response_guidelines table (e.g., NotTaylor's chaotic formatting rules)
+                from src.prompts.cdl_component_factories import create_response_guidelines_component
+                
+                response_guidelines_component = await create_response_guidelines_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name,
+                    priority=16  # After personality/voice, before final guidance
+                )
+                if response_guidelines_component:
+                    assembler.add_component(response_guidelines_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added response guidelines for {bot_name}")
+                else:
+                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No response guidelines found for {bot_name}")
                 
                 # ================================
                 # FINAL CDL COMPONENT: Response Guidance (Priority 20)
