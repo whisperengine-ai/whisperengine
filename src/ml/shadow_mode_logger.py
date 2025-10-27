@@ -81,9 +81,17 @@ class MLShadowModeLogger:
         
         Args:
             influxdb_client: InfluxDB client for writing predictions (optional)
+                           Can be either a raw InfluxDBClient or TemporalIntelligenceClient
         """
-        self.influxdb_client = influxdb_client
-        self.enabled = ENABLE_ML_SHADOW_MODE and INFLUXDB_AVAILABLE and influxdb_client is not None
+        # Handle both TemporalIntelligenceClient wrapper and raw InfluxDBClient
+        if influxdb_client and hasattr(influxdb_client, 'client'):
+            # It's a TemporalIntelligenceClient, extract the raw client
+            self.influxdb_client = influxdb_client.client
+        else:
+            # It's a raw InfluxDBClient or None
+            self.influxdb_client = influxdb_client
+        
+        self.enabled = ENABLE_ML_SHADOW_MODE and INFLUXDB_AVAILABLE and self.influxdb_client is not None
         
         if ENABLE_ML_SHADOW_MODE and not self.enabled:
             if not INFLUXDB_AVAILABLE:
@@ -226,6 +234,9 @@ class MLShadowModeLogger:
         """
         if not self.enabled:
             return {"error": "ML Shadow Mode not enabled"}
+        
+        if not self.influxdb_client:
+            return {"error": "InfluxDB client not available"}
         
         try:
             query_api = self.influxdb_client.query_api()
