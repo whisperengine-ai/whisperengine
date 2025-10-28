@@ -237,18 +237,16 @@ for point in points[:5]:
 
 ---
 
-## 🐛 Known Issues & Notes
+## ✅ Recent Fixes
 
-### **PostgreSQL Column Mismatches (Minor)**
-```
-⚠️ Failed to import background knowledge: column "phase_name" does not exist
-⚠️ Failed to import goals knowledge: column "goal_name" does not exist  
-⚠️ Failed to import interests knowledge: column "interest_name" does not exist
-```
-
-**Impact:** Medium - Bot self-memory imports work but miss some data
-**Status:** These column names need verification against actual CDL schema
-**Workaround:** Currently gets 2/4 knowledge types (relationships work)
+### CDL Column Name Corrections (FIXED - Commit 31ac845)
+- **Fixed**: Updated all CDL queries to match actual PostgreSQL schema
+- **Changes**:
+  - `character_background`: `phase_name→category/title`, `age_range→period/date_range`
+  - `character_current_goals`: `goal_name→goal_text`, `priority_level→priority` (string values)
+  - `character_interests`: `interest_name→interest_text`, `engagement_level→proficiency_level`
+- **Impact**: Bot self-memory now imports **19 knowledge entries** (previously 2)
+- **Status**: All 4 knowledge types working (relationships, background, goals, interests)
 
 ### **InfluxDB Optional**
 ```
