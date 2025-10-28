@@ -678,14 +678,15 @@ class EnrichmentWorker:
                         
                         if context_metadata.get('latest_message_timestamp'):
                             ts = datetime.fromisoformat(context_metadata['latest_message_timestamp'])
-                            # Make timezone-naive for comparison
-                            if ts.tzinfo is not None:
-                                ts = ts.replace(tzinfo=None)
+                            # TIMEZONE FIX: Keep timezone-aware for comparison
+                            if ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
                             timestamps.append(ts)
                         elif fact.get('created_at'):
                             ts = fact['created_at']
-                            if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
-                                ts = ts.replace(tzinfo=None)
+                            # TIMEZONE FIX: Keep timezone-aware for comparison
+                            if hasattr(ts, 'tzinfo') and ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
                             timestamps.append(ts)
                     
                     if timestamps:
@@ -1536,9 +1537,9 @@ class EnrichmentWorker:
                 if context_metadata.get('latest_message_timestamp'):
                     try:
                         ts = datetime.fromisoformat(context_metadata['latest_message_timestamp'])
-                        # Make timezone-naive for consistency
-                        if ts.tzinfo is not None:
-                            ts = ts.replace(tzinfo=None)
+                        # TIMEZONE FIX: Keep timezone-aware for comparison
+                        if ts.tzinfo is None:
+                            ts = ts.replace(tzinfo=timezone.utc)
                         logger.debug("Last preference extraction for user %s: %s (from marker)", user_id, ts)
                         return ts
                     except (ValueError, TypeError) as e:
@@ -2188,15 +2189,20 @@ Examples:
                     time_window_hours=2
                 )
                 
+                logger.info(f"🔍 User {user_id}: got {len(recent_conversations) if recent_conversations else 0} reflection-worthy conversations")
+                
                 if not recent_conversations:
                     logger.debug("No reflection-worthy conversations for user %s", user_id)
                     continue
                 
                 # Quality filter: Must have enough messages
                 if len(recent_conversations) < 5:
+                    logger.info(f"❌ User {user_id} filtered: only {len(recent_conversations)} messages (need >= 5)")
                     logger.debug("Insufficient messages (%s) for reflection with user %s", 
                                len(recent_conversations), user_id)
                     continue
+                
+                logger.info(f"✅ User {user_id} passed all filters: generating self-reflection...")
                 
                 # Generate self-reflection via LLM
                 reflection_data = await self._generate_bot_self_reflection(
@@ -2264,7 +2270,15 @@ Examples:
                     cutoff_timestamp = last_time.timestamp()
             
             # Query Qdrant for conversations since cutoff
-            points = self.qdrant_client.scroll(
+            # WORKAROUND: Create fresh client instance to avoid stale connection issues
+            from qdrant_client import QdrantClient
+            from src.enrichment.config import config
+            fresh_client = QdrantClient(
+                host=config.QDRANT_HOST,
+                port=config.QDRANT_PORT
+            )
+            logger.info(f"🔍 Querying Qdrant: collection={collection_name}, user={user_id}, cutoff={cutoff_time.isoformat()}")
+            scroll_result = fresh_client.scroll(
                 collection_name=collection_name,
                 scroll_filter=Filter(
                     must=[
@@ -2281,7 +2295,10 @@ Examples:
                 limit=100,  # Max 100 messages per reflection window
                 with_payload=True,
                 with_vectors=False
-            )[0]
+            )
+            logger.info(f"🔍 Scroll result type: {type(scroll_result)}, length: {len(scroll_result) if isinstance(scroll_result, (list, tuple)) else 'N/A'}")
+            points = scroll_result[0] if isinstance(scroll_result, tuple) else scroll_result
+            logger.info(f"🔍 Retrieved {len(points)} points for user {user_id}")
             
             # Extract conversation data
             conversations = []
@@ -2291,7 +2308,8 @@ Examples:
                     
                 content = point.payload.get('content', '')
                 role = point.payload.get('role', '')
-                emotion_label = point.payload.get('emotion_label', 'neutral')
+                # CRITICAL FIX: Field name is 'emotional_context' not 'emotion_label'
+                emotion_label = point.payload.get('emotional_context', 'neutral')
                 roberta_confidence = point.payload.get('roberta_confidence', 0.0)
                 
                 # Event-based triggers: High emotion
@@ -2315,10 +2333,13 @@ Examples:
             
             # Quality filter: Must have emotional engagement
             high_emotion_count = sum(1 for c in conversations if c['is_high_emotion'])
+            logger.info(f"🔍 Quality filter check: user={user_id}, conversations={len(conversations)}, high_emotion={high_emotion_count}")
             if high_emotion_count == 0 and len(conversations) < 10:
                 # Need either high emotion OR substantial conversation
+                logger.info(f"❌ Filtered out user {user_id}: insufficient quality ({high_emotion_count} emotions, {len(conversations)} messages)")
                 return []
             
+            logger.info(f"✅ User {user_id} passed quality filter: returning {len(conversations)} conversations")
             return conversations
             
         except Exception as e:
@@ -2360,20 +2381,36 @@ Analyze this conversation and provide a structured self-reflection with:
 
 Respond in JSON format only."""
             
-            # Generate reflection via LLM
-            response = await self.llm_client.generate_completion(
+            # Generate reflection via LLM (synchronous method)
+            logger.info(f"🤖 Calling LLM for self-reflection: model={config.LLM_CHAT_MODEL}, max_tokens=800")
+            response = self.llm_client.generate_chat_completion(
                 model=config.LLM_CHAT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=800,
                 temperature=0.7
             )
             
-            if not response or not response.get('content'):
-                logger.warning("Empty LLM response for self-reflection")
+            # Extract content from OpenAI-style response format
+            content = None
+            if response and isinstance(response, dict):
+                # Standard OpenAI format: response['choices'][0]['message']['content']
+                if 'choices' in response and len(response['choices']) > 0:
+                    message = response['choices'][0].get('message', {})
+                    content = message.get('content', '')
+                # Legacy format: response['content'] (direct)
+                elif 'content' in response:
+                    content = response['content']
+            
+            logger.info(f"🤖 Extracted content length: {len(content) if content else 0}")
+            if content:
+                logger.info(f"🤖 Content preview: {content[:150]}...")
+            
+            if not content:
+                logger.warning(f"Empty LLM response for self-reflection: response keys={response.keys() if isinstance(response, dict) else 'not dict'}")
                 return None
             
-            # Parse JSON response
-            content = response['content'].strip()
+            # Parse JSON response (content already extracted above)
+            content = content.strip()
             if content.startswith('```json'):
                 content = content[7:]
             if content.startswith('```'):
@@ -2384,6 +2421,12 @@ Respond in JSON format only."""
             
             reflection_data = json.loads(content)
             
+            # Unwrap if LLM wrapped response in a root key (e.g., {"self_reflection": {...}})
+            if len(reflection_data) == 1 and isinstance(list(reflection_data.values())[0], dict):
+                root_key = list(reflection_data.keys())[0]
+                logger.info(f"🔧 Unwrapping nested response from key: {root_key}")
+                reflection_data = reflection_data[root_key]
+            
             # Add metadata
             reflection_data['interaction_context'] = context[:500]  # First 500 chars
             reflection_data['bot_response_preview'] = conversations[-1]['content'][:200] if conversations else ''
@@ -2393,7 +2436,7 @@ Respond in JSON format only."""
             required_fields = ['effectiveness_score', 'authenticity_score', 'emotional_resonance', 
                              'learning_insight', 'improvement_suggestion']
             if not all(field in reflection_data for field in required_fields):
-                logger.warning("Missing required fields in reflection data")
+                logger.warning(f"Missing required fields in reflection data. Have: {list(reflection_data.keys())}")
                 return None
             
             return reflection_data
