@@ -196,9 +196,9 @@ class BotSelfMemorySystem:
         try:
             async with self.db_pool.acquire() as conn:
                 # Query character_background table
+                # Actual columns: category, period, title, description, date_range, importance_level
                 rows = await conn.fetch("""
-                    SELECT phase_name, age_range, key_events, emotional_impact, 
-                           cultural_influences, formative_experience, importance_level
+                    SELECT category, period, title, description, date_range, importance_level
                     FROM character_background 
                     WHERE character_id = $1 
                       AND importance_level >= 7
@@ -207,10 +207,10 @@ class BotSelfMemorySystem:
                 """, character_id)
                 
                 for row in rows:
-                    phase = row['phase_name'] or 'Life Phase'
-                    age = row['age_range'] or 'Past'
-                    events = row['key_events'] or ''
-                    impact = row['emotional_impact'] or ''
+                    phase = row['category'] or row['title'] or 'Life Phase'
+                    age = row['period'] or row['date_range'] or 'Past'
+                    events = row['title'] or ''
+                    impact = row['description'] or ''
                     
                     # Build content
                     content_parts = [f"{phase} ({age})"]
@@ -258,23 +258,32 @@ class BotSelfMemorySystem:
         try:
             async with self.db_pool.acquire() as conn:
                 # Query character_current_goals table
+                # Actual columns: goal_text, priority, timeframe, status
                 rows = await conn.fetch("""
-                    SELECT goal_name, goal_description, goal_category, priority_level,
-                           progress_status, emotional_investment, time_commitment
+                    SELECT goal_text, priority, timeframe, status
                     FROM character_current_goals 
                     WHERE character_id = $1 
-                      AND priority_level >= 6
-                    ORDER BY priority_level DESC
+                      AND priority IN ('high', 'critical')
+                    ORDER BY 
+                        CASE priority 
+                            WHEN 'critical' THEN 1 
+                            WHEN 'high' THEN 2 
+                            ELSE 3 
+                        END
                     LIMIT 10
                 """, character_id)
                 
                 for row in rows:
-                    goal = row['goal_name'] or 'Goal'
-                    description = row['goal_description'] or ''
-                    status = row['progress_status'] or 'active'
-                    priority = row['priority_level'] or 7
+                    goal = row['goal_text'] or 'Goal'
+                    priority = row['priority'] or 'medium'
+                    status = row['status'] or 'active'
+                    timeframe = row['timeframe'] or 'ongoing'
                     
-                    content = f"{goal}: {description[:250]} (Status: {status}, Priority: {priority}/10)"
+                    content = f"{goal} (Priority: {priority}, Status: {status}, Timeframe: {timeframe})"
+                    
+                    # Map priority to confidence score
+                    priority_scores = {'critical': 1.0, 'high': 0.8, 'medium': 0.6, 'low': 0.4}
+                    confidence = priority_scores.get(priority, 0.7)
                     
                     knowledge = PersonalKnowledge(
                         category="current_projects",
@@ -283,7 +292,7 @@ class BotSelfMemorySystem:
                             "goals", "working on", "projects", "future", "plans", 
                             "aspirations", "objectives", goal.lower()
                         ],
-                        confidence_score=priority / 10.0
+                        confidence_score=confidence
                     )
                     knowledge_entries.append(knowledge)
         
@@ -306,23 +315,28 @@ class BotSelfMemorySystem:
         try:
             async with self.db_pool.acquire() as conn:
                 # Query character_interests table
+                # Actual columns: category, interest_text, proficiency_level, importance, frequency
                 rows = await conn.fetch("""
-                    SELECT interest_name, interest_category, engagement_level,
-                           description, passion_level
+                    SELECT category, interest_text, proficiency_level, importance, frequency
                     FROM character_interests 
                     WHERE character_id = $1 
-                      AND engagement_level >= 6
-                    ORDER BY engagement_level DESC
+                      AND importance IN ('high', 'critical')
+                    ORDER BY proficiency_level DESC
                     LIMIT 15
                 """, character_id)
                 
                 for row in rows:
-                    interest = row['interest_name'] or 'Interest'
-                    category = row['interest_category'] or 'hobby'
-                    description = row['description'] or ''
-                    engagement = row['engagement_level'] or 7
+                    interest = row['interest_text'] or 'Interest'
+                    category = row['category'] or 'hobby'
+                    proficiency = row['proficiency_level'] or 5
+                    importance = row['importance'] or 'medium'
+                    frequency = row['frequency'] or 'occasionally'
                     
-                    content = f"{category.title()}: {interest} - {description[:200]} (Engagement: {engagement}/10)"
+                    content = f"{category.title()}: {interest} (Proficiency: {proficiency}/10, Importance: {importance}, Frequency: {frequency})"
+                    
+                    # Map importance to confidence score
+                    importance_scores = {'critical': 1.0, 'high': 0.8, 'medium': 0.6, 'low': 0.4}
+                    confidence = importance_scores.get(importance, 0.7)
                     
                     knowledge = PersonalKnowledge(
                         category="interests",
@@ -331,7 +345,7 @@ class BotSelfMemorySystem:
                             "interests", "hobbies", "passions", "enjoy", "love", 
                             interest.lower(), category.lower()
                         ],
-                        confidence_score=engagement / 10.0
+                        confidence_score=confidence
                     )
                     knowledge_entries.append(knowledge)
         
