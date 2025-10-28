@@ -561,7 +561,7 @@ class CDLContentAuditor:
         avg_completeness = sum(r.completeness_score for r in results) / total_chars
         avg_quality = sum(r.quality_score for r in results) / total_chars
         
-        rating_counts = defaultdict(int)
+        rating_counts: defaultdict[str, int] = defaultdict(int)
         for result in results:
             rating_counts[result.overall_rating] += 1
         
@@ -599,7 +599,7 @@ class CDLContentAuditor:
                 all_issues.extend(section.issues)
         
         if all_issues:
-            issue_counts = defaultdict(int)
+            issue_counts: defaultdict[str, int] = defaultdict(int)
             for issue in all_issues:
                 issue_counts[issue] += 1
             

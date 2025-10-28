@@ -86,7 +86,7 @@ class ConversationSummarizer:
         }
         
         # Cache for performance optimization
-        self._summary_cache = {}
+        self._summary_cache: dict[str, Any] = {}
         self._cache_max_size = 1000
     
     async def summarize_conversation(

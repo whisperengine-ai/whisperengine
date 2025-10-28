@@ -378,7 +378,7 @@ class PromptAssembler:
         total_tokens = sum(c.estimate_token_cost() for c in components)
         
         # Count components by type
-        type_counts = defaultdict(int)
+        type_counts: defaultdict[str, int] = defaultdict(int)
         for component in components:
             type_counts[component.type.value] += 1
         

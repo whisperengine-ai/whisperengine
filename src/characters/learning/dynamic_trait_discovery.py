@@ -436,7 +436,7 @@ class DynamicTraitDiscovery:
             strong_relationships = [rel for rel in trait_relationships if rel['strength'] >= relationship_strength_threshold]
             
             # Group by relationship type
-            relationship_groups = {}
+            relationship_groups: dict[str, list[dict]] = {}
             for rel in strong_relationships:
                 rel_type = rel['relationship_type']
                 if rel_type not in relationship_groups:

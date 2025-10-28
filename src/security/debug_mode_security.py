@@ -32,7 +32,7 @@ class SecureDebugLogger:
 
     def __init__(self, enable_debug_mode: bool = False):
         self.enable_debug_mode = enable_debug_mode
-        self.user_id_cache = {}  # Cache for user ID hashing
+        self.user_id_cache: dict[str, str] = {}  # Cache for user ID hashing
 
     def hash_user_id(self, user_id: str) -> str:
         """Create a consistent hash for user ID that can be used for debugging"""

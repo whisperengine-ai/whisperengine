@@ -15,7 +15,7 @@ class ConversationHistoryManager:
     def __init__(self, max_channels: int = 100, max_messages_per_channel: int = 20):
         self.max_channels = max_channels
         self.max_messages_per_channel = max_messages_per_channel
-        self.channels = OrderedDict()
+        self.channels: OrderedDict[str, list[dict]] = OrderedDict()
         logger.debug(
             f"ConversationHistoryManager initialized: max_channels={max_channels}, max_messages={max_messages_per_channel}"
         )

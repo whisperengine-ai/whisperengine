@@ -417,7 +417,7 @@ class APIKeySecurityManager:
         invalid_keys = total_keys - valid_keys
 
         # Count threat types
-        threat_counts = {}
+        threat_counts: dict[str, int] = {}
         for info in env_validation.values():
             for threat in info.security_threats:
                 threat_counts[threat.value] = threat_counts.get(threat.value, 0) + 1
