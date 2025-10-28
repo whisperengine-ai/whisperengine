@@ -14,7 +14,7 @@ import sys
 import json
 import os
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Any
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
@@ -110,7 +110,7 @@ class EnrichmentWorker:
     async def _enrichment_cycle(self):
         """Single enrichment processing cycle"""
         logger.info("📊 Starting enrichment cycle...")
-        cycle_start = datetime.utcnow()
+        cycle_start = datetime.now(timezone.utc)
         
         # Get all bot collections from Qdrant
         collections = self._get_bot_collections()
@@ -170,7 +170,7 @@ class EnrichmentWorker:
                 logger.error("Error processing collection %s: %s", collection_name, e)
                 continue
         
-        cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
+        cycle_duration = (datetime.now(timezone.utc) - cycle_start).total_seconds()
         logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback, %s reflections in %.2fs",
                    total_summaries_created, total_facts_extracted, total_preferences_extracted, 
                    total_emoji_feedback_processed, total_reflections_created, cycle_duration)
@@ -402,7 +402,7 @@ class EnrichmentWorker:
                     if timestamp.tzinfo is not None:
                         timestamp = timestamp.replace(tzinfo=None)
                 except:
-                    timestamp = datetime.utcnow()
+                    timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
                 
                 messages.append({
                     'content': point.payload.get('content', ''),
@@ -443,7 +443,7 @@ class EnrichmentWorker:
         4. Avoids wasteful re-processing of same old conversations
         """
         windows = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Find the last processed timestamp
         if existing_summaries:
@@ -691,17 +691,17 @@ class EnrichmentWorker:
                     if timestamps:
                         last_processed = max(timestamps)
                     else:
-                        last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                        last_processed = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                     
                     logger.debug("Last processed MESSAGE timestamp for user %s: %s", user_id, last_processed)
                 else:
                     # No facts yet - backfill from LOOKBACK_DAYS ago
-                    last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                    last_processed = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                     logger.debug("No existing facts for user %s, backfilling from %s", user_id, last_processed)
                 
                 # CRITICAL: Enforce maximum lookback window - NEVER process messages older than LOOKBACK_DAYS
                 # This prevents burning tokens on ancient conversations even if marker timestamp is old
-                max_lookback = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                max_lookback = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                 if last_processed < max_lookback:
                     logger.info(
                         f"⏭️  [ENFORCING LOOKBACK] User {user_id} marker is old ({last_processed.isoformat()}), "
@@ -1013,7 +1013,7 @@ class EnrichmentWorker:
                         # Build attributes JSONB for fact_entities
                         attributes = {
                             'extraction_method': 'enrichment_worker',
-                            'extracted_at': datetime.utcnow().isoformat(),
+                            'extracted_at': datetime.now(timezone.utc).isoformat(),
                             'tags': fact.related_facts  # Used for full-text search
                         }
                         
@@ -1040,7 +1040,7 @@ class EnrichmentWorker:
                             'reasoning': fact.reasoning,
                             'source_messages': fact.source_messages,
                             'extraction_method': 'enrichment_worker',
-                            'extracted_at': datetime.utcnow().isoformat(),
+                            'extracted_at': datetime.now(timezone.utc).isoformat(),
                             'latest_message_timestamp': latest_message_timestamp.isoformat(),  # For incremental processing
                             'conversation_window_size': len(relationships) if relationships else 1,
                             'multi_message_confirmed': fact.confirmation_count > 1,
@@ -1423,7 +1423,7 @@ class EnrichmentWorker:
                 
                 # CRITICAL: Enforce maximum lookback window - NEVER process messages older than LOOKBACK_DAYS
                 # This prevents burning tokens on ancient conversations even if marker timestamp is old
-                max_lookback = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                max_lookback = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                 if last_extraction < max_lookback:
                     logger.info(
                         f"⏭️  [ENFORCING LOOKBACK] User {user_id} preference marker is old ({last_extraction.isoformat()}), "
@@ -1545,7 +1545,7 @@ class EnrichmentWorker:
                         logger.warning("Failed to parse marker timestamp for user %s: %s", user_id, e)
             
             # No marker yet - backfill from LOOKBACK_DAYS ago
-            backfill_from = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+            backfill_from = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
             logger.debug("No existing preference marker for user %s, backfilling from %s", user_id, backfill_from)
             return backfill_from
     
@@ -1756,7 +1756,7 @@ JSON Response:"""
                         preference_obj = {
                             'value': pref_value,
                             'confidence': confidence,
-                            'updated_at': datetime.utcnow().isoformat(),
+                            'updated_at': datetime.now(timezone.utc).isoformat(),
                             'metadata': {
                                 'extraction_method': 'enrichment_worker',
                                 'reasoning': pref.get('reasoning', ''),
@@ -1806,7 +1806,7 @@ JSON Response:"""
         
         # Get time window for unprocessed emoji reactions
         time_window_hours = config.TIME_WINDOW_HOURS
-        time_threshold = datetime.utcnow() - timedelta(hours=time_window_hours)
+        time_threshold = datetime.now(timezone.utc) - timedelta(hours=time_window_hours)
         
         # Query Qdrant for EMOJI REACTION memories (interaction_type=emoji_reaction)
         # These are stored by emoji_reaction_intelligence.py with original_bot_message metadata
@@ -2247,8 +2247,8 @@ Examples:
     ) -> List[Dict[str, Any]]:
         """Get conversations worthy of self-reflection (quality filters applied)"""
         try:
-            # Calculate time window
-            cutoff_time = datetime.utcnow() - timedelta(hours=time_window_hours)
+            # Calculate time window (use UTC timezone-aware datetime to match storage)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=time_window_hours)
             cutoff_timestamp = cutoff_time.timestamp()
             
             # Check if we already reflected on recent conversations
