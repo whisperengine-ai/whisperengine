@@ -158,7 +158,7 @@ class LearningOrchestrator:
         self.correlation_analysis_interval = timedelta(days=7)
         
         # Sprint 6 Telemetry: Usage tracking for evaluation
-        self._telemetry = {
+        self._telemetry: Dict[str, Any] = {
             'coordinate_learning_cycle_count': 0,
             'monitor_learning_health_count': 0,
             'prioritize_learning_tasks_count': 0,
@@ -189,8 +189,8 @@ class LearningOrchestrator:
         cycle_start = datetime.utcnow()
         logger.info("🎯 ORCHESTRATOR: Starting unified learning cycle for %s", bot_name)
         
-        # Sprint 6 Telemetry: Track invocation
-        self._telemetry['coordinate_learning_cycle_count'] += 1
+        # Sprint 6 Telemetry: Track invocation (cast for type safety)
+        self._telemetry['coordinate_learning_cycle_count'] = int(self._telemetry['coordinate_learning_cycle_count']) + 1
         
         try:
             # Phase 1: Health assessment across all components
@@ -218,8 +218,8 @@ class LearningOrchestrator:
             
             cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
             
-            # Sprint 6 Telemetry: Record execution time
-            self._telemetry['total_execution_time_seconds'] += cycle_duration
+            # Sprint 6 Telemetry: Record execution time (cast for type safety)
+            self._telemetry['total_execution_time_seconds'] = float(self._telemetry['total_execution_time_seconds']) + cycle_duration
             
             # Sprint 6 Telemetry: Write to InfluxDB for evaluation
             if self.temporal_client:
@@ -301,8 +301,8 @@ class LearningOrchestrator:
         health_check_start = datetime.utcnow()
         component_statuses = []
         
-        # Sprint 6 Telemetry: Track invocation
-        self._telemetry['monitor_learning_health_count'] += 1
+        # Sprint 6 Telemetry: Track invocation (cast for type safety)
+        self._telemetry['monitor_learning_health_count'] = int(self._telemetry['monitor_learning_health_count']) + 1
         
         try:
             # Sprint 1: TrendWise health check
@@ -584,7 +584,7 @@ class LearningOrchestrator:
     async def _check_trendwise_health(self, _bot_name: str) -> ComponentHealthStatus:
         """Check health of Sprint 1 TrendWise components."""
         issues = []
-        metrics = {}
+        metrics: Dict[str, Any] = {}
         performance_score = 0.8  # Default healthy score
         
         if not self.trend_analyzer:
@@ -611,8 +611,8 @@ class LearningOrchestrator:
     
     async def _check_memoryboost_health(self, _bot_name: str) -> ComponentHealthStatus:
         """Check health of Sprint 2 MemoryBoost components."""
-        issues = []
-        metrics = {}
+        issues: List[str] = []
+        metrics: Dict[str, Any] = {}
         performance_score = 0.8
         
         if not self.memory_manager:
@@ -638,8 +638,8 @@ class LearningOrchestrator:
     
     async def _check_relationship_health(self, _bot_name: str) -> ComponentHealthStatus:
         """Check health of Sprint 3 RelationshipTuner components."""
-        issues = []
-        metrics = {}
+        issues: List[str] = []
+        metrics: Dict[str, Any] = {}
         performance_score = 0.8
         
         if not self.relationship_engine:
@@ -666,8 +666,8 @@ class LearningOrchestrator:
     
     async def _check_character_evolution_health(self, _bot_name: str) -> ComponentHealthStatus:
         """Check health of Sprint 4 CharacterEvolution components."""
-        issues = []
-        metrics = {}
+        issues: List[str] = []
+        metrics: Dict[str, Any] = {}
         performance_score = 0.8  # Assume healthy until implementation
         
         # CharacterEvolution components would be in src/characters/
@@ -691,8 +691,8 @@ class LearningOrchestrator:
     
     async def _check_knowledge_fusion_health(self, _bot_name: str) -> ComponentHealthStatus:
         """Check health of Sprint 5 KnowledgeFusion components."""
-        issues = []
-        metrics = {}
+        issues: List[str] = []
+        metrics: Dict[str, Any] = {}
         performance_score = 0.8  # Assume healthy until implementation
         
         # KnowledgeFusion components would be in src/knowledge/
