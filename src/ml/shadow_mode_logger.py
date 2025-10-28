@@ -168,8 +168,9 @@ class MLShadowModeLogger:
                     elif isinstance(value, str):
                         point = point.field(key, value)
             
-            # Write to InfluxDB (non-blocking)
-            write_api = self.influxdb_client.write_api()
+            # Write to InfluxDB (SYNCHRONOUS mode to prevent Rx thread spam)
+            from influxdb_client.client.write_api import SYNCHRONOUS
+            write_api = self.influxdb_client.write_api(write_options=SYNCHRONOUS)
             write_api.write(
                 bucket=os.getenv("INFLUXDB_BUCKET", "whisperengine"),
                 record=point
