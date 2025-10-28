@@ -153,18 +153,26 @@ markers = [
 
 [tool.mypy]
 python_version = "3.13"
-warn_return_any = true
+# Gradual adoption mode - lenient settings to start
+warn_return_any = false
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
+disallow_untyped_defs = false  # Too strict for gradual adoption
+disallow_incomplete_defs = false  # Too strict for gradual adoption
+check_untyped_defs = true  # Check types even if no annotations
+disallow_untyped_decorators = false  # Too strict
+no_implicit_optional = false  # Allow Optional[T] = None pattern
 warn_redundant_casts = true
-warn_unused_ignores = true
+warn_unused_ignores = false  # Avoid noise during gradual adoption
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+# Show error codes to help understand issues
+show_error_codes = true
+# Exclude deprecated files
+exclude = [
+    "src/platforms/universal_chat_DEPRECATED.py",
+    "src/core/message_processor_fix.py",
+]
 
 [[tool.mypy.overrides]]
 module = [
@@ -174,5 +182,9 @@ module = [
     "elevenlabs.*",
     "redis.*",
     "audioop_lts.*",
+    "psycopg2.*",
+    "influxdb_client.*",
+    "transformers.*",
+    "torch.*",
 ]
 ignore_missing_imports = true

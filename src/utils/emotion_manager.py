@@ -23,6 +23,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +276,7 @@ class EmotionManager:
 
         # Thread safety for concurrent operations
         self._save_lock = threading.RLock()
-        self._auto_save_timer = None
+        self._auto_save_timer: Optional[threading.Timer] = None
         self._auto_save_interval = 300  # 5 minutes
         self._last_save = time.time()
         self._unsaved_changes = False

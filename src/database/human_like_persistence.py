@@ -666,22 +666,6 @@ class HumanLikePersistenceManager:
         except Exception as e:
             logger.error("Failed to get effective response patterns: %s", e)
             return []
-            
-            if self.use_postgres:
-                return await self._track_empathetic_response_postgres(
-                    user_id, intervention_type, response_style, effectiveness_score, context
-                )
-            elif self.use_sqlite:
-                return await self._track_empathetic_response_sqlite(
-                    user_id, intervention_type, response_style, effectiveness_score, context
-                )
-            else:
-                logger.warning("No database backend available for tracking empathetic responses")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Failed to track empathetic response for {user_id}: {e}")
-            return False
     
     async def _track_empathetic_response_postgres(
         self, user_id: str, intervention_type: str, response_style: str,

@@ -174,7 +174,7 @@ class PromptAssembler:
         """
         total_tokens = sum(c.estimate_token_cost() for c in components)
         
-        if total_tokens <= self.max_tokens:
+        if self.max_tokens is None or total_tokens <= self.max_tokens:
             logger.debug(
                 "Within token budget: %d tokens (limit: %d)",
                 total_tokens,
@@ -195,7 +195,7 @@ class PromptAssembler:
         # Calculate required tokens
         required_tokens = sum(c.estimate_token_cost() for c in required)
         
-        if required_tokens > self.max_tokens:
+        if self.max_tokens is not None and required_tokens > self.max_tokens:
             logger.error(
                 "Required components exceed token budget: %d > %d - applying intelligent truncation",
                 required_tokens,
@@ -211,7 +211,7 @@ class PromptAssembler:
         
         for component in optional:
             component_tokens = component.estimate_token_cost()
-            if current_tokens + component_tokens <= self.max_tokens:
+            if self.max_tokens is None or current_tokens + component_tokens <= self.max_tokens:
                 result.append(component)
                 current_tokens += component_tokens
             else:

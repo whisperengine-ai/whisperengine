@@ -6,7 +6,7 @@ SECURITY ENHANCED: Now includes API key validation and secure credential handlin
 import logging
 import os
 from io import BytesIO
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp
 
@@ -28,9 +28,9 @@ class ElevenLabsClient:
         try:
             from src.security.api_key_security import APIKeyType, get_api_key_manager
 
-            self.api_key_manager = get_api_key_manager()
+            self.api_key_manager: Optional[Any] = get_api_key_manager()
         except ImportError:
-            self.api_key_manager = None
+            self.api_key_manager: Optional[Any] = None
             logging.warning(
                 "API key security module not available for ElevenLabs - using basic validation"
             )
@@ -41,15 +41,15 @@ class ElevenLabsClient:
         if raw_api_key and self.api_key_manager:
             key_info = self.api_key_manager.validate_api_key(raw_api_key, APIKeyType.ELEVENLABS)
             if key_info.is_valid:
-                self.api_key = raw_api_key
+                self.api_key: Optional[str] = raw_api_key
                 logging.debug(f"ElevenLabs API key validated: {key_info.masked_key}")
             else:
-                self.api_key = None
+                self.api_key: Optional[str] = None
                 error_msg = f"Invalid ElevenLabs API key rejected: {key_info.masked_key} - Threats: {[t.value for t in key_info.security_threats]}"
                 logging.error(error_msg)
                 raise ValueError(f"Invalid ElevenLabs API key. {error_msg}")
         else:
-            self.api_key = raw_api_key
+            self.api_key: Optional[str] = raw_api_key
 
         if not self.api_key and require_api_key:
             raise ValueError(
