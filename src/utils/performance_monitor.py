@@ -179,6 +179,9 @@ class PerformanceMonitor:
         bottlenecks = []
         
         for operation, stats in self.get_all_stats().items():
+            if not isinstance(stats, PerformanceStats):
+                continue
+                
             baseline = self.baselines.get(operation, 1000)
             
             issues = []

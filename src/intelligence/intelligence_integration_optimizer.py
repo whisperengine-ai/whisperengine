@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class PhaseIntegrationOptimizer:
         self.cache_ttl_seconds = cache_ttl_seconds
 
         # Performance tracking
-        self.performance_stats = {
+        self.performance_stats: Dict[str, Any] = {
             "total_requests": 0,
             "cache_hits": 0,
             "parallel_executions": 0,
