@@ -1629,15 +1629,31 @@ class UnifiedQueryClassifier:
 # FACTORY FUNCTION
 # ============================================================================
 
-def create_unified_query_classifier(postgres_pool=None, qdrant_client=None) -> UnifiedQueryClassifier:
+def create_unified_query_classifier(postgres_pool=None, qdrant_client=None):
     """
     Factory function to create UnifiedQueryClassifier instance.
+    
+    PERFORMANCE NOTE: UnifiedQueryClassifier adds significant overhead (~2x processing time)
+    due to spaCy NLP analysis on every query. Disabled by default in production.
     
     Args:
         postgres_pool: Optional PostgreSQL connection pool
         qdrant_client: Optional Qdrant client
         
     Returns:
-        Configured UnifiedQueryClassifier instance
+        Configured UnifiedQueryClassifier instance, or None if disabled
+        
+    Environment Variables:
+        ENABLE_LLM_TOOL_CALLING: Set to 'true' to enable (default: 'false')
     """
+    import os
+    
+    enable_tool_calling = os.getenv('ENABLE_LLM_TOOL_CALLING', 'false').lower() == 'true'
+    
+    if not enable_tool_calling:
+        # Return None - callers must check for None before using
+        return None
+    
     return UnifiedQueryClassifier(postgres_pool, qdrant_client)
+
+
