@@ -14,7 +14,7 @@ import json
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, cast
 from dataclasses import dataclass, asdict
 from enum import Enum
 
@@ -119,7 +119,7 @@ class FactExtractor:
         timestamp = datetime.now(timezone.utc)
         
         for pattern in self.patterns:
-            matches = re.finditer(pattern['regex'], message_lower, re.IGNORECASE)
+            matches = re.finditer(cast(str, pattern['regex']), message_lower, re.IGNORECASE)
             
             for match in matches:
                 try:
@@ -127,11 +127,11 @@ class FactExtractor:
                     object_val = match.group(pattern['object_group']).strip()
                     
                     fact = ExtractedFact(
-                        fact_type=pattern['fact_type'],
+                        fact_type=cast(FactType, pattern['fact_type']),
                         subject=subject,
-                        predicate=pattern['predicate'],
+                        predicate=cast(str, pattern['predicate']),
                         object=object_val,
-                        confidence=pattern['confidence'],
+                        confidence=cast(float, pattern['confidence']),
                         source_message=message,
                         timestamp=timestamp,
                         user_id=user_id

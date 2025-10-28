@@ -6,7 +6,7 @@ with fallback to generic patterns when character has no database entries.
 
 import logging
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ class TriggerModeController:
         """
         try:
             message_lower = message_content.lower()
-            detected_triggers = []
+            detected_triggers: List[str] = []
             
             # First, try to get database-driven interaction modes
             interaction_modes = []
@@ -139,7 +139,7 @@ class TriggerModeController:
                 score = 0.3
             
             mode_scores[mode.mode_name] = {
-                'score': score,
+                'score': float(score),
                 'mode': mode,
                 'triggers': mode_triggers
             }
@@ -203,8 +203,8 @@ class TriggerModeController:
         
         # Find highest scoring mode
         if mode_scores:
-            best_mode_name = max(mode_scores.keys(), key=lambda k: mode_scores[k]['score'])
-            best_score = mode_scores[best_mode_name]['score']
+            best_mode_name = max(mode_scores.keys(), key=lambda k: cast(float, mode_scores[k]['score']))
+            best_score = cast(float, mode_scores[best_mode_name]['score'])
             
             # Only activate if we have actual matches
             if best_score > 0:
@@ -212,8 +212,8 @@ class TriggerModeController:
                 active_mode = ActiveMode(
                     mode_name=best_mode_name,
                     mode_description=f"Fallback {best_mode_name} mode",
-                    response_guidelines=mode_data['guidelines'],
-                    avoid_patterns=mode_data['avoid'],
+                    response_guidelines=str(mode_data['guidelines']),
+                    avoid_patterns=list(mode_data['avoid']) if isinstance(mode_data['avoid'], list) else [str(mode_data['avoid'])],
                     trigger_source='fallback',
                     confidence=min(best_score / 2.0, 1.0)  # Normalize confidence
                 )

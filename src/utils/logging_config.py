@@ -10,7 +10,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
 
 class StructuredFormatter(logging.Formatter):
@@ -157,7 +157,7 @@ def setup_logging(
     root_logger.handlers.clear()
     root_logger.setLevel(root_level)
 
-    handlers = []
+    handlers: List[logging.Handler] = []
 
     # Console Handler - Always enabled
     console_handler = logging.StreamHandler(sys.stdout)
