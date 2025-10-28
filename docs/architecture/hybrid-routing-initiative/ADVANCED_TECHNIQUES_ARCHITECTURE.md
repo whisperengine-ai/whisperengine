@@ -120,11 +120,16 @@ Advanced Techniques (shared memory, learning, optimization)
 
 ### Overview
 
-**What**: Enable bots to store and query their own personal knowledge (CDL data) and self-reflections in isolated vector memory  
-**Why**: Foundation for character self-awareness, evolution, and all advanced learning features  
-**How**: Refactor existing `bot_self_memory_system.py` to use PostgreSQL CDL database instead of JSON files
+**What**: Enable bots to store and query their own personal knowledge (CDL data) and self-reflections with hybrid storage architecture
 
-**Status**: ⚠️ **CRITICAL PREREQUISITE** - Existing file is outdated, requires complete refactor
+**Why**: Foundation for character self-awareness, evolution, and all advanced learning features
+
+**How**: 
+1. Refactor existing `bot_self_memory_system.py` to use PostgreSQL CDL database instead of JSON files
+2. Implement hybrid storage for self-reflections (PostgreSQL + Qdrant + InfluxDB)
+3. Integrate self-reflection analysis into enrichment worker (async, zero hot path impact)
+
+**Status**: ⚠️ **CRITICAL PREREQUISITE** - Architecture finalized (Oct 2025), ready for implementation
 
 ### Current State (October 2025)
 
@@ -136,12 +141,89 @@ Advanced Techniques (shared memory, learning, optimization)
 2. **Wrong Schema**: Expects old nested JSON structure (`character_section.get('background', {})`)
 3. **No Database Integration**: Zero `asyncpg` code, no PostgreSQL queries
 4. **Incompatible with Current CDL**: WhisperEngine now has 53+ PostgreSQL tables
+5. **No Self-Reflection Storage**: Self-reflections currently only in Qdrant (needs hybrid storage)
 
 **What's Still Good**:
 - ✅ Architecture: Namespace isolation (`bot_self_{bot_name}`)
 - ✅ Data classes: `PersonalKnowledge` and `SelfReflection` structures
 - ✅ Query interface: `query_self_knowledge()`, `store_self_reflection()` APIs
 - ✅ Vector storage pattern using `MemoryManagerProtocol`
+
+### Hybrid Storage Architecture (NEW - October 2025)
+
+**Bot self-memory serves TWO purposes**:
+1. **Reading Character Profile** - Static CDL data from PostgreSQL (who am I?)
+2. **Storing Self-Reflections** - Dynamic learning insights (what have I learned?)
+
+#### Storage Strategy for Self-Reflections
+
+**PostgreSQL (Primary Storage)**:
+- **Table**: New `bot_self_reflections` table (Alembic migration required)
+- **Purpose**: Structured analytics, filtering, aggregations
+- **Schema**:
+  ```sql
+  CREATE TABLE bot_self_reflections (
+    id UUID PRIMARY KEY,
+    bot_name VARCHAR(100) NOT NULL,
+    interaction_id UUID,
+    user_id VARCHAR(255),
+    conversation_id UUID,
+    effectiveness_score FLOAT,
+    authenticity_score FLOAT,
+    emotional_resonance FLOAT,
+    learning_insight TEXT,
+    improvement_suggestion TEXT,
+    interaction_context TEXT,
+    bot_response_preview TEXT,
+    trigger_type VARCHAR(50),  -- 'time_based', 'high_emotion', 'user_feedback', etc.
+    reflection_category VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+  ```
+- **Query Patterns**: 
+  - "Show all reflections where bot was wrong" (filter by effectiveness_score)
+  - "Get improvement suggestions for user interaction style" (filter by category)
+  - "Aggregate performance trends over time" (GROUP BY, ORDER BY created_at)
+
+**Qdrant (Semantic Index)**:
+- **Namespace**: `bot_self_{bot_name}` (existing namespace, shared with character knowledge)
+- **Purpose**: Semantic search for "find similar learning moments"
+- **Metadata**: `reflection_id` (links to PostgreSQL), scores, category, trigger_type
+- **Query Patterns**:
+  - "What did I learn in similar conversations?"
+  - "Find reflections about handling emotional users"
+
+**InfluxDB (Time-Series Metrics)**:
+- **Measurement**: `bot_self_reflection`
+- **Tags**: `bot`, `trigger_type`, `reflection_category`
+- **Fields**: `effectiveness_score`, `authenticity_score`, `emotional_resonance`
+- **Purpose**: Trending analysis, performance correlation, learning velocity
+- **Query Patterns**:
+  - "Is the bot's self-assessment accuracy improving over time?"
+  - "Correlate self-reflection scores with actual user satisfaction"
+  - "Track learning velocity (reflections per week)"
+
+#### Enrichment Worker Integration (Zero Hot Path Impact)
+
+**Execution Strategy**: Self-reflection runs ASYNC in background enrichment worker
+
+**Benefits**:
+- ✅ Zero latency impact on message processing
+- ✅ Complete conversation context (knows the outcome)
+- ✅ Time-windowed analysis (batch process 2 hours of conversations)
+- ✅ Quality filtering (only reflection-worthy conversations)
+
+**Triggers**:
+- **Time-Based**: Every 2 hours, analyze recent conversations
+- **Event-Based**: High emotion detected, user feedback received, conversation abandonment, repetitive patterns
+- **Quality Filters**: Message count >= 5, emotional engagement detected, novel situations
+
+**Reflection Generation Pipeline**:
+1. Scan recent bot conversations from Qdrant (2-hour window)
+2. Filter for reflection-worthy exchanges (quality thresholds)
+3. Generate self-reflections via LLM (analyze effectiveness, authenticity, resonance)
+4. Store in PostgreSQL (primary), Qdrant (semantic), InfluxDB (metrics)
+5. Bot retrieves learnings during future conversations via tool calling
 
 ### Refactoring Requirements
 

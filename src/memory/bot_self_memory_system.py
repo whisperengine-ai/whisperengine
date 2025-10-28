@@ -4,14 +4,17 @@ Bot Self-Memory System
 Core system for storing and querying bot's personal knowledge, self-reflections,
 and evolution tracking. Enables bots to have authentic personal memories and
 self-awareness capabilities.
+
+HYBRID STORAGE ARCHITECTURE (October 2025):
+- Character Knowledge: PostgreSQL CDL database (53+ character_* tables)
+- Self-Reflections: PostgreSQL (primary) + Qdrant (semantic) + InfluxDB (metrics)
 """
 
 import logging
 from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
-from pathlib import Path
-import json
+import asyncpg
 
 from src.memory.memory_protocol import MemoryManagerProtocol
 
@@ -55,95 +58,127 @@ class BotSelfMemorySystem:
     """
     Manages bot's personal knowledge base and self-reflection storage.
     Uses isolated vector memory namespace to prevent interference with user conversations.
+    
+    HYBRID STORAGE (October 2025):
+    - Character Knowledge: Read from PostgreSQL CDL database (character_* tables)
+    - Self-Reflections: Store in PostgreSQL + Qdrant + InfluxDB (enrichment worker)
     """
     
-    def __init__(self, bot_name: str, memory_manager: MemoryManagerProtocol):
+    def __init__(
+        self, 
+        bot_name: str, 
+        memory_manager: MemoryManagerProtocol,
+        db_pool: Optional[asyncpg.Pool] = None
+    ):
         self.bot_name = bot_name
         self.memory_manager = memory_manager
         self.namespace = f"bot_self_{bot_name}"
+        self.db_pool = db_pool  # PostgreSQL connection pool for CDL queries
         
-        logger.info(f"🧠 Initialized BotSelfMemorySystem for {bot_name}")
+        logger.info("🧠 Initialized BotSelfMemorySystem for %s", bot_name)
     
-    async def import_cdl_knowledge(self, character_file: str) -> int:
+    async def import_cdl_knowledge(self, character_id: Optional[int] = None) -> int:
         """
-        Import personal knowledge from CDL character file into bot's memory.
+        Import personal knowledge from PostgreSQL CDL database into bot's memory.
         
         Args:
-            character_file: Path to CDL character JSON file
+            character_id: Optional character ID. If not provided, queries by bot_name.
             
         Returns:
             Number of knowledge entries imported
         """
+        if not self.db_pool:
+            logger.error("Cannot import CDL knowledge: No database pool configured")
+            return 0
+            
         try:
-            # Handle both full paths and just filenames
-            if character_file.startswith('characters/'):
-                character_path = Path(character_file)
-            else:
-                character_path = Path(f"characters/examples/{character_file}")
+            # Get character_id if not provided
+            if character_id is None:
+                from src.utils.bot_name_utils import normalize_bot_name
+                normalized_name = normalize_bot_name(self.bot_name)
+                
+                async with self.db_pool.acquire() as conn:
+                    row = await conn.fetchrow(
+                        "SELECT id FROM characters WHERE normalized_name = $1",
+                        normalized_name
+                    )
+                    if not row:
+                        logger.error("Character not found in database: %s", self.bot_name)
+                        return 0
+                    character_id = row['id']
             
-            if not character_path.exists():
-                logger.error(f"Character file not found: {character_path}")
-                return 0
-            
-            with open(character_path, 'r', encoding='utf-8') as f:
-                character_data = json.load(f)
-            
-            character_section = character_data.get('character', {})
             imported_count = 0
             
             # Import relationship information
-            imported_count += await self._import_relationship_knowledge(character_section)
+            imported_count += await self._import_relationship_knowledge(character_id)
             
             # Import background and life experiences
-            imported_count += await self._import_background_knowledge(character_section)
+            imported_count += await self._import_background_knowledge(character_id)
             
             # Import current goals and projects
-            imported_count += await self._import_goals_knowledge(character_section)
+            imported_count += await self._import_goals_knowledge(character_id)
             
-            # Import daily routine and habits
-            imported_count += await self._import_routine_knowledge(character_section)
+            # Import interests and hobbies
+            imported_count += await self._import_interests_knowledge(character_id)
             
-            logger.info(f"✅ Imported {imported_count} knowledge entries for {self.bot_name}")
+            logger.info("✅ Imported %d knowledge entries for %s", imported_count, self.bot_name)
             return imported_count
             
         except Exception as e:
-            logger.error(f"Failed to import CDL knowledge for {self.bot_name}: {e}")
+            logger.error("Failed to import CDL knowledge for %s: %s", self.bot_name, e)
             return 0
     
-    async def _import_relationship_knowledge(self, character_section: Dict) -> int:
-        """Import relationship and romantic status information"""
-        background = character_section.get('background', {})
-        personality = character_section.get('personality', {})
-        
+    async def _import_relationship_knowledge(self, character_id: int) -> int:
+        """Import relationship and romantic status information from PostgreSQL"""
+        if not self.db_pool:
+            return 0
+            
         knowledge_entries = []
         
-        # Check for explicit relationship information in background
-        social_circle = background.get('social_circle', [])
-        if social_circle:
-            # Look for relationship indicators
-            relationship_info = []
-            for person in social_circle:
-                if isinstance(person, str):
-                    if any(word in person.lower() for word in ['boyfriend', 'girlfriend', 'partner', 'spouse']):
-                        relationship_info.append(person)
-            
-            if relationship_info:
-                content = f"Current relationships: {'; '.join(relationship_info)}"
-            else:
-                content = "Currently single and focused on career. Has close friendships and professional relationships but no current romantic partner."
-        else:
-            # Default assumption for career-focused characters
-            content = "Currently single and focused on career development. Open to meaningful relationships but prioritizing professional goals."
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Query character_relationships table
+                rows = await conn.fetch("""
+                    SELECT related_entity, relationship_type, relationship_strength, 
+                           description, status
+                    FROM character_relationships 
+                    WHERE character_id = $1 
+                      AND relationship_strength >= 5
+                    ORDER BY relationship_strength DESC
+                    LIMIT 20
+                """, character_id)
+                
+                for row in rows:
+                    # Create descriptive content
+                    rel_type = row['relationship_type'] or 'relationship'
+                    related = row['related_entity']
+                    desc = row['description'] or f"{rel_type} with {related}"
+                    strength = row['relationship_strength']
+                    
+                    content = f"{rel_type.title()}: {related} (strength: {strength}/10) - {desc}"
+                    
+                    knowledge = PersonalKnowledge(
+                        category="relationships",
+                        content=content,
+                        searchable_queries=[
+                            "boyfriend", "girlfriend", "partner", "dating", "relationship", 
+                            "friend", "family", "colleague", related.lower(), rel_type.lower()
+                        ],
+                        confidence_score=strength / 10.0
+                    )
+                    knowledge_entries.append(knowledge)
+                
+                # If no relationships found, add single status
+                if not rows:
+                    knowledge = PersonalKnowledge(
+                        category="relationships",
+                        content="Currently single and focused on career. Open to meaningful relationships.",
+                        searchable_queries=["boyfriend", "girlfriend", "partner", "dating", "relationship", "single"]
+                    )
+                    knowledge_entries.append(knowledge)
         
-        knowledge = PersonalKnowledge(
-            category="relationships",
-            content=content,
-            searchable_queries=[
-                "boyfriend", "girlfriend", "partner", "dating", "relationship", "single", 
-                "romance", "love life", "romantic", "married", "spouse"
-            ]
-        )
-        knowledge_entries.append(knowledge)
+        except Exception as e:
+            logger.error("Failed to import relationship knowledge: %s", e)
         
         # Store in vector memory
         for knowledge in knowledge_entries:
@@ -151,58 +186,61 @@ class BotSelfMemorySystem:
         
         return len(knowledge_entries)
     
-    async def _import_background_knowledge(self, character_section: Dict) -> int:
-        """Import childhood, family, and life experience information"""
-        background = character_section.get('background', {})
+    async def _import_background_knowledge(self, character_id: int) -> int:
+        """Import childhood, family, and life experience information from PostgreSQL"""
+        if not self.db_pool:
+            return 0
+            
         knowledge_entries = []
         
-        # Life phases information
-        life_phases = background.get('life_phases', [])
-        if life_phases:
-            for phase in life_phases:
-                phase_name = phase.get('name', 'Life Phase')
-                age_range = phase.get('age_range', 'Unknown age')
-                key_events = phase.get('key_events', [])
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Query character_background table
+                rows = await conn.fetch("""
+                    SELECT phase_name, age_range, key_events, emotional_impact, 
+                           cultural_influences, formative_experience, importance_level
+                    FROM character_background 
+                    WHERE character_id = $1 
+                      AND importance_level >= 7
+                    ORDER BY importance_level DESC
+                    LIMIT 15
+                """, character_id)
                 
-                if key_events:
-                    content = f"{phase_name} ({age_range}): {'; '.join(key_events[:3])}"
+                for row in rows:
+                    phase = row['phase_name'] or 'Life Phase'
+                    age = row['age_range'] or 'Past'
+                    events = row['key_events'] or ''
+                    impact = row['emotional_impact'] or ''
                     
-                    # Determine search queries based on phase name
+                    # Build content
+                    content_parts = [f"{phase} ({age})"]
+                    if events:
+                        content_parts.append(f"Events: {events[:200]}")
+                    if impact:
+                        content_parts.append(f"Impact: {impact[:150]}")
+                    
+                    content = " - ".join(content_parts)
+                    
+                    # Determine search queries based on phase
                     queries = ["childhood", "background", "growing up", "family", "past", "history"]
-                    if "childhood" in phase_name.lower() or "upbringing" in phase_name.lower():
-                        queries.extend(["childhood", "young", "kid", "family", "parents", "grandmother"])
-                    elif "academic" in phase_name.lower() or "education" in phase_name.lower():
-                        queries.extend(["school", "college", "university", "education", "learning", "student"])
-                    elif "career" in phase_name.lower():
-                        queries.extend(["work", "job", "career", "professional", "early career"])
+                    phase_lower = phase.lower()
+                    if "childhood" in phase_lower or "upbringing" in phase_lower:
+                        queries.extend(["young", "kid", "parents", "grandmother"])
+                    elif "academic" in phase_lower or "education" in phase_lower:
+                        queries.extend(["school", "college", "university", "learning", "student"])
+                    elif "career" in phase_lower:
+                        queries.extend(["work", "job", "professional", "early career"])
                     
                     knowledge = PersonalKnowledge(
                         category="background",
                         content=content,
-                        searchable_queries=queries
+                        searchable_queries=queries,
+                        confidence_score=(row['importance_level'] or 7) / 10.0
                     )
                     knowledge_entries.append(knowledge)
         
-        # Family background
-        family_background = background.get('family_background')
-        if family_background:
-            knowledge = PersonalKnowledge(
-                category="background",
-                content=f"Family background: {family_background}",
-                searchable_queries=["family", "parents", "background", "heritage", "upbringing", "roots"]
-            )
-            knowledge_entries.append(knowledge)
-        
-        # Formative experiences
-        formative_experiences = background.get('formative_experiences', [])
-        if formative_experiences:
-            content = f"Key formative experiences: {'; '.join(formative_experiences[:4])}"
-            knowledge = PersonalKnowledge(
-                category="background",
-                content=content,
-                searchable_queries=["experiences", "formative", "important events", "memories", "defining moments"]
-            )
-            knowledge_entries.append(knowledge)
+        except Exception as e:
+            logger.error("Failed to import background knowledge: %s", e)
         
         # Store in vector memory
         for knowledge in knowledge_entries:
@@ -210,42 +248,47 @@ class BotSelfMemorySystem:
         
         return len(knowledge_entries)
     
-    async def _import_goals_knowledge(self, character_section: Dict) -> int:
-        """Import current goals, projects, and aspirations"""
-        background = character_section.get('background', {})
+    async def _import_goals_knowledge(self, character_id: int) -> int:
+        """Import current goals, projects, and aspirations from PostgreSQL"""
+        if not self.db_pool:
+            return 0
+            
         knowledge_entries = []
         
-        # Current goals
-        goals = background.get('goals', [])
-        if goals:
-            content = f"Current goals: {'; '.join(goals[:4])}"
-            knowledge = PersonalKnowledge(
-                category="current_projects",
-                content=content,
-                searchable_queries=["goals", "working on", "projects", "future", "plans", "aspirations", "objectives"]
-            )
-            knowledge_entries.append(knowledge)
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Query character_current_goals table
+                rows = await conn.fetch("""
+                    SELECT goal_name, goal_description, goal_category, priority_level,
+                           progress_status, emotional_investment, time_commitment
+                    FROM character_current_goals 
+                    WHERE character_id = $1 
+                      AND priority_level >= 6
+                    ORDER BY priority_level DESC
+                    LIMIT 10
+                """, character_id)
+                
+                for row in rows:
+                    goal = row['goal_name'] or 'Goal'
+                    description = row['goal_description'] or ''
+                    status = row['progress_status'] or 'active'
+                    priority = row['priority_level'] or 7
+                    
+                    content = f"{goal}: {description[:250]} (Status: {status}, Priority: {priority}/10)"
+                    
+                    knowledge = PersonalKnowledge(
+                        category="current_projects",
+                        content=content,
+                        searchable_queries=[
+                            "goals", "working on", "projects", "future", "plans", 
+                            "aspirations", "objectives", goal.lower()
+                        ],
+                        confidence_score=priority / 10.0
+                    )
+                    knowledge_entries.append(knowledge)
         
-        # Current projects
-        current_projects = background.get('current_projects', [])
-        if current_projects:
-            project_descriptions = []
-            for project in current_projects:
-                if isinstance(project, dict):
-                    name = project.get('name', 'Unnamed project')
-                    description = project.get('description', '')
-                    status = project.get('status', 'active')
-                    project_descriptions.append(f"{name}: {description} (status: {status})")
-                else:
-                    project_descriptions.append(str(project))
-            
-            content = f"Current projects: {'; '.join(project_descriptions[:3])}"
-            knowledge = PersonalKnowledge(
-                category="current_projects", 
-                content=content,
-                searchable_queries=["projects", "working on", "research", "work", "current work", "active projects"]
-            )
-            knowledge_entries.append(knowledge)
+        except Exception as e:
+            logger.error("Failed to import goals knowledge: %s", e)
         
         # Store in vector memory
         for knowledge in knowledge_entries:
@@ -253,38 +296,47 @@ class BotSelfMemorySystem:
         
         return len(knowledge_entries)
     
-    async def _import_routine_knowledge(self, character_section: Dict) -> int:
-        """Import daily routine and habit information"""
-        background = character_section.get('background', {})
+    async def _import_interests_knowledge(self, character_id: int) -> int:
+        """Import interests, hobbies, and passions from PostgreSQL"""
+        if not self.db_pool:
+            return 0
+            
         knowledge_entries = []
         
-        # Daily routine
-        daily_routine = background.get('daily_routine', {})
-        if daily_routine:
-            routine_parts = []
-            for key, value in daily_routine.items():
-                if key != 'habits' and value:
-                    routine_parts.append(f"{key.replace('_', ' ')}: {value}")
-            
-            if routine_parts:
-                content = f"Daily routine: {'; '.join(routine_parts[:4])}"
-                knowledge = PersonalKnowledge(
-                    category="daily_routine",
-                    content=content,
-                    searchable_queries=["routine", "daily", "schedule", "habits", "typical day", "usually do"]
-                )
-                knowledge_entries.append(knowledge)
-            
-            # Specific habits
-            habits = daily_routine.get('habits', [])
-            if habits:
-                content = f"Personal habits: {'; '.join(habits[:5])}"
-                knowledge = PersonalKnowledge(
-                    category="daily_routine",
-                    content=content,
-                    searchable_queries=["habits", "routine", "regularly do", "always", "usually", "typically"]
-                )
-                knowledge_entries.append(knowledge)
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Query character_interests table
+                rows = await conn.fetch("""
+                    SELECT interest_name, interest_category, engagement_level,
+                           description, passion_level
+                    FROM character_interests 
+                    WHERE character_id = $1 
+                      AND engagement_level >= 6
+                    ORDER BY engagement_level DESC
+                    LIMIT 15
+                """, character_id)
+                
+                for row in rows:
+                    interest = row['interest_name'] or 'Interest'
+                    category = row['interest_category'] or 'hobby'
+                    description = row['description'] or ''
+                    engagement = row['engagement_level'] or 7
+                    
+                    content = f"{category.title()}: {interest} - {description[:200]} (Engagement: {engagement}/10)"
+                    
+                    knowledge = PersonalKnowledge(
+                        category="interests",
+                        content=content,
+                        searchable_queries=[
+                            "interests", "hobbies", "passions", "enjoy", "love", 
+                            interest.lower(), category.lower()
+                        ],
+                        confidence_score=engagement / 10.0
+                    )
+                    knowledge_entries.append(knowledge)
+        
+        except Exception as e:
+            logger.error("Failed to import interests knowledge: %s", e)
         
         # Store in vector memory
         for knowledge in knowledge_entries:
