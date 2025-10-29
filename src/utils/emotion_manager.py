@@ -23,6 +23,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Optional, Dict, List, Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -197,11 +198,11 @@ class RelationshipManager:
         rules = self.relationship_rules[current_level]
 
         # Check interaction threshold
-        if profile.interaction_count < rules["interaction_threshold"]:
+        if profile.interaction_count < cast(int, rules["interaction_threshold"]):
             return False
 
         # Check specific requirements
-        requirements = rules["requirements"]
+        requirements = cast(List[str], rules["requirements"])
 
         if "multiple_interactions" in requirements:
             if profile.interaction_count < 3:
@@ -275,7 +276,7 @@ class EmotionManager:
 
         # Thread safety for concurrent operations
         self._save_lock = threading.RLock()
-        self._auto_save_timer = None
+        self._auto_save_timer: Optional[threading.Timer] = None
         self._auto_save_interval = 300  # 5 minutes
         self._last_save = time.time()
         self._unsaved_changes = False

@@ -14,6 +14,6 @@ Components:
 # Import will be available once confidence_adapter.py is complete
 # from .confidence_adapter import ConfidenceAdapter
 
-__all__ = [
+__all__: list[str] = [
     # 'ConfidenceAdapter'
 ]

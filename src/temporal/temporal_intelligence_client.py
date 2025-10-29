@@ -885,6 +885,58 @@ class TemporalIntelligenceClient:
         except (ValueError, ConnectionError, KeyError) as e:
             logger.error("Failed to record CDL integration performance: %s", e)
             return False
+    
+    async def record_bot_self_reflection(
+        self,
+        bot_name: str,
+        effectiveness_score: float,
+        authenticity_score: float,
+        emotional_resonance: float,
+        reflection_category: str,
+        trigger_type: str,
+        session_id: Optional[str] = None
+    ) -> bool:
+        """
+        Record bot self-reflection metrics for character learning analysis
+        
+        HYBRID STORAGE: InfluxDB tracks time-series metrics for self-reflection trends
+        
+        Args:
+            bot_name: Character name
+            effectiveness_score: How effective were bot responses (0.0-1.0)
+            authenticity_score: How authentic to character personality (0.0-1.0)
+            emotional_resonance: Emotional connection with user (0.0-1.0)
+            reflection_category: Category of learning (emotional_handling, topic_expertise, etc.)
+            trigger_type: What triggered reflection (time_based, high_emotion, user_feedback, etc.)
+            session_id: Optional session identifier
+            
+        Returns:
+            True if successfully recorded, False otherwise
+        """
+        if not self.enabled:
+            return False
+            
+        try:
+            point = Point("bot_self_reflection") \
+                .tag("bot", bot_name) \
+                .tag("reflection_category", reflection_category) \
+                .tag("trigger_type", trigger_type) \
+                .field("effectiveness_score", float(effectiveness_score)) \
+                .field("authenticity_score", float(authenticity_score)) \
+                .field("emotional_resonance", float(emotional_resonance)) \
+                .time(datetime.utcnow())
+            
+            if session_id:
+                point = point.tag("session_id", session_id)
+            
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded bot self-reflection for %s: category=%s, effectiveness=%.2f, authenticity=%.2f, resonance=%.2f", 
+                        bot_name, reflection_category, effectiveness_score, authenticity_score, emotional_resonance)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record bot self-reflection: %s", e)
+            return False
 
     async def record_point(
         self,

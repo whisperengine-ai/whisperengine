@@ -149,7 +149,7 @@ def truncate_context(
     
     # ADAPTIVE TRUNCATION: Add messages from MOST RECENT backwards until budget fills
     # This naturally keeps MORE messages if they're short, FEWER if they're walls of text
-    included_messages = []
+    included_messages: list[dict] = []
     included_tokens = 0
     messages_preserved = 0
     

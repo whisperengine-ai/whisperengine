@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 try:
     import asyncpg
@@ -132,7 +132,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
     def __init__(self, config: DatabaseConfig):
         super().__init__(config)
         self.db_path = self._extract_db_path(config.connection_string)
-        self.connection = None
+        self.connection: Optional[Union[Any, sqlite3.Connection]] = None  # aiosqlite or sqlite3
 
     def _extract_db_path(self, connection_string: str) -> str:
         """Extract database path from connection string"""
@@ -358,7 +358,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
 
     def __init__(self, config: DatabaseConfig):
         super().__init__(config)
-        self.pool = None
+        self.pool: Optional[Any] = None  # asyncpg.Pool type
 
     async def connect(self) -> bool:
         """Establish PostgreSQL connection pool"""

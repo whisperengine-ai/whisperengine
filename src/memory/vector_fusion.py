@@ -84,7 +84,7 @@ class ReciprocalRankFusion:
         logger.info("🔀 RRF: Fusing %d vector types: %s", len(results_by_vector), list(results_by_vector.keys()))
         
         # Calculate RRF scores for each unique memory
-        memory_scores = {}  # content_hash -> {memory, rrf_score, sources}
+        memory_scores: Dict[str, Dict[str, Any]] = {}  # content_hash -> {memory, rrf_score, sources}
         
         for vector_type, results in results_by_vector.items():
             weight = self.config.weights.get(vector_type, 1.0) if self.config.weights else 1.0

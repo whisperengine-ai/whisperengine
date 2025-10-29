@@ -199,7 +199,7 @@ class CrossReferencePatternDetector:
         try:
             # Minimal topic detection without hardcoded keyword lists
             # Group memories by basic content characteristics
-            content_lengths = {'short': [], 'medium': [], 'long': []}
+            content_lengths: dict[str, list[Any]] = {'short': [], 'medium': [], 'long': []}
             question_memories = []
             
             for memory in memories:
@@ -257,7 +257,7 @@ class CrossReferencePatternDetector:
         
         try:
             # Group memories by emotional content
-            emotional_memories = {}
+            emotional_memories: dict[str, list[Any]] = {}
             
             for memory in memories:
                 # Check for emotion data
@@ -391,7 +391,7 @@ class CrossReferencePatternDetector:
     
     def _group_memories_by_time(self, memories: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """Group memories by time periods"""
-        time_groups = {
+        time_groups: dict[str, list[dict[str, Any]]] = {
             'morning': [],
             'afternoon': [],
             'evening': [],

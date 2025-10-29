@@ -1869,6 +1869,1255 @@ class SemanticKnowledgeRouter:
         except Exception as e:
             logger.error(f"❌ Failed to restore deprecated facts: {e}")
             return 0
+    
+    # ========================================================================
+    # LLM TOOL CALLING - Week 1 Hybrid Routing Integration
+    # ========================================================================
+    
+    async def execute_tools(
+        self,
+        query: str,
+        user_id: str,
+        character_name: str,
+        llm_client=None
+    ) -> Dict[str, Any]:
+        """
+        Execute LLM tool calling for structured data retrieval.
+        
+        This method integrates with the UnifiedQueryClassifier's TOOL_ASSISTED
+        intent to provide LLM-assisted multi-source data aggregation.
+        
+        Migrated from src/intelligence/tool_executor.py as part of Week 1
+        hybrid routing refactoring.
+        
+        Args:
+            query: User's query string
+            user_id: User's unique identifier
+            character_name: Current character name
+            llm_client: Optional LLM client (will create if not provided)
+        
+        Returns:
+            Dict with tool execution results:
+                {
+                    "tool_results": List[Dict],  # Raw tool results
+                    "enriched_context": str,  # Formatted context for LLM
+                    "tools_used": List[str],  # Names of tools executed
+                    "execution_time_ms": float
+                }
+        """
+        start_time = datetime.now()
+        
+        # Get tool definitions
+        tools = self._get_tool_definitions()
+        
+        # Create LLM client if not provided
+        if llm_client is None:
+            from src.llm.llm_protocol import create_llm_client
+            llm_client = create_llm_client(llm_client_type="openrouter")
+        
+        try:
+            # Use LLM tool calling to determine which tools to execute
+            tool_response = llm_client.generate_chat_completion_with_tools(
+                messages=[{
+                    "role": "user",
+                    "content": f"For the query: '{query}' - determine which data retrieval tools to use."
+                }],
+                tools=tools,
+                tool_choice="auto"
+            )
+            
+            # Execute called tools
+            tool_results = []
+            tools_used = []
+            
+            if hasattr(tool_response, 'tool_calls') and tool_response.tool_calls:
+                for tool_call in tool_response.tool_calls:
+                    tool_name = tool_call.function.name
+                    
+                    # Parse arguments (handle both string and dict)
+                    if isinstance(tool_call.function.arguments, str):
+                        import json
+                        tool_arguments = json.loads(tool_call.function.arguments)
+                    else:
+                        tool_arguments = tool_call.function.arguments
+                    
+                    # Add required arguments
+                    if tool_name == "query_user_facts":
+                        tool_arguments["user_id"] = user_id
+                    elif tool_name == "recall_conversation_context":
+                        tool_arguments["user_id"] = user_id
+                    elif tool_name == "query_character_backstory":
+                        # Tool 3 uses DISCORD_BOT_NAME environment variable directly
+                        # No character_name parameter needed
+                        pass
+                    elif tool_name == "summarize_user_relationship":
+                        tool_arguments["user_id"] = user_id
+                    elif tool_name == "query_temporal_trends":
+                        tool_arguments["user_id"] = user_id
+                    
+                    # Execute tool
+                    result = await self._execute_single_tool(
+                        tool_name=tool_name,
+                        arguments=tool_arguments
+                    )
+                    
+                    tool_results.append(result)
+                    tools_used.append(tool_name)
+            
+            # Format results for LLM consumption
+            enriched_context = self._format_tool_results(tool_results)
+            
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            logger.info(
+                "🔧 TOOL EXECUTION: query='%s...' → %d tools used (%s) | Time: %.2fms",
+                query[:40],
+                len(tools_used),
+                ', '.join(tools_used),
+                execution_time
+            )
+            
+            return {
+                "tool_results": tool_results,
+                "enriched_context": enriched_context,
+                "tools_used": tools_used,
+                "execution_time_ms": execution_time
+            }
+            
+        except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.error(
+                "❌ TOOL EXECUTION FAILED: %s | Time: %.2fms",
+                str(e),
+                execution_time,
+                exc_info=True
+            )
+            
+            return {
+                "tool_results": [],
+                "enriched_context": "",
+                "tools_used": [],
+                "execution_time_ms": execution_time,
+                "error": str(e)
+            }
+    
+    async def _execute_single_tool(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Execute a single tool and return results.
+        
+        Routes to the appropriate tool execution method based on tool_name.
+        
+        Args:
+            tool_name: Name of the tool to execute
+            arguments: Dictionary of tool arguments
+        
+        Returns:
+            Dict with tool results
+        """
+        start_time = datetime.now()
+        
+        try:
+            # Route to appropriate tool method
+            if tool_name == "query_user_facts":
+                data = await self._tool_query_user_facts(**arguments)
+            elif tool_name == "recall_conversation_context":
+                data = await self._tool_recall_conversation_context(**arguments)
+            elif tool_name == "query_character_backstory":
+                data = await self._tool_query_character_backstory(**arguments)
+            elif tool_name == "summarize_user_relationship":
+                data = await self._tool_summarize_user_relationship(**arguments)
+            elif tool_name == "query_temporal_trends":
+                data = await self._tool_query_temporal_trends(**arguments)
+            else:
+                raise ValueError(f"Unknown tool: {tool_name}")
+            
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "data": data,
+                "error": None,
+                "execution_time_ms": execution_time
+            }
+            
+        except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            
+            logger.error(
+                "Tool execution failed: %s | Error: %s | Time: %.2fms",
+                tool_name,
+                error_msg,
+                execution_time
+            )
+            
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "data": None,
+                "error": error_msg,
+                "execution_time_ms": execution_time
+            }
+    
+    def _get_tool_definitions(self) -> List[Dict[str, Any]]:
+        """
+        Get LLM tool calling definitions for all 5 core tools.
+        
+        Returns:
+            List of tool definitions in OpenAI function calling format
+        """
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_user_facts",
+                    "description": "Query structured user facts and preferences from PostgreSQL (pets, hobbies, family, preferences, location, etc.)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "fact_type": {
+                                "type": "string",
+                                "enum": ["all", "pet", "hobby", "family", "preference", "location"],
+                                "description": "Type of facts to query (default: 'all')"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of facts to return (default: 10)"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "recall_conversation_context",
+                    "description": "Retrieve relevant conversation history using semantic search on Qdrant vector memory",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Semantic search query to find relevant conversations"
+                            },
+                            "time_window": {
+                                "type": "string",
+                                "enum": ["24h", "7d", "30d", "all"],
+                                "description": "Time window filter (default: 'all')"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of memories to return (default: 5)"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_character_backstory",
+                    "description": "Query PostgreSQL CDL database for character backstory, personality, and designer-defined facts",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "What to query about the character's background"
+                            },
+                            "source": {
+                                "type": "string",
+                                "enum": ["cdl_database", "self_memory", "both"],
+                                "description": "Data source to query (default: 'both')"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "summarize_user_relationship",
+                    "description": "Generate comprehensive relationship summary by aggregating user facts and conversation history",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "include_facts": {
+                                "type": "boolean",
+                                "description": "Include user facts from PostgreSQL (default: true)"
+                            },
+                            "include_conversations": {
+                                "type": "boolean",
+                                "description": "Include conversation history from Qdrant (default: true)"
+                            },
+                            "time_window": {
+                                "type": "string",
+                                "enum": ["24h", "7d", "30d", "all"],
+                                "description": "Time window for conversations (default: 'all')"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_temporal_trends",
+                    "description": "Query InfluxDB for conversation quality metrics over time (engagement, satisfaction, coherence)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "metric": {
+                                "type": "string",
+                                "enum": ["all", "engagement_score", "satisfaction_score", "coherence_score"],
+                                "description": "Metric to query (default: 'all')"
+                            },
+                            "time_window": {
+                                "type": "string",
+                                "enum": ["24h", "7d", "30d"],
+                                "description": "Time window for trends (default: '7d')"
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    
+    def _format_tool_results(self, tool_results: List[Dict[str, Any]]) -> str:
+        """
+        Format tool results into enriched context string for LLM.
+        
+        Args:
+            tool_results: List of tool execution results
+        
+        Returns:
+            Formatted context string
+        """
+        if not tool_results:
+            return ""
+        
+        context_parts = ["=== TOOL RESULTS ==="]
+        
+        for result in tool_results:
+            if not result.get("success"):
+                continue
+            
+            tool_name = result["tool_name"]
+            data = result["data"]
+            
+            context_parts.append(f"\n--- {tool_name} ---")
+            
+            if isinstance(data, list) and data:
+                context_parts.append(f"Found {len(data)} items:")
+                for item in data[:5]:  # Limit to first 5 for context
+                    context_parts.append(f"  • {json.dumps(item, indent=2)}")
+            elif isinstance(data, dict):
+                context_parts.append(json.dumps(data, indent=2))
+            else:
+                context_parts.append(str(data))
+        
+        context_parts.append("\n===================")
+        
+        return "\n".join(context_parts)
+    
+    # Tool 1: Query User Facts
+    async def _tool_query_user_facts(
+        self,
+        user_id: str,
+        fact_type: str = "all",
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Tool 1: Query PostgreSQL for user facts and preferences.
+        
+        Migrated from src/intelligence/tool_executor.py
+        """
+        if not self.postgres:
+            raise RuntimeError("PostgreSQL connection pool not available")
+        
+        # Build query based on fact_type filter
+        if fact_type == "all":
+            type_filter = "AND fe.entity_type != '_processing_marker'"
+        else:
+            type_filter = f"AND fe.entity_type = '{fact_type}'"
+        
+        query = f"""
+            SELECT 
+                ufr.relationship_type,
+                fe.entity_type,
+                fe.entity_name,
+                fe.category,
+                ufr.confidence,
+                ufr.mentioned_by_character,
+                ufr.created_at
+            FROM user_fact_relationships ufr
+            JOIN fact_entities fe ON ufr.entity_id = fe.id
+            WHERE ufr.user_id = $1
+                {type_filter}
+                AND ufr.relationship_type NOT LIKE '_enrichment%'
+            ORDER BY ufr.created_at DESC
+            LIMIT $2
+        """
+        
+        async with self.postgres.acquire() as conn:
+            rows = await conn.fetch(query, user_id, limit)
+        
+        facts = [
+            {
+                "relationship_type": row["relationship_type"],
+                "entity_type": row["entity_type"],
+                "entity_name": row["entity_name"],
+                "category": row["category"],
+                "confidence": float(row["confidence"]) if row["confidence"] else 1.0,
+                "mentioned_by_character": row["mentioned_by_character"],
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None
+            }
+            for row in rows
+        ]
+        
+        logger.debug(
+            "query_user_facts | User: %s | Type: %s | Found: %d facts",
+            user_id,
+            fact_type,
+            len(facts)
+        )
+        
+        return facts
+    
+    # Tool 2: Recall Conversation Context
+    async def _tool_recall_conversation_context(
+        self,
+        user_id: str,
+        query: str,
+        time_window: str = "all",
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Tool 2: Query Qdrant for relevant conversation history.
+        
+        Migrated from src/intelligence/tool_executor.py
+        """
+        if not self.qdrant:
+            raise RuntimeError("Qdrant client not available")
+        
+        # Calculate time filter if needed
+        time_filter = None
+        if time_window != "all":
+            window_hours = {
+                "24h": 24,
+                "7d": 24 * 7,
+                "30d": 24 * 30
+            }
+            hours = window_hours.get(time_window, 24 * 365)
+            time_filter = datetime.now() - timedelta(hours=hours)
+        
+        # Use existing vector memory retrieval
+        # Note: This requires VectorMemorySystem instance - TODO: integrate properly
+        logger.warning(
+            "_tool_recall_conversation_context requires VectorMemorySystem integration"
+        )
+        
+        return []
+    
+    # Tool 3: Query Character Backstory
+    async def _tool_query_character_backstory(
+        self,
+        query: str,
+        source: str = "both"
+    ) -> Dict[str, Any]:
+        """
+        Tool 3: Query PostgreSQL CDL database for character backstory.
+        
+        Retrieves character biographical information from CDL tables:
+        - character_identity_details: name, age, occupation, description
+        - character_attributes: fears, dreams, quirks, values
+        - character_communication_patterns: tone, humor style, pacing
+        
+        Uses DISCORD_BOT_NAME environment variable as single source of truth for character identification.
+        
+        Args:
+            query: User's query about the character (for context/filtering)
+            source: Data source - "cdl_database", "self_memory", or "both"
+        
+        Returns:
+            Dict with character backstory information
+        
+        Migrated from src/intelligence/tool_executor.py
+        """
+        import os
+        
+        if not self.postgres:
+            raise RuntimeError("PostgreSQL connection pool not available")
+        
+        # Get character name from DISCORD_BOT_NAME environment variable (single source of truth)
+        bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown').lower()
+        
+        result = {
+            "character_name": bot_name,
+            "query": query,
+            "identity": {},
+            "attributes": [],
+            "communication": {},
+            "source": source,
+            "found": False
+        }
+        
+        async with self.postgres.acquire() as conn:
+            # Get character ID using normalized_name column (matches DISCORD_BOT_NAME)
+            char_row = await conn.fetchrow(
+                """
+                SELECT id, name
+                FROM characters 
+                WHERE normalized_name = $1
+                LIMIT 1
+                """,
+                bot_name
+            )
+            
+            if not char_row:
+                logger.warning(
+                    "query_character_backstory | Character not found: %s",
+                    bot_name
+                )
+                return result
+            
+            character_id = char_row["id"]
+            result["found"] = True
+            
+            # Query character identity details
+            identity_row = await conn.fetchrow(
+                """
+                SELECT full_name, nickname, gender, location
+                FROM character_identity_details
+                WHERE character_id = $1
+                """,
+                character_id
+            )
+            
+            if identity_row:
+                result["identity"] = {
+                    "full_name": identity_row["full_name"],
+                    "nickname": identity_row["nickname"],
+                    "gender": identity_row["gender"],
+                    "location": identity_row["location"]
+                }
+            
+            # Query character attributes (fears, dreams, quirks, values)
+            attribute_rows = await conn.fetch(
+                """
+                SELECT category, description, importance, display_order
+                FROM character_attributes
+                WHERE character_id = $1
+                    AND active = true
+                ORDER BY display_order, category
+                LIMIT 20
+                """,
+                character_id
+            )
+            
+            if attribute_rows:
+                result["attributes"] = [
+                    {
+                        "category": row["category"],
+                        "description": row["description"],
+                        "importance": row["importance"],
+                        "display_order": row["display_order"]
+                    }
+                    for row in attribute_rows
+                ]
+            
+            # Query communication patterns
+            comm_rows = await conn.fetch(
+                """
+                SELECT pattern_type, pattern_name, pattern_value
+                FROM character_communication_patterns
+                WHERE character_id = $1
+                LIMIT 10
+                """,
+                character_id
+            )
+            
+            if comm_rows:
+                result["communication"] = [
+                    {
+                        "pattern_type": row["pattern_type"],
+                        "pattern_name": row["pattern_name"],
+                        "pattern_value": row["pattern_value"]
+                    }
+                    for row in comm_rows
+                ]
+        
+        logger.debug(
+            "query_character_backstory | Character: %s (ID: %d) | "
+            "Identity: %s | Attributes: %d | Communication: %s",
+            bot_name,
+            character_id,
+            "found" if result["identity"] else "not found",
+            len(result["attributes"]),
+            "found" if result["communication"] else "not found"
+        )
+        
+        return result
+    
+    # Tool 4: Summarize User Relationship
+    async def _tool_summarize_user_relationship(
+        self,
+        user_id: str,
+        include_facts: bool = True,
+        include_conversations: bool = True,
+        time_window: str = "all"
+    ) -> Dict[str, Any]:
+        """
+        Tool 4: Generate comprehensive user relationship summary.
+        
+        Migrated from src/intelligence/tool_executor.py
+        """
+        summary = {
+            "user_id": user_id,
+            "facts": [],
+            "conversation_summary": {},
+            "relationship_duration": None,
+            "total_interactions": 0,
+            "most_discussed_topics": []
+        }
+        
+        # Get user facts if requested
+        if include_facts and self.postgres:
+            summary["facts"] = await self._tool_query_user_facts(
+                user_id=user_id,
+                fact_type="all",
+                limit=20
+            )
+        
+        # Get conversation summary if requested
+        if include_conversations and self.qdrant:
+            memories = await self._tool_recall_conversation_context(
+                user_id=user_id,
+                query="general conversation",
+                time_window=time_window,
+                limit=10
+            )
+            
+            if memories:
+                summary["conversation_summary"] = {
+                    "recent_conversations": len(memories),
+                    "time_window": time_window,
+                    "sample_interactions": memories[:3]
+                }
+                summary["total_interactions"] = len(memories)
+        
+        logger.debug(
+            "summarize_user_relationship | User: %s | Facts: %d | "
+            "Conversations: %d | Window: %s",
+            user_id,
+            len(summary["facts"]),
+            summary["total_interactions"],
+            time_window
+        )
+        
+        return summary
+    
+    # Tool 5: Query Temporal Trends
+    async def _tool_query_temporal_trends(
+        self,
+        user_id: str,
+        metric: str = "all",
+        time_window: str = "7d"
+    ) -> Dict[str, Any]:
+        """
+        Tool 5: Query InfluxDB for conversation quality metrics over time.
+        
+        Queries the conversation_quality measurement in InfluxDB for user-specific
+        quality metrics (engagement_score, satisfaction_score, natural_flow_score, etc.)
+        
+        Args:
+            user_id: User identifier
+            metric: Metric to query ("all", "engagement_score", "satisfaction_score", "coherence_score")
+            time_window: Time window ("24h", "7d", "30d")
+        
+        Returns:
+            Dict with time-series data and summary statistics
+        """
+        if not self.influx:
+            logger.warning(
+                "query_temporal_trends | InfluxDB not available | "
+                "User: %s | Metric: %s",
+                user_id,
+                metric
+            )
+            return {
+                "user_id": user_id,
+                "metric": metric,
+                "time_window": time_window,
+                "data_points": [],
+                "summary": {},
+                "note": "InfluxDB client not available"
+            }
+        
+        try:
+            # Get bot name from environment (single source of truth)
+            from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Parse time window
+            if time_window == "24h":
+                range_filter = "1d"
+            elif time_window == "7d":
+                range_filter = "7d"
+            elif time_window == "30d":
+                range_filter = "30d"
+            else:
+                range_filter = "7d"  # Default
+            
+            # Build field filter based on metric
+            if metric == "all":
+                field_filter = ""  # Get all fields
+            elif metric == "coherence_score":
+                # Map to actual field name (natural_flow_score)
+                field_filter = '|> filter(fn: (r) => r._field == "natural_flow_score")'
+            else:
+                # engagement_score, satisfaction_score, emotional_resonance, topic_relevance
+                field_filter = f'|> filter(fn: (r) => r._field == "{metric}")'
+            
+            # Build Flux query
+            import os
+            query = f'''
+                from(bucket: "{os.getenv('INFLUXDB_BUCKET', 'whisperengine')}")
+                |> range(start: -{range_filter})
+                |> filter(fn: (r) => r._measurement == "conversation_quality")
+                |> filter(fn: (r) => r.bot == "{bot_name}")
+                |> filter(fn: (r) => r.user_id == "{user_id}")
+                {field_filter}
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+            '''
+            
+            # Execute query
+            result = self.influx.query_api.query(query)
+            
+            # Process results
+            data_points = []
+            for table in result:
+                for record in table.records:
+                    point = {
+                        'timestamp': record.get_time().isoformat(),
+                    }
+                    
+                    # Add requested metrics
+                    if metric == "all":
+                        point['engagement_score'] = record.values.get('engagement_score')
+                        point['satisfaction_score'] = record.values.get('satisfaction_score')
+                        point['natural_flow_score'] = record.values.get('natural_flow_score')
+                        point['emotional_resonance'] = record.values.get('emotional_resonance')
+                        point['topic_relevance'] = record.values.get('topic_relevance')
+                    elif metric == "coherence_score":
+                        # Map coherence_score to natural_flow_score
+                        point['coherence_score'] = record.values.get('natural_flow_score')
+                    else:
+                        point[metric] = record.values.get(metric)
+                    
+                    data_points.append(point)
+            
+            # Calculate summary statistics
+            summary = self._calculate_trend_summary(data_points, metric)
+            
+            logger.info(
+                "✅ query_temporal_trends | User: %s | Metric: %s | Window: %s | Points: %d",
+                user_id,
+                metric,
+                time_window,
+                len(data_points)
+            )
+            
+            return {
+                "user_id": user_id,
+                "bot_name": bot_name,
+                "metric": metric,
+                "time_window": time_window,
+                "data_points": data_points,
+                "summary": summary,
+                "count": len(data_points)
+            }
+            
+        except Exception as e:
+            logger.error(
+                "❌ query_temporal_trends failed | User: %s | Metric: %s | Error: %s",
+                user_id,
+                metric,
+                str(e),
+                exc_info=True
+            )
+            
+            return {
+                "user_id": user_id,
+                "metric": metric,
+                "time_window": time_window,
+                "data_points": [],
+                "summary": {},
+                "error": str(e)
+            }
+    
+    def _calculate_trend_summary(
+        self,
+        data_points: List[Dict[str, Any]],
+        metric: str
+    ) -> Dict[str, Any]:
+        """
+        Calculate summary statistics for temporal trend data.
+        
+        Args:
+            data_points: List of time-series data points
+            metric: Metric being analyzed
+        
+        Returns:
+            Dict with summary statistics (average, trend, etc.)
+        """
+        if not data_points:
+            return {
+                "average": None,
+                "trend": "insufficient_data",
+                "data_points_count": 0
+            }
+        
+        try:
+            # Extract values for the requested metric(s)
+            if metric == "all":
+                # Calculate averages for all metrics
+                metrics = ['engagement_score', 'satisfaction_score', 'natural_flow_score', 
+                          'emotional_resonance', 'topic_relevance']
+                
+                summary = {
+                    "data_points_count": len(data_points)
+                }
+                
+                for m in metrics:
+                    raw_values = [p.get(m) for p in data_points if p.get(m) is not None]
+                    values: List[float] = [float(v) for v in raw_values]  # type: ignore
+                    if values:
+                        avg: float = sum(values) / len(values)
+                        summary[f"{m}_average"] = avg  # type: ignore
+                        summary[f"{m}_trend"] = self._calculate_simple_trend(values)  # type: ignore
+                
+                return summary
+            else:
+                # Single metric analysis
+                metric_key = "coherence_score" if metric == "coherence_score" else metric
+                raw_values = [p.get(metric_key) for p in data_points if p.get(metric_key) is not None]
+                values: List[float] = [float(v) for v in raw_values]  # type: ignore
+                
+                if not values:
+                    return {
+                        "average": None,
+                        "trend": "no_data",
+                        "data_points_count": len(data_points)
+                    }
+                
+                return {
+                    "average": sum(values) / len(values),
+                    "min": min(values),
+                    "max": max(values),
+                    "trend": self._calculate_simple_trend(values),
+                    "data_points_count": len(data_points)
+                }
+                
+        except Exception as e:
+            logger.error("Failed to calculate trend summary: %s", str(e))
+            return {
+                "error": str(e),
+                "data_points_count": len(data_points)
+            }
+    
+    def _calculate_simple_trend(self, values: List[float]) -> str:
+        """
+        Calculate simple trend direction from time-series values.
+        
+        Args:
+            values: List of numeric values in chronological order
+        
+        Returns:
+            Trend direction: "improving", "declining", "stable"
+        """
+        if len(values) < 2:
+            return "insufficient_data"
+        
+        # Compare first half to second half
+        midpoint = len(values) // 2
+        first_half_avg = sum(values[:midpoint]) / midpoint
+        second_half_avg = sum(values[midpoint:]) / (len(values) - midpoint)
+        
+        diff = second_half_avg - first_half_avg
+        
+        if diff > 0.05:  # 5% improvement threshold
+            return "improving"
+        elif diff < -0.05:  # 5% decline threshold
+            return "declining"
+        else:
+            return "stable"
+
+    # ============================================================================
+    # BOT SELF-REFLECTION TOOLS
+    # These methods enable bots to query their own performance reflections
+    # generated by the enrichment worker background process.
+    # ============================================================================
+
+    async def reflect_on_interaction(
+        self,
+        bot_name: str,
+        user_id: str,
+        current_conversation_context: str,
+        limit: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate real-time reflection by querying past similar reflections.
+        
+        This tool helps bots learn from past interactions by finding relevant
+        self-reflections from similar conversation contexts.
+        
+        Args:
+            bot_name: Bot's name (e.g., 'jake', 'elena')
+            user_id: User ID for personalized reflection
+            current_conversation_context: Current conversation summary/keywords
+            limit: Maximum number of past reflections to retrieve
+            
+        Returns:
+            List of relevant past reflections with scores and insights
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                # Query reflections with similar categories or trigger types
+                # Order by relevance (recent + high scores)
+                reflections = await conn.fetch("""
+                    SELECT 
+                        id,
+                        user_id,
+                        effectiveness_score,
+                        authenticity_score,
+                        emotional_resonance,
+                        learning_insight,
+                        improvement_suggestion,
+                        reflection_category,
+                        trigger_type,
+                        created_at
+                    FROM bot_self_reflections
+                    WHERE bot_name = $1
+                        AND (user_id = $2 OR user_id IS NULL)  -- User-specific or general
+                        AND created_at >= NOW() - INTERVAL '30 days'  -- Recent reflections
+                    ORDER BY 
+                        created_at DESC,
+                        (effectiveness_score + authenticity_score + emotional_resonance) / 3 DESC
+                    LIMIT $3
+                """, bot_name, user_id, limit)
+                
+                return [dict(r) for r in reflections]
+                
+        except Exception as e:
+            logger.error(f"Error in reflect_on_interaction: {e}")
+            return []
+
+    async def analyze_self_performance(
+        self,
+        bot_name: str,
+        metric: str = "overall",
+        time_window_days: int = 30
+    ) -> Dict[str, Any]:
+        """
+        Analyze bot's performance across multiple dimensions.
+        
+        Aggregates self-reflection scores to identify strengths and weaknesses.
+        
+        Args:
+            bot_name: Bot's name
+            metric: Which metric to analyze ('effectiveness', 'authenticity', 
+                   'emotional_resonance', or 'overall')
+            time_window_days: How many days back to analyze
+            
+        Returns:
+            Performance analysis with averages, trends, and insights
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                # Get aggregated performance metrics
+                stats = await conn.fetchrow("""
+                    SELECT 
+                        COUNT(*) as total_reflections,
+                        AVG(effectiveness_score) as avg_effectiveness,
+                        AVG(authenticity_score) as avg_authenticity,
+                        AVG(emotional_resonance) as avg_emotional_resonance,
+                        AVG((effectiveness_score + authenticity_score + emotional_resonance) / 3) as avg_overall,
+                        STDDEV(effectiveness_score) as stddev_effectiveness,
+                        MIN(created_at) as earliest_reflection,
+                        MAX(created_at) as latest_reflection,
+                        array_agg(DISTINCT reflection_category) as common_categories,
+                        array_agg(DISTINCT trigger_type) as common_triggers
+                    FROM bot_self_reflections
+                    WHERE bot_name = $1
+                        AND created_at >= NOW() - INTERVAL '1 day' * $2
+                """, bot_name, time_window_days)
+                
+                if not stats or stats['total_reflections'] == 0:
+                    return {
+                        "status": "no_data",
+                        "message": f"No reflections found for {bot_name} in the last {time_window_days} days"
+                    }
+                
+                # Get recent trend (last 7 days vs previous period)
+                recent_stats = await conn.fetchrow("""
+                    SELECT 
+                        AVG(effectiveness_score) as recent_effectiveness,
+                        AVG(authenticity_score) as recent_authenticity,
+                        AVG(emotional_resonance) as recent_emotional_resonance
+                    FROM bot_self_reflections
+                    WHERE bot_name = $1
+                        AND created_at >= NOW() - INTERVAL '7 days'
+                """, bot_name)
+                
+                # Calculate trend
+                metric_map = {
+                    "effectiveness": ("avg_effectiveness", "recent_effectiveness"),
+                    "authenticity": ("avg_authenticity", "recent_authenticity"),
+                    "emotional_resonance": ("avg_emotional_resonance", "recent_emotional_resonance"),
+                    "overall": ("avg_overall", None)
+                }
+                
+                avg_key, recent_key = metric_map.get(metric, ("avg_overall", None))
+                avg_score = float(stats[avg_key]) if stats[avg_key] else 0.0
+                recent_score = float(recent_stats[recent_key]) if recent_key and recent_stats and recent_stats[recent_key] else avg_score
+                
+                trend = "stable"
+                if recent_score > avg_score + 0.05:
+                    trend = "improving"
+                elif recent_score < avg_score - 0.05:
+                    trend = "declining"
+                
+                return {
+                    "status": "success",
+                    "bot_name": bot_name,
+                    "time_window_days": time_window_days,
+                    "total_reflections": stats['total_reflections'],
+                    "metrics": {
+                        "effectiveness": round(float(stats['avg_effectiveness'] or 0), 3),
+                        "authenticity": round(float(stats['avg_authenticity'] or 0), 3),
+                        "emotional_resonance": round(float(stats['avg_emotional_resonance'] or 0), 3),
+                        "overall": round(avg_score, 3)
+                    },
+                    "trend": trend,
+                    "common_categories": stats['common_categories'] or [],
+                    "common_triggers": stats['common_triggers'] or [],
+                    "time_range": {
+                        "earliest": stats['earliest_reflection'].isoformat() if stats['earliest_reflection'] else None,
+                        "latest": stats['latest_reflection'].isoformat() if stats['latest_reflection'] else None
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in analyze_self_performance: {e}")
+            return {"status": "error", "message": str(e)}
+
+    async def query_self_insights(
+        self,
+        bot_name: str,
+        query_keywords: List[str],
+        category_filter: Optional[str] = None,
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Search past reflections for relevant learning insights.
+        
+        Enables bots to recall specific lessons learned from past interactions.
+        
+        Args:
+            bot_name: Bot's name
+            query_keywords: Keywords to search for in insights/suggestions
+            category_filter: Optional category filter (e.g., 'emotional_handling')
+            limit: Maximum number of insights to return
+            
+        Returns:
+            List of relevant past insights with context
+        """
+        try:
+            # Build search query using PostgreSQL full-text search
+            search_query = ' | '.join(query_keywords)  # OR search
+            
+            async with self.postgres.acquire() as conn:
+                if category_filter:
+                    insights = await conn.fetch("""
+                        SELECT 
+                            id,
+                            user_id,
+                            effectiveness_score,
+                            authenticity_score,
+                            emotional_resonance,
+                            learning_insight,
+                            improvement_suggestion,
+                            reflection_category,
+                            trigger_type,
+                            created_at,
+                            ts_rank(
+                                to_tsvector('english', learning_insight || ' ' || COALESCE(improvement_suggestion, '')),
+                                plainto_tsquery('english', $2)
+                            ) as relevance
+                        FROM bot_self_reflections
+                        WHERE bot_name = $1
+                            AND reflection_category LIKE $3
+                        ORDER BY relevance DESC, created_at DESC
+                        LIMIT $4
+                    """, bot_name, search_query, f"%{category_filter}%", limit)
+                else:
+                    insights = await conn.fetch("""
+                        SELECT 
+                            id,
+                            user_id,
+                            effectiveness_score,
+                            authenticity_score,
+                            emotional_resonance,
+                            learning_insight,
+                            improvement_suggestion,
+                            reflection_category,
+                            trigger_type,
+                            created_at,
+                            ts_rank(
+                                to_tsvector('english', learning_insight || ' ' || COALESCE(improvement_suggestion, '')),
+                                plainto_tsquery('english', $2)
+                            ) as relevance
+                        FROM bot_self_reflections
+                        WHERE bot_name = $1
+                        ORDER BY relevance DESC, created_at DESC
+                        LIMIT $3
+                    """, bot_name, search_query, limit)
+                
+                return [dict(r) for r in insights]
+                
+        except Exception as e:
+            logger.error(f"Error in query_self_insights: {e}")
+            return []
+
+    async def adapt_personality_trait(
+        self,
+        bot_name: str,
+        trait_name: str,
+        adjustment_reason: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Record a personality trait adjustment based on self-reflection.
+        
+        This doesn't modify CDL directly (that's designer territory), but records
+        the bot's self-awareness of needed adjustments for future reference.
+        
+        Args:
+            bot_name: Bot's name
+            trait_name: Which trait to adjust (e.g., 'directness', 'empathy')
+            adjustment_reason: Why this adjustment is needed
+            metadata: Additional context (scores, examples, etc.)
+            
+        Returns:
+            Confirmation of recorded adjustment
+        """
+        try:
+            # Store as a special type of reflection with category 'personality_adaptation'
+            async with self.postgres.acquire() as conn:
+                result = await conn.fetchrow("""
+                    INSERT INTO bot_self_reflections (
+                        bot_name,
+                        learning_insight,
+                        improvement_suggestion,
+                        reflection_category,
+                        trigger_type,
+                        effectiveness_score,
+                        authenticity_score,
+                        emotional_resonance
+                    ) VALUES (
+                        $1, $2, $3, 'personality_adaptation', $4, 0.0, 0.0, 0.0
+                    )
+                    RETURNING id, created_at
+                """, 
+                    bot_name,
+                    f"Self-identified need to adjust trait: {trait_name}",
+                    adjustment_reason,
+                    f"trait_adaptation_{trait_name}"
+                )
+                
+                return {
+                    "status": "recorded",
+                    "bot_name": bot_name,
+                    "trait": trait_name,
+                    "reason": adjustment_reason,
+                    "reflection_id": str(result['id']),
+                    "recorded_at": result['created_at'].isoformat(),
+                    "metadata": metadata or {}
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in adapt_personality_trait: {e}")
+            return {"status": "error", "message": str(e)}
+
+    async def record_manual_insight(
+        self,
+        bot_name: str,
+        insight: str,
+        insight_type: str = "self_observation",
+        user_id: Optional[str] = None,
+        context: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Store an explicit self-observation or manual insight.
+        
+        Allows bots to record real-time observations during conversations
+        for later enrichment worker processing.
+        
+        Args:
+            bot_name: Bot's name
+            insight: The insight or observation to record
+            insight_type: Type of insight ('self_observation', 'user_feedback', 'pattern_noticed')
+            user_id: Optional user ID if insight relates to specific user
+            context: Optional conversation context
+            
+        Returns:
+            Confirmation of recorded insight
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                result = await conn.fetchrow("""
+                    INSERT INTO bot_self_reflections (
+                        bot_name,
+                        user_id,
+                        learning_insight,
+                        interaction_context,
+                        reflection_category,
+                        trigger_type,
+                        effectiveness_score,
+                        authenticity_score,
+                        emotional_resonance
+                    ) VALUES (
+                        $1, $2, $3, $4, 'manual_insight', $5, 0.0, 0.0, 0.0
+                    )
+                    RETURNING id, created_at
+                """,
+                    bot_name,
+                    user_id,
+                    insight,
+                    context,
+                    insight_type
+                )
+                
+                return {
+                    "status": "recorded",
+                    "bot_name": bot_name,
+                    "insight": insight,
+                    "insight_type": insight_type,
+                    "reflection_id": str(result['id']),
+                    "recorded_at": result['created_at'].isoformat()
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in record_manual_insight: {e}")
+            return {"status": "error", "message": str(e)}
 
 
 # Factory function for easy integration

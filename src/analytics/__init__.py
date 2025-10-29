@@ -14,6 +14,6 @@ Components:
 # Import will be available once trend_analyzer.py is complete
 # from .trend_analyzer import InfluxDBTrendAnalyzer
 
-__all__ = [
+__all__: list[str] = [
     # 'InfluxDBTrendAnalyzer'
 ]

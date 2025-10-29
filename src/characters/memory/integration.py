@@ -113,14 +113,16 @@ class CharacterMemoryIntegrator:
         background_text = []
         if self.character.backstory.family_background:
             background_text.append(self.character.backstory.family_background)
-        if self.character.backstory.cultural_background:
-            background_text.append(self.character.backstory.cultural_background)
-        background_text.extend(self.character.backstory.major_life_events)
+        if hasattr(self.character.backstory, 'cultural_background') and self.character.backstory.cultural_background:
+            background_text.append(self.character.backstory.cultural_background)  # type: ignore[attr-defined]
+        if hasattr(self.character.backstory, 'major_life_events'):
+            background_text.extend(self.character.backstory.major_life_events)  # type: ignore[attr-defined]
         
         background = " ".join(background_text).lower()
         
         # Example memory extraction (simplified - could use NLP)
-        if "childhood" in background or self.character.backstory.childhood.key_events:
+        childhood_key_events = getattr(getattr(self.character.backstory, 'childhood', None), 'key_events', None) if hasattr(self.character.backstory, 'childhood') else None
+        if "childhood" in background or childhood_key_events:
             memories.append({
                 'id': str(uuid.uuid4()),
                 'content': f"Childhood experiences that shaped {self.character.identity.name}",

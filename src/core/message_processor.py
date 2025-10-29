@@ -120,12 +120,18 @@ class MessageProcessor:
         self.conversation_cache = conversation_cache
         
         # Phase 2c: Initialize unified query classifier for single authoritative classification
-        self._unified_query_classifier = None
+        # PERFORMANCE: Disabled by default due to significant overhead (~2x processing time)
+        # Enable via ENABLE_LLM_TOOL_CALLING=true environment variable
+        # Factory function returns None if disabled, so we only check the flag in one place
         try:
             self._unified_query_classifier = create_unified_query_classifier()
-            logger.info("✅ UNIFIED: MessageProcessor using UnifiedQueryClassifier for routing")
+            if self._unified_query_classifier is not None:
+                logger.info("✅ UNIFIED: MessageProcessor using UnifiedQueryClassifier for routing (tool calling enabled)")
+            else:
+                logger.info("⚠️  UNIFIED: UnifiedQueryClassifier disabled (set ENABLE_LLM_TOOL_CALLING=true to enable)")
         except Exception as e:
             logger.warning("⚠️  UNIFIED: Failed to initialize UnifiedQueryClassifier: %s", str(e))
+            self._unified_query_classifier = None
         
         # Phase 5: Initialize temporal intelligence with PostgreSQL integration
         # Temporal intelligence is now permanently enabled (no feature flag)
@@ -465,6 +471,93 @@ class MessageProcessor:
             
             return self.character_state_manager is not None
     
+    @staticmethod
+    def _is_tool_worthy_query(message: str) -> bool:
+        """
+        Fast spaCy-based pre-filter to determine if message warrants tool calling.
+        
+        Uses lightweight spaCy linguistic analysis (much faster than full classifier):
+        - Dependency parsing for question structure (WH-words with auxiliary verbs)
+        - POS tagging for imperative/analytical verbs (list, show, tell, summarize)
+        - Entity recognition for information-seeking queries
+        
+        Reuses the singleton spaCy instance from spacy_manager for efficiency.
+        
+        This eliminates ~90-95% of casual conversation overhead while
+        preserving tool support for analytical queries.
+        
+        Args:
+            message: User message content
+            
+        Returns:
+            True if message appears to be an analytical/information query
+        """
+        # Skip very short messages - likely greetings/casual
+        if len(message.split()) < 5:
+            return False
+        
+        try:
+            from src.nlp.spacy_manager import get_spacy_nlp
+            
+            # Get singleton spaCy instance (shared across all classifiers)
+            nlp = get_spacy_nlp()
+            if nlp is None:
+                raise ImportError("spaCy not available")
+            
+            doc = nlp(message)
+            
+            # Rule 1: WH-question words with auxiliary verbs (what/how/when/where + do/have/can)
+            # Example: "What foods have I mentioned?" → what(WP) + have(VBP) = tool-worthy
+            wh_words = {'what', 'which', 'where', 'when', 'how', 'why', 'who'}
+            aux_verbs = {'do', 'does', 'did', 'have', 'has', 'had', 'can', 'could', 'would', 'should'}
+            
+            has_wh = any(token.text.lower() in wh_words and token.tag_ in ['WP', 'WRB', 'WDT'] 
+                        for token in doc)
+            has_aux = any(token.text.lower() in aux_verbs and token.dep_ == 'aux' 
+                         for token in doc)
+            
+            if has_wh and has_aux:
+                return True
+            
+            # Rule 2: Imperative analytical verbs (tell, list, show, summarize, describe, explain)
+            # Example: "Tell me everything about..." → tell(VB) at start = tool-worthy
+            analytical_verbs = {'tell', 'list', 'show', 'summarize', 'describe', 'explain', 'give'}
+            
+            # Check if sentence starts with imperative verb (VB tag, no subject dependency)
+            if doc[0].pos_ == 'VERB' and doc[0].lemma_ in analytical_verbs:
+                return True
+            
+            # Rule 3: Quantifiers + mental state verbs (everything, all + know, remember, mention)
+            # Example: "Do you remember everything I told you?" → quantifier + mental verb = tool-worthy
+            has_quantifier = any(token.text.lower() in {'everything', 'all', 'any'} 
+                                for token in doc)
+            has_mental_verb = any(token.lemma_ in {'know', 'remember', 'mention', 'tell', 'say'} 
+                                 and token.pos_ == 'VERB'
+                                 for token in doc)
+            
+            if has_quantifier and has_mental_verb:
+                return True
+            
+            # Rule 4: Deictic time references with memory verbs (when, before, last time + mention/tell/say)
+            # Example: "When did I mention that?" → temporal + memory verb = tool-worthy
+            temporal_words = {'when', 'before', 'last', 'previously', 'earlier', 'ago'}
+            has_temporal = any(token.text.lower() in temporal_words or token.tag_ == 'WRB'
+                              for token in doc)
+            
+            if has_temporal and has_mental_verb:
+                return True
+            
+            return False
+            
+        except Exception as e:
+            # Fallback to simple heuristic if spaCy fails
+            logger.debug("spaCy pre-filter failed, using fallback: %s", e)
+            message_lower = message.lower()
+            return any(pattern in message_lower for pattern in [
+                'tell me everything', 'list all', 'show me all', 
+                'what do you know', 'have i mentioned', 'when did i'
+            ])
+    
     async def _ensure_cdl_database_pool_initialized(self):
         """
         Ensure CDL database manager pool is initialized (lazy initialization).
@@ -733,6 +826,81 @@ class MessageProcessor:
                         )
                 except Exception as e:
                     logger.debug("Failed to retrieve character emotional state: %s", e)
+            
+            # Phase 6.9: Hybrid Query Routing (LLM Tool Calling)
+            # PERFORMANCE NOTE: This feature adds significant overhead (~2x processing time)
+            # due to UnifiedQueryClassifier's spaCy NLP analysis + potential extra LLM call.
+            # Uses selective invocation to only classify analytical queries (fast pre-filter).
+            # Feature enabled/disabled via ENABLE_LLM_TOOL_CALLING environment variable (checked once in factory).
+            
+            if self._unified_query_classifier is not None and self._is_tool_worthy_query(message_context.content):
+                from src.memory.unified_query_classification import DataSource
+                
+                try:
+                    # Get bot name from environment using standard utility
+                    from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+                    bot_name = get_normalized_bot_name_from_env()
+                    
+                    logger.info(
+                        "🔧 TOOL FILTER: Query passed selective filter, running classifier | "
+                        "User: %s | Message: %s",
+                        message_context.user_id, 
+                        message_context.content[:100]
+                    )
+                    
+                    # Run unified classification to check for tool-assisted routing
+                    if self._unified_query_classifier is not None:
+                        unified_classification = await self._unified_query_classifier.classify(
+                            query=message_context.content,
+                            emotion_data=ai_components.get("emotion_data"),
+                            user_id=message_context.user_id,
+                            character_name=bot_name
+                        )
+                        
+                        if DataSource.LLM_TOOLS in unified_classification.data_sources:
+                            logger.info(
+                                "🔧 TOOL ASSISTED: Unified classifier detected tool-worthy query | "
+                                "Intent: %s | Confidence: %.2f",
+                                unified_classification.intent_type.value,
+                                unified_classification.intent_confidence
+                            )
+                            
+                            # Execute tools via bot_core's knowledge_router (SemanticKnowledgeRouter)
+                            knowledge_router = getattr(self.bot_core, 'knowledge_router', None) if self.bot_core else None
+                            
+                            if knowledge_router is not None:
+                                tool_execution_result = await knowledge_router.execute_tools(
+                                    query=message_context.content,
+                                    user_id=message_context.user_id,
+                                    character_name=bot_name,
+                                    llm_client=self.llm_client
+                                )
+                                
+                                if tool_execution_result.get("enriched_context"):
+                                    # Add tool results to conversation context
+                                    conversation_context += "\n\n" + tool_execution_result["enriched_context"]
+                                    
+                                    logger.info(
+                                        "🔧 TOOL EXECUTION: Added enriched context | User: %s | Tools: %s",
+                                        message_context.user_id,
+                                        ', '.join(tool_execution_result.get("tools_used", []))
+                                    )
+                            else:
+                                logger.warning("🔧 TOOL ASSISTED: SemanticKnowledgeRouter not available")
+                except Exception as e:
+                    logger.error(
+                        "🔧 TOOL EXECUTION FAILED: %s | Continuing with standard context",
+                        str(e),
+                        exc_info=True
+                    )
+            elif self._unified_query_classifier is not None:
+                # Classifier exists but message didn't pass selective filter
+                logger.debug(
+                    "🔧 TOOL FILTER: Skipped classification for casual message | "
+                    "User: %s | Words: %d",
+                    message_context.user_id,
+                    len(message_context.content.split())
+                )
             
             # Phase 7: Response generation
             print(f"🎯 PHASE 7 START: About to call _generate_response for user {message_context.user_id}", flush=True)
@@ -7802,7 +7970,7 @@ class MessageProcessor:
                 return summaries
                 
         except Exception as e:
-            logger.error(f"Failed to retrieve enriched summaries: {e}")
+            logger.error(f"Failed to retrieve enriched summaries: %s", e)
             return []
 
 

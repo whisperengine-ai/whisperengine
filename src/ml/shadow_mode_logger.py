@@ -139,15 +139,15 @@ class MLShadowModeLogger:
                 .field("recommended_modes", ",".join(prediction.recommended_modes))
             
             # Add prediction metadata if available
-            if prediction.metadata:
-                if "engagement_score" in prediction.metadata:
-                    point = point.field("engagement_score", float(prediction.metadata["engagement_score"]))
-                if "satisfaction_score" in prediction.metadata:
-                    point = point.field("satisfaction_score", float(prediction.metadata["satisfaction_score"]))
-                if "current_mode" in prediction.metadata:
-                    point = point.field("actual_mode", str(prediction.metadata["current_mode"]))
-                if "message_count" in prediction.metadata:
-                    point = point.field("message_count", int(prediction.metadata["message_count"]))
+            if prediction.prediction_metadata:
+                if "engagement_score" in prediction.prediction_metadata:
+                    point = point.field("engagement_score", float(prediction.prediction_metadata["engagement_score"]))
+                if "satisfaction_score" in prediction.prediction_metadata:
+                    point = point.field("satisfaction_score", float(prediction.prediction_metadata["satisfaction_score"]))
+                if "current_mode" in prediction.prediction_metadata:
+                    point = point.field("actual_mode", str(prediction.prediction_metadata["current_mode"]))
+                if "message_count" in prediction.prediction_metadata:
+                    point = point.field("message_count", int(prediction.prediction_metadata["message_count"]))
             
             # Add feature importances (top 5)
             if prediction.feature_importance:
@@ -168,8 +168,9 @@ class MLShadowModeLogger:
                     elif isinstance(value, str):
                         point = point.field(key, value)
             
-            # Write to InfluxDB (non-blocking)
-            write_api = self.influxdb_client.write_api()
+            # Write to InfluxDB (SYNCHRONOUS mode to prevent Rx thread spam)
+            from influxdb_client.client.write_api import SYNCHRONOUS
+            write_api = self.influxdb_client.write_api(write_options=SYNCHRONOUS)
             write_api.write(
                 bucket=os.getenv("INFLUXDB_BUCKET", "whisperengine"),
                 record=point

@@ -14,8 +14,8 @@ import sys
 import json
 import os
 from pathlib import Path
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Optional, Any
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
 import asyncpg
@@ -110,7 +110,7 @@ class EnrichmentWorker:
     async def _enrichment_cycle(self):
         """Single enrichment processing cycle"""
         logger.info("📊 Starting enrichment cycle...")
-        cycle_start = datetime.utcnow()
+        cycle_start = datetime.now(timezone.utc)
         
         # Get all bot collections from Qdrant
         collections = self._get_bot_collections()
@@ -120,6 +120,7 @@ class EnrichmentWorker:
         total_facts_extracted = 0
         total_preferences_extracted = 0
         total_emoji_feedback_processed = 0
+        total_reflections_created = 0
         
         for collection_name in collections:
             bot_name = await self._extract_bot_name(collection_name)
@@ -157,14 +158,22 @@ class EnrichmentWorker:
                 
                 total_emoji_feedback_processed += emoji_feedback
                 
+                # Process bot self-reflections (hybrid storage: PostgreSQL + Qdrant + InfluxDB)
+                reflections_created = await self._process_bot_self_reflections(
+                    collection_name=collection_name,
+                    bot_name=bot_name
+                )
+                
+                total_reflections_created += reflections_created
+                
             except Exception as e:
                 logger.error("Error processing collection %s: %s", collection_name, e)
                 continue
         
-        cycle_duration = (datetime.utcnow() - cycle_start).total_seconds()
-        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback in %.2fs",
+        cycle_duration = (datetime.now(timezone.utc) - cycle_start).total_seconds()
+        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback, %s reflections in %.2fs",
                    total_summaries_created, total_facts_extracted, total_preferences_extracted, 
-                   total_emoji_feedback_processed, cycle_duration)
+                   total_emoji_feedback_processed, total_reflections_created, cycle_duration)
     
     async def _process_conversation_summaries(
         self,
@@ -393,7 +402,7 @@ class EnrichmentWorker:
                     if timestamp.tzinfo is not None:
                         timestamp = timestamp.replace(tzinfo=None)
                 except:
-                    timestamp = datetime.utcnow()
+                    timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
                 
                 messages.append({
                     'content': point.payload.get('content', ''),
@@ -434,7 +443,7 @@ class EnrichmentWorker:
         4. Avoids wasteful re-processing of same old conversations
         """
         windows = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Find the last processed timestamp
         if existing_summaries:
@@ -669,30 +678,31 @@ class EnrichmentWorker:
                         
                         if context_metadata.get('latest_message_timestamp'):
                             ts = datetime.fromisoformat(context_metadata['latest_message_timestamp'])
-                            # Make timezone-naive for comparison
-                            if ts.tzinfo is not None:
-                                ts = ts.replace(tzinfo=None)
+                            # TIMEZONE FIX: Keep timezone-aware for comparison
+                            if ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
                             timestamps.append(ts)
                         elif fact.get('created_at'):
                             ts = fact['created_at']
-                            if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
-                                ts = ts.replace(tzinfo=None)
+                            # TIMEZONE FIX: Keep timezone-aware for comparison
+                            if hasattr(ts, 'tzinfo') and ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
                             timestamps.append(ts)
                     
                     if timestamps:
                         last_processed = max(timestamps)
                     else:
-                        last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                        last_processed = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                     
                     logger.debug("Last processed MESSAGE timestamp for user %s: %s", user_id, last_processed)
                 else:
                     # No facts yet - backfill from LOOKBACK_DAYS ago
-                    last_processed = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                    last_processed = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                     logger.debug("No existing facts for user %s, backfilling from %s", user_id, last_processed)
                 
                 # CRITICAL: Enforce maximum lookback window - NEVER process messages older than LOOKBACK_DAYS
                 # This prevents burning tokens on ancient conversations even if marker timestamp is old
-                max_lookback = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                max_lookback = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                 if last_processed < max_lookback:
                     logger.info(
                         f"⏭️  [ENFORCING LOOKBACK] User {user_id} marker is old ({last_processed.isoformat()}), "
@@ -1004,7 +1014,7 @@ class EnrichmentWorker:
                         # Build attributes JSONB for fact_entities
                         attributes = {
                             'extraction_method': 'enrichment_worker',
-                            'extracted_at': datetime.utcnow().isoformat(),
+                            'extracted_at': datetime.now(timezone.utc).isoformat(),
                             'tags': fact.related_facts  # Used for full-text search
                         }
                         
@@ -1031,7 +1041,7 @@ class EnrichmentWorker:
                             'reasoning': fact.reasoning,
                             'source_messages': fact.source_messages,
                             'extraction_method': 'enrichment_worker',
-                            'extracted_at': datetime.utcnow().isoformat(),
+                            'extracted_at': datetime.now(timezone.utc).isoformat(),
                             'latest_message_timestamp': latest_message_timestamp.isoformat(),  # For incremental processing
                             'conversation_window_size': len(relationships) if relationships else 1,
                             'multi_message_confirmed': fact.confirmation_count > 1,
@@ -1414,7 +1424,7 @@ class EnrichmentWorker:
                 
                 # CRITICAL: Enforce maximum lookback window - NEVER process messages older than LOOKBACK_DAYS
                 # This prevents burning tokens on ancient conversations even if marker timestamp is old
-                max_lookback = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+                max_lookback = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
                 if last_extraction < max_lookback:
                     logger.info(
                         f"⏭️  [ENFORCING LOOKBACK] User {user_id} preference marker is old ({last_extraction.isoformat()}), "
@@ -1527,16 +1537,16 @@ class EnrichmentWorker:
                 if context_metadata.get('latest_message_timestamp'):
                     try:
                         ts = datetime.fromisoformat(context_metadata['latest_message_timestamp'])
-                        # Make timezone-naive for consistency
-                        if ts.tzinfo is not None:
-                            ts = ts.replace(tzinfo=None)
+                        # TIMEZONE FIX: Keep timezone-aware for comparison
+                        if ts.tzinfo is None:
+                            ts = ts.replace(tzinfo=timezone.utc)
                         logger.debug("Last preference extraction for user %s: %s (from marker)", user_id, ts)
                         return ts
                     except (ValueError, TypeError) as e:
                         logger.warning("Failed to parse marker timestamp for user %s: %s", user_id, e)
             
             # No marker yet - backfill from LOOKBACK_DAYS ago
-            backfill_from = datetime.utcnow() - timedelta(days=config.LOOKBACK_DAYS)
+            backfill_from = datetime.now(timezone.utc) - timedelta(days=config.LOOKBACK_DAYS)
             logger.debug("No existing preference marker for user %s, backfilling from %s", user_id, backfill_from)
             return backfill_from
     
@@ -1747,7 +1757,7 @@ JSON Response:"""
                         preference_obj = {
                             'value': pref_value,
                             'confidence': confidence,
-                            'updated_at': datetime.utcnow().isoformat(),
+                            'updated_at': datetime.now(timezone.utc).isoformat(),
                             'metadata': {
                                 'extraction_method': 'enrichment_worker',
                                 'reasoning': pref.get('reasoning', ''),
@@ -1797,7 +1807,7 @@ JSON Response:"""
         
         # Get time window for unprocessed emoji reactions
         time_window_hours = config.TIME_WINDOW_HOURS
-        time_threshold = datetime.utcnow() - timedelta(hours=time_window_hours)
+        time_threshold = datetime.now(timezone.utc) - timedelta(hours=time_window_hours)
         
         # Query Qdrant for EMOJI REACTION memories (interaction_type=emoji_reaction)
         # These are stored by emoji_reaction_intelligence.py with original_bot_message metadata
@@ -2142,6 +2152,404 @@ Examples:
                 VALUES ($1, $2, $3, 'emoji_feedback', NOW(), $4, $5)
                 ON CONFLICT (user_id, bot_name, point_id, processing_type) DO NOTHING
             """, user_id, bot_name, point_id, feedback_type, confidence)
+    
+    async def _process_bot_self_reflections(
+        self,
+        collection_name: str,
+        bot_name: str
+    ) -> int:
+        """
+        Process bot self-reflections for character learning and evolution
+        
+        HYBRID STORAGE ARCHITECTURE:
+        - PostgreSQL: Primary structured storage (bot_self_reflections table)
+        - Qdrant: Semantic index (bot_self_{bot_name} namespace)
+        - InfluxDB: Time-series metrics (bot_self_reflection measurement)
+        
+        TRIGGERS:
+        - Time-based: Every enrichment cycle (2 hours default)
+        - Event-based: High emotion, user feedback, abandonment
+        - Quality filters: Message count >= 5, emotional engagement
+        """
+        logger.info("🧠 Processing self-reflections for %s...", bot_name)
+        
+        # Get users with conversations in this collection
+        users = await self._get_users_in_collection(collection_name)
+        logger.debug("Found %s users with conversations for self-reflection", len(users))
+        
+        reflections_created = 0
+        
+        for user_id in users:
+            try:
+                # Get recent bot conversations (last 2 hours or since last reflection)
+                recent_conversations = await self._get_reflection_worthy_conversations(
+                    collection_name=collection_name,
+                    user_id=user_id,
+                    bot_name=bot_name,
+                    time_window_hours=2
+                )
+                
+                logger.info(f"🔍 User {user_id}: got {len(recent_conversations) if recent_conversations else 0} reflection-worthy conversations")
+                
+                if not recent_conversations:
+                    logger.debug("No reflection-worthy conversations for user %s", user_id)
+                    continue
+                
+                # Quality filter: Must have enough messages
+                if len(recent_conversations) < 5:
+                    logger.info(f"❌ User {user_id} filtered: only {len(recent_conversations)} messages (need >= 5)")
+                    logger.debug("Insufficient messages (%s) for reflection with user %s", 
+                               len(recent_conversations), user_id)
+                    continue
+                
+                logger.info(f"✅ User {user_id} passed all filters: generating self-reflection...")
+                
+                # Generate self-reflection via LLM
+                reflection_data = await self._generate_bot_self_reflection(
+                    bot_name=bot_name,
+                    user_id=user_id,
+                    conversations=recent_conversations
+                )
+                
+                if not reflection_data:
+                    continue
+                
+                # Store in PostgreSQL (primary storage)
+                reflection_id = await self._store_reflection_postgres(
+                    bot_name=bot_name,
+                    user_id=user_id,
+                    reflection_data=reflection_data
+                )
+                
+                # Store in Qdrant (semantic search)
+                await self._store_reflection_qdrant(
+                    bot_name=bot_name,
+                    reflection_id=reflection_id,
+                    reflection_data=reflection_data
+                )
+                
+                # Store in InfluxDB (time-series metrics)
+                await self._store_reflection_influxdb(
+                    bot_name=bot_name,
+                    reflection_data=reflection_data
+                )
+                
+                reflections_created += 1
+                logger.debug("✅ Created self-reflection for %s <> user %s", bot_name, user_id)
+                
+            except Exception as e:
+                logger.error("Error creating self-reflection for user %s: %s", user_id, e)
+                continue
+        
+        logger.info("✅ Created %s self-reflections for %s", reflections_created, bot_name)
+        return reflections_created
+    
+    async def _get_reflection_worthy_conversations(
+        self,
+        collection_name: str,
+        user_id: str,
+        bot_name: str,
+        time_window_hours: int = 2
+    ) -> List[Dict[str, Any]]:
+        """Get conversations worthy of self-reflection (quality filters applied)"""
+        try:
+            # Calculate time window (use UTC timezone-aware datetime to match storage)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=time_window_hours)
+            cutoff_timestamp = cutoff_time.timestamp()
+            
+            # Check if we already reflected on recent conversations
+            async with self.db_pool.acquire() as conn:
+                last_reflection = await conn.fetchrow("""
+                    SELECT MAX(created_at) as last_reflection_time
+                    FROM bot_self_reflections
+                    WHERE bot_name = $1 AND user_id = $2
+                """, bot_name, user_id)
+                
+                if last_reflection and last_reflection['last_reflection_time']:
+                    last_time = last_reflection['last_reflection_time']
+                    cutoff_timestamp = last_time.timestamp()
+            
+            # Query Qdrant for conversations since cutoff
+            # WORKAROUND: Create fresh client instance to avoid stale connection issues
+            from qdrant_client import QdrantClient
+            from src.enrichment.config import config
+            fresh_client = QdrantClient(
+                host=config.QDRANT_HOST,
+                port=config.QDRANT_PORT
+            )
+            logger.info(f"🔍 Querying Qdrant: collection={collection_name}, user={user_id}, cutoff={cutoff_time.isoformat()}")
+            scroll_result = fresh_client.scroll(
+                collection_name=collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="user_id",
+                            match=MatchValue(value=user_id)
+                        ),
+                        FieldCondition(
+                            key="timestamp_unix",
+                            range=Range(gte=cutoff_timestamp)
+                        )
+                    ]
+                ),
+                limit=100,  # Max 100 messages per reflection window
+                with_payload=True,
+                with_vectors=False
+            )
+            logger.info(f"🔍 Scroll result type: {type(scroll_result)}, length: {len(scroll_result) if isinstance(scroll_result, (list, tuple)) else 'N/A'}")
+            points = scroll_result[0] if isinstance(scroll_result, tuple) else scroll_result
+            logger.info(f"🔍 Retrieved {len(points)} points for user {user_id}")
+            
+            # Extract conversation data
+            conversations = []
+            for point in points:
+                if not point.payload:
+                    continue
+                    
+                content = point.payload.get('content', '')
+                role = point.payload.get('role', '')
+                # CRITICAL FIX: Field name is 'emotional_context' not 'emotion_label'
+                emotion_label = point.payload.get('emotional_context', 'neutral')
+                roberta_confidence = point.payload.get('roberta_confidence', 0.0)
+                
+                # Event-based triggers: High emotion
+                is_high_emotion = (
+                    emotion_label in ['joy', 'anger', 'fear', 'sadness'] and 
+                    roberta_confidence > 0.7
+                )
+                
+                conversations.append({
+                    'content': content,
+                    'role': role,
+                    'emotion_label': emotion_label,
+                    'roberta_confidence': roberta_confidence,
+                    'is_high_emotion': is_high_emotion,
+                    'timestamp': point.payload.get('timestamp', ''),
+                    'timestamp_unix': point.payload.get('timestamp_unix', 0)
+                })
+            
+            # Sort by timestamp
+            conversations.sort(key=lambda x: x['timestamp_unix'])
+            
+            # Quality filter: Must have emotional engagement
+            high_emotion_count = sum(1 for c in conversations if c['is_high_emotion'])
+            logger.info(f"🔍 Quality filter check: user={user_id}, conversations={len(conversations)}, high_emotion={high_emotion_count}")
+            if high_emotion_count == 0 and len(conversations) < 10:
+                # Need either high emotion OR substantial conversation
+                logger.info(f"❌ Filtered out user {user_id}: insufficient quality ({high_emotion_count} emotions, {len(conversations)} messages)")
+                return []
+            
+            logger.info(f"✅ User {user_id} passed quality filter: returning {len(conversations)} conversations")
+            return conversations
+            
+        except Exception as e:
+            logger.error("Error getting reflection-worthy conversations: %s", e)
+            return []
+    
+    async def _generate_bot_self_reflection(
+        self,
+        bot_name: str,
+        user_id: str,
+        conversations: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """Generate self-reflection via LLM analysis"""
+        try:
+            # Build conversation context for LLM
+            conversation_text = []
+            for conv in conversations[-20:]:  # Last 20 messages max
+                role_label = "User" if conv['role'] == 'user' else "Bot"
+                emotion_label = f" [{conv['emotion_label']}]" if conv['is_high_emotion'] else ""
+                conversation_text.append(f"{role_label}{emotion_label}: {conv['content']}")
+            
+            context = "\n".join(conversation_text)
+            
+            # LLM prompt for self-reflection
+            prompt = f"""You are analyzing a conversation between AI character "{bot_name}" and a user.
+Generate a self-reflection from the bot's perspective, analyzing effectiveness, authenticity, and emotional resonance.
+
+CONVERSATION:
+{context}
+
+Analyze this conversation and provide a structured self-reflection with:
+1. effectiveness_score (0.0-1.0): How effective were the bot's responses?
+2. authenticity_score (0.0-1.0): How authentic to character personality?
+3. emotional_resonance (0.0-1.0): How well did bot connect emotionally?
+4. learning_insight: What did the bot learn from this interaction?
+5. improvement_suggestion: How could the bot improve in similar future conversations?
+6. reflection_category: Category of learning (emotional_handling, topic_expertise, conversation_flow, etc.)
+7. trigger_type: What prompted this reflection? (time_based, high_emotion, user_feedback, etc.)
+
+Respond in JSON format only."""
+            
+            # Generate reflection via LLM (synchronous method)
+            logger.info(f"🤖 Calling LLM for self-reflection: model={config.LLM_CHAT_MODEL}, max_tokens=800")
+            response = self.llm_client.generate_chat_completion(
+                model=config.LLM_CHAT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=800,
+                temperature=0.7
+            )
+            
+            # Extract content from OpenAI-style response format
+            content = None
+            if response and isinstance(response, dict):
+                # Standard OpenAI format: response['choices'][0]['message']['content']
+                if 'choices' in response and len(response['choices']) > 0:
+                    message = response['choices'][0].get('message', {})
+                    content = message.get('content', '')
+                # Legacy format: response['content'] (direct)
+                elif 'content' in response:
+                    content = response['content']
+            
+            logger.info(f"🤖 Extracted content length: {len(content) if content else 0}")
+            if content:
+                logger.info(f"🤖 Content preview: {content[:150]}...")
+            
+            if not content:
+                logger.warning(f"Empty LLM response for self-reflection: response keys={response.keys() if isinstance(response, dict) else 'not dict'}")
+                return None
+            
+            # Parse JSON response (content already extracted above)
+            content = content.strip()
+            if content.startswith('```json'):
+                content = content[7:]
+            if content.startswith('```'):
+                content = content[3:]
+            if content.endswith('```'):
+                content = content[:-3]
+            content = content.strip()
+            
+            reflection_data = json.loads(content)
+            
+            # Unwrap if LLM wrapped response in a root key (e.g., {"self_reflection": {...}})
+            if len(reflection_data) == 1 and isinstance(list(reflection_data.values())[0], dict):
+                root_key = list(reflection_data.keys())[0]
+                logger.info(f"🔧 Unwrapping nested response from key: {root_key}")
+                reflection_data = reflection_data[root_key]
+            
+            # Add metadata
+            reflection_data['interaction_context'] = context[:500]  # First 500 chars
+            reflection_data['bot_response_preview'] = conversations[-1]['content'][:200] if conversations else ''
+            reflection_data['conversation_id'] = None  # TODO: Add conversation_id tracking
+            
+            # Validate required fields
+            required_fields = ['effectiveness_score', 'authenticity_score', 'emotional_resonance', 
+                             'learning_insight', 'improvement_suggestion']
+            if not all(field in reflection_data for field in required_fields):
+                logger.warning(f"Missing required fields in reflection data. Have: {list(reflection_data.keys())}")
+                return None
+            
+            return reflection_data
+            
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse LLM reflection response as JSON: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Error generating bot self-reflection: %s", e)
+            return None
+    
+    async def _store_reflection_postgres(
+        self,
+        bot_name: str,
+        user_id: str,
+        reflection_data: Dict[str, Any]
+    ) -> str:
+        """Store self-reflection in PostgreSQL (primary storage)"""
+        async with self.db_pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                INSERT INTO bot_self_reflections (
+                    bot_name, user_id, conversation_id, interaction_id,
+                    effectiveness_score, authenticity_score, emotional_resonance,
+                    learning_insight, improvement_suggestion, interaction_context,
+                    bot_response_preview, trigger_type, reflection_category
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                RETURNING id
+            """,
+                bot_name,
+                user_id,
+                reflection_data.get('conversation_id'),
+                reflection_data.get('interaction_id'),
+                reflection_data.get('effectiveness_score'),
+                reflection_data.get('authenticity_score'),
+                reflection_data.get('emotional_resonance'),
+                reflection_data.get('learning_insight'),
+                reflection_data.get('improvement_suggestion'),
+                reflection_data.get('interaction_context'),
+                reflection_data.get('bot_response_preview'),
+                reflection_data.get('trigger_type', 'time_based'),
+                reflection_data.get('reflection_category', 'general')
+            )
+            return str(row['id'])
+    
+    async def _store_reflection_qdrant(
+        self,
+        bot_name: str,
+        reflection_id: str,
+        reflection_data: Dict[str, Any]
+    ):
+        """Store self-reflection in Qdrant (semantic search)"""
+        try:
+            from src.memory.memory_protocol import create_memory_manager
+            
+            # Get bot's self-memory namespace
+            memory_manager = create_memory_manager(memory_type="vector")
+            
+            # Create searchable content
+            learning_insight = reflection_data.get('learning_insight', '')
+            improvement_suggestion = reflection_data.get('improvement_suggestion', '')
+            content = f"[SELF_REFLECTION] {learning_insight}\n\nImprovement: {improvement_suggestion}"
+            
+            # Store using store_conversation with bot_name as user_id (bot's self-memory)
+            # This will store in bot_self_{bot_name} namespace
+            await memory_manager.store_conversation(
+                user_id=bot_name,  # Use bot_name for self-memory namespace
+                user_message=f"Reflection on interaction: {reflection_data.get('interaction_context', '')[:200]}",
+                bot_response=content,
+                pre_analyzed_emotion_data={
+                    'primary_emotion': 'neutral',
+                    'emotion_scores': {},
+                    'roberta_confidence': 1.0,
+                    'metadata': {
+                        'reflection_id': reflection_id,
+                        'category': reflection_data.get('reflection_category', 'general'),
+                        'trigger_type': reflection_data.get('trigger_type', 'time_based'),
+                        'effectiveness_score': reflection_data.get('effectiveness_score', 0.0),
+                        'authenticity_score': reflection_data.get('authenticity_score', 0.0),
+                        'emotional_resonance': reflection_data.get('emotional_resonance', 0.0),
+                        'memory_type': 'bot_self_reflection'
+                    }
+                }
+            )
+            
+        except Exception as e:
+            logger.error("Error storing reflection in Qdrant: %s", e)
+    
+    async def _store_reflection_influxdb(
+        self,
+        bot_name: str,
+        reflection_data: Dict[str, Any]
+    ):
+        """Store self-reflection metrics in InfluxDB (time-series)"""
+        try:
+            from src.temporal.temporal_protocol import create_temporal_intelligence_system
+            
+            temporal_client, _ = create_temporal_intelligence_system()
+            if not temporal_client:
+                logger.warning("No temporal client available for reflection metrics")
+                return
+            
+            # Record reflection metrics
+            await temporal_client.record_bot_self_reflection(
+                bot_name=bot_name,
+                effectiveness_score=reflection_data.get('effectiveness_score', 0.0),
+                authenticity_score=reflection_data.get('authenticity_score', 0.0),
+                emotional_resonance=reflection_data.get('emotional_resonance', 0.0),
+                reflection_category=reflection_data.get('reflection_category', 'general'),
+                trigger_type=reflection_data.get('trigger_type', 'time_based')
+            )
+            
+        except Exception as e:
+            logger.error("Error storing reflection in InfluxDB: %s", e)
 
 
 async def main():

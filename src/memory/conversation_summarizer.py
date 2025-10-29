@@ -8,7 +8,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -206,12 +206,16 @@ class AdvancedConversationSummarizer:
             total_length = sum(len(msg.get("content", "")) for msg in messages)
             analysis["avg_message_length"] = total_length / len(messages)
 
-        # Determine conversation style
-        if analysis["question_count"] > len(messages) * 0.3:
+        # Determine conversation style (cast to ensure type safety)
+        question_count = cast(int, analysis["question_count"])
+        exclamation_count = cast(int, analysis["exclamation_count"])
+        avg_length = cast(float, analysis["avg_message_length"])
+        
+        if question_count > len(messages) * 0.3:
             analysis["conversation_style"] = "inquisitive"
-        elif analysis["exclamation_count"] > len(messages) * 0.2:
+        elif exclamation_count > len(messages) * 0.2:
             analysis["conversation_style"] = "energetic"
-        elif analysis["avg_message_length"] > 100:
+        elif avg_length > 100:
             analysis["conversation_style"] = "detailed"
         else:
             analysis["conversation_style"] = "casual"
@@ -449,7 +453,7 @@ class AdvancedConversationSummarizer:
         flow = []
 
         # Group messages into exchanges (user -> bot pairs)
-        current_exchange = {}
+        current_exchange: dict[str, str] = {}
 
         for msg in messages:
             role = msg.get("role", "")

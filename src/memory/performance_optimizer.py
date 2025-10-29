@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from statistics import mean
-from typing import Any
+from typing import Any, Dict, List
 
 import psutil
 
@@ -965,7 +965,7 @@ class MemoryPerformanceOptimizer:
                 return {"no_metrics": True}
 
             # Group metrics by operation type
-            operation_stats = {}
+            operation_stats: Dict[str, Dict[str, Any]] = {}
             recent_metrics = [
                 m
                 for m in self.performance_metrics

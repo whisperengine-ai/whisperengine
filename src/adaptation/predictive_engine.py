@@ -226,7 +226,7 @@ class PredictiveAdaptationEngine:
                     
                     # Use write_api directly (it's already a WriteApi object, not a method)
                     self.temporal_client.write_api.write(
-                        bucket=self.temporal_client.bucket if hasattr(self.temporal_client, 'bucket') else 'whisperengine',
+                        bucket=self.temporal_client.bucket if hasattr(self.temporal_client, 'bucket') else 'performance_metrics',
                         record=telemetry_point
                     )
                     logger.info("📊 PREDICTIVE ENGINE TELEMETRY: Recorded prediction metrics to InfluxDB")

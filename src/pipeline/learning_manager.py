@@ -153,7 +153,7 @@ class LearningPipelineManager:
         self._shutdown_event = asyncio.Event()
         
         # Sprint 6 Telemetry: Usage tracking for evaluation
-        self._telemetry = {
+        self._telemetry: Dict[str, Any] = {
             'start_pipeline_count': 0,
             'schedule_learning_cycle_count': 0,
             'execute_task_count': 0,
