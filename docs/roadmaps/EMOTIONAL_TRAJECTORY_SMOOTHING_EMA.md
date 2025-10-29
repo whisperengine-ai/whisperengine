@@ -4,6 +4,19 @@
 **Priority**: Medium (Quality-of-Life improvement for trajectory analysis)  
 **Created**: October 29, 2025  
 **Target**: Q1 2026  
+**Prerequisite**: [Character Emotional State Full-Spectrum Redesign](./CHARACTER_EMOTIONAL_STATE_FULL_SPECTRUM_REDESIGN.md) ⚠️
+
+---
+
+## 🚨 CRITICAL PREREQUISITE
+
+**This roadmap depends on completing the Character Emotional State redesign FIRST.**
+
+**Why**: EMA operates on emotional state data. If bot emotional state uses lossy 5-dimension compression (current system), EMA cannot recover the lost emotional fidelity. We must migrate to full 11-emotion spectrum tracking before implementing EMA smoothing.
+
+**See**: `docs/roadmaps/CHARACTER_EMOTIONAL_STATE_FULL_SPECTRUM_REDESIGN.md` for details.
+
+**Timeline Impact**: Character state redesign must complete by late November 2025 for Q1 2026 EMA implementation to remain on schedule.
 
 ---
 
@@ -13,6 +26,8 @@ Implement **Exponential Moving Average (EMA) smoothing** for emotional trajector
 
 **Key Point**: This is **NOT** a replacement for per-message RoBERTa analysis. EMA is a **trajectory-only tool** for understanding emotional arcs across conversation history.
 
+**Applies To**: **BOTH user emotions AND bot emotions** - WhisperEngine tracks emotional trajectories for both sides of the conversation (see Phase 7.5 & 7.6).
+
 ---
 
 ## 📊 Current State Analysis
@@ -20,15 +35,25 @@ Implement **Exponential Moving Average (EMA) smoothing** for emotional trajector
 ### **What We Do Well** ✅
 
 1. **Per-Message Emotion Analysis** (RoBERTa-powered)
+   - **User Emotions**: Analyzed from incoming messages (Phase 3)
+   - **Bot Emotions**: Analyzed from generated responses (Phase 7.5 & 7.6)
    - 12+ metadata fields per message: `roberta_confidence`, `emotion_variance`, `emotional_intensity`, `emotion_dominance`
    - ~90% accuracy on emotion classification
-   - Stored in Qdrant vector memory payloads
+   - Both stored in Qdrant vector memory payloads
    - **This is excellent and should NOT be smoothed**
 
-2. **Basic Trajectory Pattern Detection**
+2. **Character Emotional State Tracking** (Bot-Side)
+   - Location: `src/intelligence/character_emotional_state.py`
+   - Tracks 5 dimensions: enthusiasm, stress, contentment, empathy, confidence
+   - Updates from bot's own response emotions
+   - 10% per hour homeostasis (time decay toward baseline)
+   - **Currently uses raw bot emotions - would benefit from EMA**
+
+3. **Basic Trajectory Pattern Detection**
    - Location: `src/intelligence/advanced_emotion_detector.py` (line 478-490)
    - Patterns: escalating, declining, stable, oscillating, volatile
    - Uses simple averaging of raw intensities
+   - **Works for both user and bot emotion histories**
 
 ### **Current Limitations** ⚠️
 
@@ -61,10 +86,18 @@ Implement **Exponential Moving Average (EMA) smoothing** for emotional trajector
    - User had 1-2 neutral messages between worried messages
    - Current system may miss sustained patterns due to noise
 
-4. **Multi-Bot Context Transfer Issues**
+4. **Bot Emotional State Volatility**
+   - `CharacterEmotionalState` updates from raw bot emotions
+   - Location: `src/intelligence/character_emotional_state.py` (line 81-158)
+   - Bot's `enthusiasm`, `stress`, `contentment` can spike from single responses
+   - Example: Bot gives excited response → enthusiasm jumps 15% → next response calmer → drops again
+   - **Bot emotional continuity would benefit from smoothed trajectory**
+
+5. **Multi-Bot Context Transfer Issues**
    - User switches from Elena to Marcus mid-conversation
    - Raw trajectory doesn't clearly show if worry is escalating or declining
    - Smoothed trajectory would reveal actual emotional arc
+   - **Applies to both user emotional state AND bot emotional memory**
 
 ---
 
@@ -158,7 +191,7 @@ if variance > 0.1:
 
 **Location**: `src/prompts/emotional_intelligence_component.py` (line 230-280)
 
-**Scenario**: Character references past emotional states
+**Scenario A - User Emotion References**:
 ```python
 # Without EMA - character might say:
 "You seemed worried earlier, but then you were fine, then worried again..."
@@ -169,10 +202,19 @@ if variance > 0.1:
 # (Clearer narrative - references actual trend)
 ```
 
+**Scenario B - Bot Self-Awareness** (Phase 7.6):
+```python
+# Bot emotional trajectory guidance (line 320-350)
+bot_trajectory = await _get_bot_emotion_trajectory_from_influx(...)
+# Current: "Your emotional trajectory: joy → neutral → joy → excitement → calm"
+# With EMA: "Your emotional trajectory: consistently joyful with growing excitement"
+```
+
 **Benefits**:
-- More coherent emotional memory references
+- More coherent emotional memory references (both user and bot)
 - Characters sound more emotionally intelligent
 - Better alignment with how humans perceive emotional arcs
+- **Bot self-awareness becomes more authentic** ("I've been feeling energized" vs "I felt happy then calm then happy")
 
 ### **3. Conversation Mode Switching** (TERTIARY USE CASE)
 
@@ -198,18 +240,27 @@ if emotional_intensity_ema > 0.7 and pattern == "escalating":
 
 **Location**: `src/characters/learning/character_learning_moment_detector.py`
 
-**Scenario**: Detecting significant emotional trajectory shifts
+**Scenario A - User Trajectory Shifts**:
 ```python
 # Detect when user's emotional arc meaningfully changes
-if abs(ema_current - ema_5_messages_ago) > 0.4:
+if abs(user_ema_current - user_ema_5_messages_ago) > 0.4:
     learning_moment = "User's emotional state significantly shifted"
     # Character should remember this transition point
 ```
 
+**Scenario B - Bot Emotional Evolution**:
+```python
+# Detect when bot's own emotional state has shifted significantly
+if abs(bot_ema_current - bot_ema_start_of_conversation) > 0.5:
+    learning_moment = "My emotional state has changed dramatically in this conversation"
+    # Character develops self-awareness of emotional journey
+```
+
 **Benefits**:
-- Better episodic memory formation
+- Better episodic memory formation (both user and bot perspectives)
 - Characters learn from emotional arcs, not spikes
 - More meaningful relationship evolution
+- **Bot self-reflection becomes more accurate** ("This conversation energized me" vs "I had some excited responses")
 
 ---
 
@@ -287,24 +338,62 @@ User: "I finally got the courage to tell them how I feel"
 
 **Rule**: Empathy requires raw emotional data for authentic response.
 
-### **5. Memory Importance Scoring** (USE BOTH)
+### **5. Bot Emotional State Updates** (SHOULD USE EMA - AFTER REDESIGN)
 
-**Why Mixed**: Peak emotions + sustained context both matter
+**Location**: `src/intelligence/character_emotional_state.py` (line 81-158)
+
+**Why It Matters**: Bot's character state influences future responses
+
+**⚠️ PREREQUISITE**: This requires completing the Character Emotional State Full-Spectrum Redesign first. Current 5-dimension system should NOT have EMA applied - we must migrate to 11-emotion spectrum, THEN apply EMA.
 
 ```python
-# Important memory characteristics
-is_peak_emotion = raw_intensity > 0.8  # Significant moment
-is_sustained_pattern = ema_intensity > 0.7 and pattern == "escalating"  # Ongoing arc
+# Current (5 dimensions - LOSSY): CharacterEmotionalState updates from raw bot emotions
+state.update_from_bot_emotion(bot_emotion_data)  # Raw intensity
 
-# Memory importance combines both
+# Problem: Single enthusiastic response spikes bot enthusiasm
+Bot: "That's AMAZING! I'm so excited for you!" (joy: 0.95, intensity: 0.9)
+→ state.enthusiasm jumps from 0.7 to 0.82 (+17%)
+Next response: Bot calmer → enthusiasm drops back to 0.74
+
+# Future (11 emotions + EMA - FULL FIDELITY): Smoothed trajectory prevents whiplash
+Bot gives 3 consistently happy responses (joy: 0.85, 0.88, 0.90)
+→ state.joy gradually rises: 0.70 → 0.74 → 0.78 → 0.81
+→ Sustained shift detected, character genuinely more joyful
+→ ALL 11 emotions tracked with EMA smoothing
+```
+
+**Benefits**:
+- **More authentic bot emotional continuity** (no mood whiplash)
+- Better alignment with homeostasis system (10% per hour decay works better with smooth values)
+- Character state reflects sustained emotional patterns, not spikes
+- **Bot self-awareness prompts become more meaningful** ("I've been feeling energized lately" = truth)
+
+**Rule**: Bot character state should use EMA bot emotions, not raw.
+
+### **6. Memory Importance Scoring** (USE BOTH)
+
+**Why Mixed**: Peak emotions + sustained context both matter (applies to both user and bot)
+
+```python
+# Important memory characteristics (USER perspective)
+is_peak_user_emotion = raw_user_intensity > 0.8  # Significant moment
+is_sustained_user_pattern = ema_user_intensity > 0.7 and pattern == "escalating"
+
+# Important memory characteristics (BOT perspective)
+is_peak_bot_emotion = raw_bot_intensity > 0.8  # Character expressed strongly
+is_sustained_bot_pattern = ema_bot_intensity > 0.7  # Character consistently felt this way
+
+# Memory importance combines all factors
 importance_score = (
-    raw_intensity * 0.6 +      # Peak moment weight
-    ema_intensity * 0.4 +      # Sustained context weight
-    emotional_complexity_bonus
+    raw_user_intensity * 0.3 +      # User peak moment
+    ema_user_intensity * 0.2 +      # User sustained context
+    raw_bot_intensity * 0.2 +       # Bot peak expression
+    ema_bot_intensity * 0.2 +       # Bot sustained state
+    emotional_complexity_bonus * 0.1
 )
 ```
 
-**Rule**: Memory scoring benefits from both raw (peaks) and EMA (context).
+**Rule**: Memory scoring benefits from both raw (peaks) and EMA (context) for BOTH user and bot.
 
 ---
 
@@ -664,43 +753,66 @@ class TestEMATrajectorySmoothing:
 
 ### **Qdrant Payload Structure** (Backward Compatible)
 
+WhisperEngine stores **BOTH user and bot emotions** in the same memory point (efficient design). EMA fields would be added for both:
+
 ```python
 # BEFORE (Current)
 payload = {
-    'emotional_intensity': 0.75,      # Raw RoBERTa
+    # USER emotion analysis (from incoming message)
+    'emotional_intensity': 0.75,      # Raw RoBERTa (user)
     'primary_emotion': 'anxiety',
     'roberta_confidence': 0.88,
     'emotion_variance': 0.12,
     'emotion_dominance': 0.85,
-    # ... 12+ existing fields ...
+    # ... 12+ existing user emotion fields ...
+    
+    # BOT emotion analysis (from generated response - Phase 7.5)
+    'bot_primary_emotion': 'concern',     # Bot shows concern for anxious user
+    'bot_emotional_intensity': 0.72,
+    'bot_roberta_confidence': 0.85,
+    # ... bot emotion fields ...
 }
 
 # AFTER (With EMA - Additive Only)
 payload = {
-    # Existing fields (UNCHANGED - backward compatible)
-    'emotional_intensity': 0.75,      # Raw RoBERTa (used for immediate response)
+    # USER emotion fields (UNCHANGED - backward compatible)
+    'emotional_intensity': 0.75,      # Raw RoBERTa (user - for immediate response)
     'primary_emotion': 'anxiety',
     'roberta_confidence': 0.88,
     'emotion_variance': 0.12,
     'emotion_dominance': 0.85,
-    # ... all existing fields preserved ...
+    # ... all existing user fields preserved ...
     
-    # NEW: EMA fields (Optional - graceful fallback if missing)
-    'emotional_intensity_ema': 0.68,  # Smoothed trajectory value
+    # NEW: USER EMA fields (Optional - graceful fallback if missing)
+    'emotional_intensity_ema': 0.68,  # Smoothed user trajectory
     'ema_alpha': 0.3,                 # Smoothing factor used
     'ema_calculation_timestamp': 1730246400,
     
-    # NEW: Trajectory metadata (Optional)
-    'trajectory_pattern': 'escalating',  # Pre-computed from EMA
-    'trajectory_confidence': 0.85,        # Pattern confidence
+    # BOT emotion fields (UNCHANGED - backward compatible)
+    'bot_primary_emotion': 'concern',
+    'bot_emotional_intensity': 0.72,  # Raw (for character state updates)
+    'bot_roberta_confidence': 0.85,
+    # ... all existing bot fields preserved ...
+    
+    # NEW: BOT EMA fields (Optional - for character emotional continuity)
+    'bot_emotional_intensity_ema': 0.64,  # Smoothed bot trajectory
+    'bot_ema_alpha': 0.3,                 # May differ from user alpha
+    'bot_ema_calculation_timestamp': 1730246400,
+    
+    # NEW: Trajectory metadata (Optional - for both user and bot)
+    'user_trajectory_pattern': 'escalating',   # Pre-computed from user EMA
+    'user_trajectory_confidence': 0.85,
+    'bot_trajectory_pattern': 'stable',       # Pre-computed from bot EMA
+    'bot_trajectory_confidence': 0.78,
 }
 ```
 
 **Backward Compatibility**:
 - All existing payloads work without EMA fields
-- Code falls back to raw `emotional_intensity` if `emotional_intensity_ema` missing
+- Code falls back to raw intensities if EMA missing
 - No data migration required
 - Old and new payloads coexist seamlessly
+- **Both user and bot emotions continue to be stored in same memory point** (no schema restructuring)
 
 ---
 
@@ -870,12 +982,22 @@ def calculate_ema(current: float, previous: Optional[float], alpha: float) -> fl
 - `docs/performance/ROBERTA_EMOTION_GOLDMINE_REFERENCE.md` - Current emotion system
 - `src/intelligence/enhanced_vector_emotion_analyzer.py` - RoBERTa implementation
 - `src/intelligence/advanced_emotion_detector.py` - Trajectory analysis code
+- `docs/roadmaps/CHARACTER_EMOTIONAL_STATE_FULL_SPECTRUM_REDESIGN.md` - **PREREQUISITE REDESIGN**
+- `docs/architecture/EMOTION_GUIDANCE_SYSTEM.md` - Complete emotion guidance architecture
 
 ---
 
 ## 📝 Implementation Checklist
 
-### **Phase 1: Core Infrastructure** ✅ Not Started
+### **Phase 0: PREREQUISITE - Character State Redesign** 🚨 BLOCKING
+
+- [ ] Complete `CHARACTER_EMOTIONAL_STATE_FULL_SPECTRUM_REDESIGN.md` implementation
+- [ ] Validate bot emotional state uses full 11-emotion spectrum
+- [ ] Verify emotion fidelity preserved in PostgreSQL storage
+- [ ] Confirm production deployment successful (all bots migrated)
+- [ ] **GATE**: Cannot proceed to Phase 1 until Phase 0 complete
+
+### **Phase 1: Core Infrastructure** ✅ Not Started (Blocked by Phase 0)
 
 - [ ] Add `_calculate_ema()` method to `AdvancedEmotionDetector`
 - [ ] Add `_get_previous_ema()` retrieval helper
@@ -953,16 +1075,21 @@ async def analyze_emotional_arc_WRONG(user_id: str) -> str:
 
 ### **Quick Reference Table**
 
-| Use Case | Use Raw Intensity | Use EMA Intensity |
-|----------|------------------|------------------|
-| **Bot response generation** | ✅ Always | ❌ Never |
-| **Crisis detection** | ✅ Always | ❌ Never |
-| **Empathy moment recognition** | ✅ Always | ❌ Never |
-| **Trajectory pattern classification** | ❌ Never | ✅ Always |
-| **Character memory references** | ❌ Rarely | ✅ Usually |
-| **Conversation mode switching** | ⚠️ For fast switches | ✅ For sustained changes |
-| **Memory importance scoring** | ✅ For peaks | ✅ For sustained context |
-| **Character learning moments** | ⚠️ For surprises | ✅ For trajectory shifts |
+| Use Case | Use Raw User Intensity | Use EMA User Intensity | Use Raw Bot Intensity | Use EMA Bot Intensity |
+|----------|----------------------|----------------------|---------------------|---------------------|
+| **Bot response generation** | ✅ Always | ❌ Never | ❌ Never | ❌ Never |
+| **Crisis detection** | ✅ Always | ❌ Never | N/A | N/A |
+| **Empathy moment recognition** | ✅ Always | ❌ Never | N/A | N/A |
+| **User trajectory pattern classification** | ❌ Never | ✅ Always | N/A | N/A |
+| **Bot trajectory pattern classification** | N/A | N/A | ❌ Never | ✅ Always |
+| **Character memory references (user)** | ❌ Rarely | ✅ Usually | N/A | N/A |
+| **Character memory references (bot self)** | N/A | N/A | ❌ Rarely | ✅ Usually |
+| **Character state updates** | N/A | N/A | ❌ Current (problem) | ✅ Proposed (better) |
+| **Conversation mode switching** | ⚠️ For fast switches | ✅ For sustained changes | N/A | N/A |
+| **Memory importance scoring** | ✅ For user peaks | ✅ For user context | ✅ For bot expression peaks | ✅ For bot sustained state |
+| **Character learning moments** | ⚠️ For surprises | ✅ For user trajectory shifts | ⚠️ For surprising self-expression | ✅ For bot emotional evolution |
+
+**Legend**: N/A = Not applicable to this use case
 
 ---
 
@@ -972,15 +1099,66 @@ async def analyze_emotional_arc_WRONG(user_id: str) -> str:
 
 By implementing EMA for emotional trajectory analysis while preserving raw RoBERTa data for immediate responses, WhisperEngine will gain:
 
-1. **More accurate emotional pattern detection** (fewer false "volatile" alerts)
-2. **Better character memory coherence** (smoother emotional arc references)
+1. **More accurate emotional pattern detection** (fewer false "volatile" alerts for users)
+2. **Better character memory coherence** (smoother emotional arc references for users)
 3. **Improved multi-bot emotional continuity** (user switches between characters)
-4. **Foundation for advanced features** (predictive emotional modeling, relationship evolution)
+4. **More authentic bot emotional evolution** (character state reflects sustained patterns, not spikes)
+5. **Better bot self-awareness** (characters can accurately reflect on their emotional journey)
+6. **Foundation for advanced features** (predictive emotional modeling, relationship evolution)
 
-**Critical Principle**: Raw intensity for **what's happening now**, EMA for **how they've been feeling over time**.
+**Critical Principles**: 
+- **User emotions**: Raw intensity for **what's happening now**, EMA for **how they've been feeling over time**
+- **Bot emotions**: Raw intensity for **what was just expressed**, EMA for **how the character has been feeling**
 
-This enhancement preserves WhisperEngine's core strength (per-message emotional intelligence via RoBERTa) while adding sophisticated longitudinal emotional understanding - essential for authentic multi-character roleplay relationships.
+This enhancement preserves WhisperEngine's core strength (per-message emotional intelligence via RoBERTa for BOTH user and bot) while adding sophisticated longitudinal emotional understanding - essential for authentic multi-character roleplay relationships.
+
+**Why Bot EMA Matters**: Currently, `CharacterEmotionalState` uses lossy 5-dimension compression AND raw emotion updates causing mood whiplash. After full-spectrum redesign + EMA:
+- Elena has enthusiastic conversation → joy gradually rises (authentic shift) - ALL 11 emotions tracked
+- Marcus gives one excited response → joy slightly rises but doesn't spike (noise filtered)
+- Bot self-awareness prompts become meaningful: "I've been feeling energized lately" = statistically true trend
+- Character emotional memory preserves nuance: "I was both optimistic and anxious" (not compressed to "enthusiasm")
+
+**Critical Dependency**: Bot EMA implementation requires Character Emotional State Full-Spectrum Redesign (11 emotions) to be completed FIRST. EMA on 5-dimension lossy data would compound fidelity loss.
 
 ---
+
+## 🗓️ Updated Timeline
+
+**Critical Path**:
+
+1. **Late November 2025**: Complete Character Emotional State Full-Spectrum Redesign
+   - 3 weeks implementation + 1 week validation
+   - Migrate from 5 dimensions → 11 RoBERTa emotions
+   - **BLOCKING**: EMA cannot proceed until this completes
+
+2. **Early January 2026**: Begin EMA Core Infrastructure (Phase 1)
+   - Week 1: Core EMA calculation and storage
+   - Apply to BOTH user trajectory AND bot emotional state
+   - Depends on full-spectrum emotional state being operational
+
+3. **Mid January 2026**: Trajectory Analysis Integration (Phase 2)
+   - Week 2: Pattern classification using EMA
+   - Test false volatile rate reduction
+   - Validate bot emotional continuity improvements
+
+4. **Late January 2026**: Context-Aware Alpha & Validation (Phases 3-4)
+   - Week 3: Adaptive smoothing based on context
+   - Week 4: Comprehensive testing and validation
+   - Measure before/after whiplash reduction
+
+5. **Early February 2026**: Production Deployment
+   - Gradual rollout across character bots
+   - Monitor for 2 weeks before full deployment
+
+**Revised Target**: Q1 2026 (February 2026) - **contingent on prerequisite completion**
+
+---
+
+**Next Steps**: 
+1. ✅ Review Character Emotional State redesign roadmap (`CHARACTER_EMOTIONAL_STATE_FULL_SPECTRUM_REDESIGN.md`)
+2. 🔲 Approve architecture for character state migration
+3. 🔲 Schedule character state implementation sprint (November 2025)
+4. 🔲 After character state complete: Schedule EMA implementation (January 2026)
+5. 🔲 Update project timeline with dependency chain
 
 **Next Steps**: Review this roadmap with team, prioritize against other features, and schedule implementation for Q1 2026.
