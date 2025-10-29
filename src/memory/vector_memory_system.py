@@ -200,8 +200,11 @@ class VectorMemoryStore:
             self._cross_encoder_reranker = create_cross_encoder_reranker()
             if self._cross_encoder_reranker:
                 logger.info("✅ Cross-encoder re-ranking enabled (+15-25% precision)")
-        except ImportError as e:
-            logger.debug("Cross-encoder re-ranking not available: %s", e)
+            else:
+                logger.debug("Cross-encoder re-ranking disabled (set ENABLE_CROSS_ENCODER_RERANKING=true)")
+        except Exception as e:
+            logger.warning("Cross-encoder re-ranking not available: %s", e)
+            self._cross_encoder_reranker = None
         
         # Performance tracking
         self.stats = {
@@ -4765,6 +4768,10 @@ class VectorMemoryManager:
         Returns:
             Re-ranked results (or original results if reranker disabled)
         """
+        # Defensive check for attribute (backward compatibility)
+        if not hasattr(self, '_cross_encoder_reranker'):
+            self._cross_encoder_reranker = None
+        
         if not self._cross_encoder_reranker or not results:
             return results
         
