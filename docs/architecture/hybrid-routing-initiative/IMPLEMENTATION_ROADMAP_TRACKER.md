@@ -258,17 +258,17 @@ df8d9f9 - feat(bot-self-memory): Implement hybrid storage architecture and Postg
   - Performance optimization
   - Documentation updates
 
-### Week 6-7: Advanced Techniques (Techniques 1-8)
+### Week 6-7: Advanced Techniques (Techniques 1-7)
 - [ ] Prioritize techniques for implementation
 - [ ] Implement selected techniques:
   - Cross-Encoder Re-Ranking
-  - Prompt Caching
   - Shared World Memory
   - Guardrails
   - Chain-of-Thought (CoT)
   - Active Learning (depends on Bot Self-Memory)
   - Adaptive Context
   - A/B Testing framework
+  - ~~Prompt Caching~~ (REMOVED - not applicable for dynamic prompts)
 
 ---
 

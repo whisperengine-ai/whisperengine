@@ -80,7 +80,7 @@ The **Hybrid Query Routing Initiative** introduces intelligent LLM tool calling 
 
 #### Techniques 1-8:
 1. **Cross-Encoder Re-Ranking** - Improve memory retrieval precision
-2. **Prompt Caching** - Reduce latency for repeated CDL data
+2. ~~**Prompt Caching**~~ (REMOVED - not applicable for WhisperEngine's dynamic prompts)
 3. **Shared World Memory** - Cross-character knowledge (e.g., news events, public facts)
 4. **Guardrails** - Safety, format compliance, character authenticity
 5. **Chain-of-Thought (CoT)** - Expose reasoning process for complex queries
