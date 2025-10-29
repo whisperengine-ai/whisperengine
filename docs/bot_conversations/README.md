@@ -4,8 +4,8 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 
 ## Overview
 
-- **Total Conversations:** 20
-- **Unique Character Pairs:** 5
+- **Total Conversations:** 29
+- **Unique Character Pairs:** 9
 
 ## Conversations by Character Pair
 
@@ -14,6 +14,11 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 - [Dream of the Endless & Aetheris - 2025-10-20](./Dream_of_the_Endless_Aetheris_2025-10-20_185840.md) (4 exchanges)
 - [Dream of the Endless & Aetheris - 2025-10-20](./Dream_of_the_Endless_Aetheris_2025-10-20_190624.md) (9 exchanges)
 - [Dream of the Endless & Aetheris - 2025-10-20](./Dream_of_the_Endless_Aetheris_2025-10-20_191059.md) (4 exchanges)
+
+### Aetheris & Elena
+
+- [Elena Rodriguez & Aetheris - 2025-10-26](./Elena_Rodriguez_Aetheris_2025-10-26_230305.md) (11 exchanges)
+- [Elena Rodriguez & Aetheris - 2025-10-26](./Elena_Rodriguez_Aetheris_2025-10-26_230738.md) (11 exchanges)
 
 ### Aethys & Marcus
 
@@ -33,8 +38,27 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 - [Dotty & Not Taylor - 2025-10-23](./Dotty_Not_Taylor_2025-10-23_230827.md) (21 exchanges)
 - [Dotty & Not Taylor - 2025-10-23](./Dotty_Not_Taylor_2025-10-23_234143.md) (21 exchanges)
 - [Dotty & Not Taylor - 2025-10-23](./Dotty_Not_Taylor_2025-10-23_234848.md) (21 exchanges)
-- [Dotty & Not Taylor - 2025-10-25 **COMPLETE**](./Dotty_Not_Taylor_2025-10-25_175326.md) (48 exchanges) ✨
-  - *All four conversation sessions combined, including recovered data from vector memory*
+- [Dotty & Not Taylor - 2025-10-25](./Dotty_Not_Taylor_2025-10-25_175326.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-25](./Dotty_Not_Taylor_2025-10-25_180158.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-25](./Dotty_Not_Taylor_2025-10-25_180846.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_205504.md) (6 exchanges)
+- [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_205724.md) (6 exchanges)
+- [Dotty & Not Taylor - 2025-10-25](./Dotty_Not_Taylor_2025-10-25_175326.md) (48 exchanges)
+- [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_005432.md) (15 exchanges)
+- [Not Taylor & Dotty - 2025-10-26](./Not_Taylor_Dotty_2025-10-26_210102.md) (6 exchanges)
+
+### Elena & Marcus
+
+- [Elena Rodriguez & Marcus Thompson - 2025-10-26](./Elena_Rodriguez_Marcus_Thompson_2025-10-26_212118.md) (7 exchanges)
+
+### Elena & Nottaylor
+
+- [Elena Rodriguez & Not Taylor - 2025-10-26](./Elena_Rodriguez_Not_Taylor_2025-10-26_221906.md) (11 exchanges)
+- [Elena Rodriguez & Not Taylor - 2025-10-26](./Elena_Rodriguez_Not_Taylor_2025-10-26_224552.md) (11 exchanges)
+
+### Jake & Ryan
+
+- [Jake Sterling & Ryan Chen - 2025-10-26](./Jake_Sterling_Ryan_Chen_2025-10-26_211505.md) (7 exchanges)
 
 ### Nottaylor & Sophia
 

@@ -16,6 +16,16 @@
 
 **Before creating new docs: ASK USER FIRST.** Stale documentation creates hallucinations and technical debt.
 
+## 🔒 CRITICAL SECURITY - NEVER COMMIT SECRETS
+
+**NEVER commit .env or .env.{bot_name} files to git!**
+- ❌ **NEVER use `git add -f .env*`** - forces adding gitignored files with secrets
+- ❌ **NEVER stage .env files** - they contain Discord tokens, API keys, database passwords
+- ✅ **.env files are gitignored for security** - keep them local only
+- ✅ **Use .env.example or .env.template** for documentation (without real secrets)
+- ✅ **Configuration changes to .env files stay local** - never committed to repo
+- 🚨 **If you accidentally stage .env files**: Run `git reset HEAD .env*` immediately
+
 ## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a PRODUCTION MULTI-CHARACTER DISCORD PLATFORM** - users actively chat with 10+ AI characters
