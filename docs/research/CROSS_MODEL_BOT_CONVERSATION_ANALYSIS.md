@@ -3,7 +3,7 @@
 **Research Date**: October 28-29, 2025  
 **Platform**: WhisperEngine Multi-Bot System  
 **Characters**: Dotty (Mystical Bartender) & NotTaylor (Taylor Swift Parody)  
-**Researcher**: Mark Castillo
+**Researcher**: Mark Anthony
 
 ---
 
@@ -37,9 +37,9 @@ This document presents findings from controlled experiments testing conversation
 
 | Test # | Dotty Model | NotTaylor Model | Date/Time | File |
 |--------|-------------|-----------------|-----------|------|
-| **1** | Mistral Medium 3.1 | Mistral Medium 3.1 | Oct 28, 8:15 PM | `dotty_nottaylor_20251028_201443.json` |
-| **2** | Claude 3.7 Sonnet | Mistral Medium 3.1 | Oct 28, 8:36 PM | `nottaylor_dotty_20251028_203641.json` |
-| **3** | Claude 3.7 Sonnet | Claude 3.7 Sonnet | Oct 28, 8:48 PM | `nottaylor_dotty_20251028_204823.json` |
+| **1** | Mistral Medium 3.1 | Mistral Medium 3.1 | Oct 28, 8:15 PM | [Dotty_Not_Taylor_2025-10-28_201510.md](../bot_conversations/Dotty_Not_Taylor_2025-10-28_201510.md) |
+| **2** | Claude 3.7 Sonnet | Mistral Medium 3.1 | Oct 28, 8:36 PM | [Not_Taylor_Dotty_2025-10-28_203655.md](../bot_conversations/Not_Taylor_Dotty_2025-10-28_203655.md) |
+| **3** | Claude 3.7 Sonnet | Claude 3.7 Sonnet | Oct 28, 8:48 PM | [Not_Taylor_Dotty_2025-10-28_204829.md](../bot_conversations/Not_Taylor_Dotty_2025-10-28_204829.md) |
 
 **Temperature Settings:**
 - Mistral Medium 3.1: 1.2 (high creativity)
@@ -412,9 +412,9 @@ This document presents findings from controlled experiments testing conversation
 ## Appendix: Raw Data
 
 ### Conversation Files
-- Test 1 (Mistral+Mistral): `logs/bot_conversations/dotty_nottaylor_20251028_201443.json`
-- Test 2 (Claude+Mistral): `logs/bot_conversations/nottaylor_dotty_20251028_203641.json`
-- Test 3 (Claude+Claude): `logs/bot_conversations/nottaylor_dotty_20251028_204823.json`
+- Test 1 (Mistral+Mistral): [Dotty_Not_Taylor_2025-10-28_201510.md](../bot_conversations/Dotty_Not_Taylor_2025-10-28_201510.md)
+- Test 2 (Claude+Mistral): [Not_Taylor_Dotty_2025-10-28_203655.md](../bot_conversations/Not_Taylor_Dotty_2025-10-28_203655.md)
+- Test 3 (Claude+Claude): [Not_Taylor_Dotty_2025-10-28_204829.md](../bot_conversations/Not_Taylor_Dotty_2025-10-28_204829.md)
 
 ### Configuration Files
 - Dotty (Mistral): `.env.dotty` - LLM_CHAT_MODEL=mistralai/mistral-medium-3.1, TEMP=1.2
@@ -442,7 +442,7 @@ This document presents findings from controlled experiments testing conversation
 If you use these findings in your research, please cite:
 
 ```
-Castillo, M. (2025). Cross-Model Bot Conversation Dynamics: An Analysis of 
+Castillo, Anthony Mark. (2025). Cross-Model Bot Conversation Dynamics: An Analysis of 
 LLM Pairing Effects in Multi-Agent Conversational AI. WhisperEngine Research 
 Series. https://github.com/whisperengine-ai/whisperengine
 ```

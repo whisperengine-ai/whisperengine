@@ -4,7 +4,7 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 
 ## Overview
 
-- **Total Conversations:** 29
+- **Total Conversations:** 32
 - **Unique Character Pairs:** 9
 
 ## Conversations by Character Pair
@@ -43,9 +43,12 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 - [Dotty & Not Taylor - 2025-10-25](./Dotty_Not_Taylor_2025-10-25_180846.md) (11 exchanges)
 - [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_205504.md) (6 exchanges)
 - [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_205724.md) (6 exchanges)
+- [Dotty & Not Taylor - 2025-10-28](./Dotty_Not_Taylor_2025-10-28_201510.md) (11 exchanges)
 - [Dotty & Not Taylor - 2025-10-25](./Dotty_Not_Taylor_2025-10-25_175326.md) (48 exchanges)
 - [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_005432.md) (15 exchanges)
 - [Not Taylor & Dotty - 2025-10-26](./Not_Taylor_Dotty_2025-10-26_210102.md) (6 exchanges)
+- [Not Taylor & Dotty - 2025-10-28](./Not_Taylor_Dotty_2025-10-28_203655.md) (11 exchanges)
+- [Not Taylor & Dotty - 2025-10-28](./Not_Taylor_Dotty_2025-10-28_204829.md) (11 exchanges)
 
 ### Elena & Marcus
 
