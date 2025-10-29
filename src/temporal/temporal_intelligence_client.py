@@ -442,17 +442,32 @@ class TemporalIntelligenceClient:
         self,
         bot_name: str,
         user_id: str,
-        enthusiasm: float,
-        stress: float,
-        contentment: float,
-        empathy: float,
-        confidence: float,
-        dominant_state: str,
+        enthusiasm: Optional[float] = None,
+        stress: Optional[float] = None,
+        contentment: Optional[float] = None,
+        empathy: Optional[float] = None,
+        confidence: Optional[float] = None,
+        dominant_state: Optional[str] = None,
         session_id: Optional[str] = None,
-        timestamp: Optional[datetime] = None
+        timestamp: Optional[datetime] = None,
+        # V2 11-emotion spectrum parameters
+        joy: Optional[float] = None,
+        anger: Optional[float] = None,
+        sadness: Optional[float] = None,
+        fear: Optional[float] = None,
+        love: Optional[float] = None,
+        trust: Optional[float] = None,
+        optimism: Optional[float] = None,
+        pessimism: Optional[float] = None,
+        anticipation: Optional[float] = None,
+        surprise: Optional[float] = None,
+        disgust: Optional[float] = None,
+        emotional_intensity: Optional[float] = None,
+        emotional_valence: Optional[float] = None,
+        dominant_emotion: Optional[str] = None
     ) -> bool:
         """
-        Record character's 5-dimensional emotional state to InfluxDB
+        Record character's emotional state to InfluxDB (supports both v1 and v2 formats)
         
         Captures the bot's persistent emotional state for temporal analysis of
         character growth and emotional evolution patterns. This enables:
@@ -461,15 +476,40 @@ class TemporalIntelligenceClient:
         - Tracking character growth and relationship-specific emotional states
         - Foundation for proactive emotional awareness
         
+        Supports two formats:
+        1. V1 (Legacy - 5-dimension): enthusiasm, stress, contentment, empathy, confidence
+        2. V2 (Current - 11-dimension): joy, anger, sadness, fear, love, trust, optimism,
+           pessimism, anticipation, surprise, disgust + computed properties
+        
         Args:
             bot_name: Name of the bot (elena, marcus, etc.)
             user_id: User identifier
-            enthusiasm: Enthusiasm level (0.0-1.0) - dopamine-like motivation/energy
-            stress: Stress level (0.0-1.0) - cortisol-like pressure/tension
-            contentment: Contentment level (0.0-1.0) - serotonin-like satisfaction
-            empathy: Empathy level (0.0-1.0) - oxytocin-like connection/warmth
-            confidence: Confidence level (0.0-1.0) - self-assurance/capability
+            
+            # V1 Parameters (legacy, optional)
+            enthusiasm: Enthusiasm level (0.0-1.0)
+            stress: Stress level (0.0-1.0)
+            contentment: Contentment level (0.0-1.0)
+            empathy: Empathy level (0.0-1.0)
+            confidence: Confidence level (0.0-1.0)
             dominant_state: Human-readable dominant state (overwhelmed, energized, etc.)
+            
+            # V2 Parameters (current, optional)
+            joy: Joy emotion (0.0-1.0)
+            anger: Anger emotion (0.0-1.0)
+            sadness: Sadness emotion (0.0-1.0)
+            fear: Fear emotion (0.0-1.0)
+            love: Love emotion (0.0-1.0)
+            trust: Trust emotion (0.0-1.0)
+            optimism: Optimism emotion (0.0-1.0)
+            pessimism: Pessimism emotion (0.0-1.0)
+            anticipation: Anticipation emotion (0.0-1.0)
+            surprise: Surprise emotion (0.0-1.0)
+            disgust: Disgust emotion (0.0-1.0)
+            emotional_intensity: Computed intensity metric (0.0-1.0)
+            emotional_valence: Computed valence metric (-1.0 to +1.0)
+            dominant_emotion: Most prominent emotion from v2 (joy, anger, etc.)
+            
+            # Common Parameters
             session_id: Optional session identifier
             timestamp: Optional timestamp (defaults to current time)
             
@@ -480,29 +520,73 @@ class TemporalIntelligenceClient:
             return False
 
         try:
+            # Determine which format is being used
+            has_v2 = joy is not None
+            has_v1 = enthusiasm is not None
+            
+            # Use dominant_emotion from v2, fall back to dominant_state from v1
+            state_tag = dominant_emotion if dominant_emotion else (dominant_state or "neutral")
+            
             point = Point("character_emotional_state") \
                 .tag("bot", bot_name) \
                 .tag("user_id", user_id) \
-                .tag("dominant_state", dominant_state)
+                .tag("dominant_state", state_tag)
             
             if session_id:
                 point = point.tag("session_id", session_id)
+            
+            # Add version tag to track which format is being recorded
+            if has_v2:
+                point = point.tag("emotion_format", "v2_11_emotion")
+            elif has_v1:
+                point = point.tag("emotion_format", "v1_5_emotion")
+            
+            # Record V2 emotions if provided (11-dimension spectrum)
+            if has_v2:
+                point = point \
+                    .field("joy", joy) \
+                    .field("anger", anger) \
+                    .field("sadness", sadness) \
+                    .field("fear", fear) \
+                    .field("love", love) \
+                    .field("trust", trust) \
+                    .field("optimism", optimism) \
+                    .field("pessimism", pessimism) \
+                    .field("anticipation", anticipation) \
+                    .field("surprise", surprise) \
+                    .field("disgust", disgust)
                 
-            point = point \
-                .field("enthusiasm", enthusiasm) \
-                .field("stress", stress) \
-                .field("contentment", contentment) \
-                .field("empathy", empathy) \
-                .field("confidence", confidence)
+                # Add computed properties if provided
+                if emotional_intensity is not None:
+                    point = point.field("emotional_intensity", emotional_intensity)
+                if emotional_valence is not None:
+                    point = point.field("emotional_valence", emotional_valence)
+            
+            # Record V1 emotions if provided (5-dimension legacy)
+            elif has_v1:
+                point = point \
+                    .field("enthusiasm", enthusiasm) \
+                    .field("stress", stress) \
+                    .field("contentment", contentment) \
+                    .field("empathy", empathy) \
+                    .field("confidence", confidence)
             
             if timestamp:
                 point = point.time(timestamp)
                 
             self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
-            logger.debug(
-                "📊 TEMPORAL: Recorded character emotional state for %s/%s (dominant: %s, stress: %.2f, enthusiasm: %.2f)",
-                bot_name, user_id, dominant_state, stress, enthusiasm
-            )
+            
+            # Log appropriate message based on format
+            if has_v2:
+                logger.debug(
+                    "📊 TEMPORAL: Recorded character emotional state (v2) for %s/%s (dominant: %s, intensity: %.2f, valence: %+.2f)",
+                    bot_name, user_id, state_tag, emotional_intensity or 0.0, emotional_valence or 0.0
+                )
+            else:
+                logger.debug(
+                    "📊 TEMPORAL: Recorded character emotional state (v1) for %s/%s (dominant: %s, stress: %.2f, enthusiasm: %.2f)",
+                    bot_name, user_id, state_tag, stress or 0.0, enthusiasm or 0.0
+                )
             return True
             
         except (ValueError, ConnectionError, KeyError) as e:

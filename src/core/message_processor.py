@@ -454,10 +454,10 @@ class MessageProcessor:
                 return self.character_state_manager is not None
             
             try:
-                from src.intelligence.character_emotional_state import create_character_emotional_state_manager
+                from src.intelligence.character_emotional_state_v2 import CharacterEmotionalStateManager
                 
-                self.character_state_manager = create_character_emotional_state_manager()
-                logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (in-memory)")
+                self.character_state_manager = CharacterEmotionalStateManager()
+                logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (v2 - 11-emotion spectrum)")
             
             except ImportError as e:
                 logger.warning("🎭 CHARACTER STATE: Tracking not available: %s", e)
@@ -809,6 +809,7 @@ class MessageProcessor:
             
             if self.character_state_manager:
                 try:
+                    from src.utils.bot_name_utils import get_normalized_bot_name_from_env
                     character_name = get_normalized_bot_name_from_env()
                     
                     if character_name:
@@ -820,9 +821,9 @@ class MessageProcessor:
                         # Add to AI components for CDL prompt building
                         ai_components['character_emotional_state'] = character_state
                         logger.info(
-                            "🎭 CHARACTER STATE: Retrieved for %s - %s (enthusiasm=%.2f, stress=%.2f)",
-                            character_name, character_state.get_dominant_state(),
-                            character_state.enthusiasm, character_state.stress
+                            "🎭 CHARACTER STATE: Retrieved for %s - %s (joy=%.2f, intensity=%.2f)",
+                            character_name, character_state.dominant_emotion,
+                            character_state.joy, character_state.emotional_intensity
                         )
                 except Exception as e:
                     logger.debug("Failed to retrieve character emotional state: %s", e)
@@ -945,23 +946,29 @@ class MessageProcessor:
                         # Phase 7.5c: Record character emotional state to InfluxDB for temporal analysis
                         if updated_state and self.temporal_client:
                             try:
+                                # Record v2 11-emotion format
                                 await self.temporal_client.record_character_emotional_state(
                                     bot_name=character_name,
                                     user_id=message_context.user_id,
-                                    enthusiasm=updated_state.enthusiasm,
-                                    stress=updated_state.stress,
-                                    contentment=updated_state.contentment,
-                                    empathy=updated_state.empathy,
-                                    confidence=updated_state.confidence,
-                                    dominant_state=updated_state.get_dominant_state()
+                                    joy=updated_state.joy,
+                                    anger=updated_state.anger,
+                                    sadness=updated_state.sadness,
+                                    fear=updated_state.fear,
+                                    love=updated_state.love,
+                                    trust=updated_state.trust,
+                                    optimism=updated_state.optimism,
+                                    pessimism=updated_state.pessimism,
+                                    anticipation=updated_state.anticipation,
+                                    surprise=updated_state.surprise,
+                                    disgust=updated_state.disgust,
+                                    emotional_intensity=updated_state.emotional_intensity,
+                                    emotional_valence=updated_state.emotional_valence,
+                                    dominant_emotion=updated_state.dominant_emotion
                                 )
                                 logger.debug(
-                                    "📊 TEMPORAL: Recorded character emotional state to InfluxDB (dominant: %s)",
-                                    updated_state.get_dominant_state()
+                                    "📊 TEMPORAL: Recorded character emotional state to InfluxDB (v2 11-emotion format, dominant: %s, intensity: %.2f)",
+                                    updated_state.dominant_emotion, updated_state.emotional_intensity
                                 )
-                            except AttributeError:
-                                # record_character_emotional_state method not yet in all environments
-                                logger.debug("Character emotional state InfluxDB recording not available in this environment")
                             except Exception as e:
                                 logger.debug("Failed to record character emotional state to InfluxDB: %s", e)
                                 

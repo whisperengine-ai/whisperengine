@@ -302,9 +302,12 @@ async def create_emotional_intelligence_component(
         if bot_guidance:
             has_significant_emotion = True
             bot_guidance_parts.append(bot_guidance)
+            # Get dominant emotion - supports both v1 (method) and v2 (property)
+            dominant = getattr(character_emotional_state, 'dominant_emotion', None) or \
+                      (character_emotional_state.get_dominant_state() if hasattr(character_emotional_state, 'get_dominant_state') else 'unknown')
             logger.info(
-                "🎭 BOT STATE: Using CharacterEmotionalState guidance - %s",
-                character_emotional_state.get_dominant_state()
+                "🎭 BOT STATE: Using CharacterEmotionalState guidance (v2: 11-emotion) - %s",
+                dominant
             )
     # Fallback to current bot emotion from RoBERTa analysis
     elif current_bot_emotion and isinstance(current_bot_emotion, dict):
