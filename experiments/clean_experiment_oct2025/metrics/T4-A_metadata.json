@@ -1,0 +1,18 @@
+{
+  "test_id": "T4-A",
+  "timestamp": "2025-10-29T12:22:12.332449",
+  "configuration": {
+    "dotty_model": "anthropic/claude-3.7-sonnet",
+    "dotty_temperature": "0.8",
+    "nottaylor_model": "mistralai/mistral-medium-3.1",
+    "nottaylor_temperature": "0.8"
+  },
+  "parameters": {
+    "turns": 10,
+    "timeout": 90,
+    "continuation": true,
+    "memory_state": "fresh"
+  },
+  "phase": 4,
+  "replication": 1
+}

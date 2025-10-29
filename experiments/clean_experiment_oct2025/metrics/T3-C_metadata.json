@@ -1,0 +1,18 @@
+{
+  "test_id": "T3-C",
+  "timestamp": "2025-10-29T12:13:07.912339",
+  "configuration": {
+    "dotty_model": "mistralai/mistral-medium-3.1",
+    "dotty_temperature": "0.8",
+    "nottaylor_model": "anthropic/claude-3.7-sonnet",
+    "nottaylor_temperature": "0.8"
+  },
+  "parameters": {
+    "turns": 10,
+    "timeout": 90,
+    "continuation": true,
+    "memory_state": "fresh"
+  },
+  "phase": 3,
+  "replication": 3
+}

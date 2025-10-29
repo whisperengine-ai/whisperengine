@@ -4,7 +4,7 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 
 ## Overview
 
-- **Total Conversations:** 32
+- **Total Conversations:** 47
 - **Unique Character Pairs:** 9
 
 ## Conversations by Character Pair
@@ -44,6 +44,21 @@ This directory contains transcripts of conversations between WhisperEngine AI ch
 - [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_205504.md) (6 exchanges)
 - [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_205724.md) (6 exchanges)
 - [Dotty & Not Taylor - 2025-10-28](./Dotty_Not_Taylor_2025-10-28_201510.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_100317.md) (3 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_100602.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_102835.md) (21 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_111845.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_112311.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_112915.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_114534.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_114835.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_115129.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_120024.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_120502.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_120916.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_121849.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_122250.md) (11 exchanges)
+- [Dotty & Not Taylor - 2025-10-29](./Dotty_Not_Taylor_2025-10-29_122629.md) (11 exchanges)
 - [Dotty & Not Taylor - 2025-10-25](./Dotty_Not_Taylor_2025-10-25_175326.md) (48 exchanges)
 - [Dotty & Not Taylor - 2025-10-26](./Dotty_Not_Taylor_2025-10-26_005432.md) (15 exchanges)
 - [Not Taylor & Dotty - 2025-10-26](./Not_Taylor_Dotty_2025-10-26_210102.md) (6 exchanges)

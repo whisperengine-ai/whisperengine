@@ -410,14 +410,15 @@ async def main():
         # Exchange messages
         success = await bridge.exchange_messages(args.turns)
         if not success:
-            print("❌ Conversation exchange failed")
-            return
+            print("❌ Conversation exchange failed - saving partial conversation")
         
-        # Save conversation
-        output_file = await bridge.save_conversation(args.output)
+        # Save conversation (even if there was an error)
+        if bridge.conversation_log:
+            output_file = await bridge.save_conversation(args.output)
+            print(f"📊 Total exchanges: {len(bridge.conversation_log)}")
         
-        print("✨ Conversation bridge completed successfully!")
-        print(f"📊 Total exchanges: {len(bridge.conversation_log)}")
+        if success:
+            print("✨ Conversation bridge completed successfully!")
         
     except KeyboardInterrupt:
         print("\n⏹️  Conversation interrupted by user")

@@ -4213,9 +4213,10 @@ class VectorMemoryManager:
                 channel_type=channel_type
             )
         except Exception as e:
+            # CRITICAL: Use simple string formatting to avoid recursive logging errors
+            # exc_info=True can cause issues with large objects in exception context
             logger.error(
-                f"Intelligent routing failed for query '{query}': {e}",
-                exc_info=True
+                f"Intelligent routing failed for query '{query[:100]}': {type(e).__name__}: {str(e)[:200]}"
             )
             # Fallback to legacy method on errors
             logger.warning("⚠️ Falling back to legacy retrieval method")
