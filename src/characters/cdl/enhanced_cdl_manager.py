@@ -731,6 +731,7 @@ class EnhancedCDLManager:
         
         # Core identity
         cdl_data = {
+            'id': character_id,  # Include character ID for persistence operations
             'identity': {
                 'name': character_row['name'],
                 'occupation': character_row['occupation'] or '',
