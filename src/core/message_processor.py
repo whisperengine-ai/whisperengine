@@ -2560,515 +2560,9 @@ class MessageProcessor:
         except Exception as e:
             logger.warning("Error recording MemoryBoost metrics: %s", str(e))
 
-    async def _build_conversation_context(self, message_context: MessageContext, 
-                                        relevant_memories: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-        """
-        🚀 SOPHISTICATED CONVERSATION CONTEXT BUILDING 🚀
-        
-        Build conversation context for LLM processing with sophisticated memory narrative,
-        conversation cache integration, and advanced system message consolidation.
-        
-        Restored from original events.py implementation with full sophistication.
-        """
-        conversation_context = []
-        
-        # Debug memory input
-        user_id = message_context.user_id
-        logger.info(f"🤖 LLM CONTEXT DEBUG: Building context for user {user_id}")
-        logger.info(f"🤖 LLM CONTEXT DEBUG: Memory input - {len(relevant_memories) if relevant_memories else 0} memories")
-        
-        # Add time context for temporal awareness
-        from src.utils.helpers import get_current_time_context
-        time_context = get_current_time_context()
-        
-        # 🚨 SOPHISTICATED MEMORY NARRATIVE BUILDING: Restored from original implementation
-        memory_fragments = []
-        if relevant_memories:
-            logger.info(f"🤖 LLM CONTEXT DEBUG: Processing {len(relevant_memories)} memories for context")
-            
-            # Handle both legacy and hierarchical memory formats (original sophistication)
-            global_facts = []
-            user_memories = []
-            
-            for i, m in enumerate(relevant_memories):
-                logger.info(f"🤖 LLM CONTEXT DEBUG: Memory {i+1} structure: {list(m.keys())}")
-                
-                # Check if memory has metadata (legacy format) or use memory_type (hierarchical format)
-                if "metadata" in m:
-                    # Legacy format
-                    if m["metadata"].get("is_global", False):
-                        global_facts.append(m)
-                    else:
-                        user_memories.append(m)
-                else:
-                    # Hierarchical format - treat all as user memories for now
-                    user_memories.append(m)
-            
-            logger.info(f"🤖 LLM CONTEXT DEBUG: Categorized - {len(global_facts)} global facts, {len(user_memories)} user memories")
-            logger.info(f"🔍 CONDITION DEBUG: user_memories={len(user_memories) if user_memories else 0}")
-            
-            # Process global facts
-            if global_facts:
-                gf_text = "; ".join(
-                    memory["metadata"].get("fact", "")[:160] for memory in global_facts
-                    if memory.get("metadata", {}).get("type") == "global_fact"
-                )
-                if gf_text:
-                    memory_fragments.append(f"Shared truths: {gf_text}")
-                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added global facts: {gf_text[:100]}...")
-            
-            # 🚀 ADVANCED USER MEMORY PROCESSING: Restored sophisticated narrative building
-            if user_memories:
-                logger.info(f"🔍 USER MEMORIES DEBUG: Processing {len(user_memories)} user memories")
-                
-                conversation_memory_parts = []
-                recent_conversation_parts = []  # Prioritize recent conversation context
-                
-                for memory in user_memories[:6]:  # limit
-                    # ALWAYS try content field first - no complex format detection
-                    content = memory.get("content", "")
-                    timestamp = memory.get("timestamp", "")
-                    logger.info(f"🔍 MEMORY DEBUG [{memory.get('id', 'unknown')}]: content='{content[:50]}...', timestamp='{timestamp}', has_metadata={'metadata' in memory}")
-                    
-                    # Determine if this is recent conversation (last 2 hours)
-                    is_recent = False
-                    if timestamp:
-                        try:
-                            from datetime import datetime, timedelta
-                            if isinstance(timestamp, str):
-                                # Parse timestamp
-                                memory_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                            elif isinstance(timestamp, (int, float)):
-                                memory_time = datetime.fromtimestamp(timestamp)
-                            else:
-                                memory_time = timestamp
-                            
-                            # Check if within last 2 hours
-                            if (datetime.now(memory_time.tzinfo if memory_time.tzinfo else None) - memory_time) < timedelta(hours=2):
-                                is_recent = True
-                        except Exception as e:
-                            logger.debug(f"Could not parse timestamp for recency check: {e}")
-                    
-                    if content and content.strip():
-                        # Try to parse if it contains conversation structure
-                        if "User:" in content and "Bot:" in content:
-                            memory_text = f"[Previous conversation: {content[:500]}]"  # Increased from 120 to 500 chars
-                        else:
-                            memory_text = f"[Memory: {content[:500]}]"  # Increased from 120 to 500 chars
-                        
-                        # Prioritize recent conversation
-                        if is_recent:
-                            recent_conversation_parts.append(memory_text)
-                            logger.info(f"🔍 MEMORY DEBUG: ✅ Added RECENT memory content")
-                        else:
-                            conversation_memory_parts.append(memory_text)
-                            logger.info(f"🔍 MEMORY DEBUG: ✅ Added older memory content")
-                    else:
-                        # Only try metadata if content is empty/missing
-                        md = memory.get("metadata", {})
-                        if md.get("user_message") and md.get("bot_response"):
-                            user_msg = md.get("user_message")[:300]  # Increased from 100 to 300 chars
-                            bot_msg = md.get("bot_response")[:300]  # Increased from 100 to 300 chars
-                            memory_text = f"[User said: \"{user_msg}\", You responded: \"{bot_msg}\"]"
-                            
-                            if is_recent:
-                                recent_conversation_parts.append(memory_text)
-                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added RECENT from metadata conversation")
-                            else:
-                                conversation_memory_parts.append(memory_text)
-                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added older from metadata conversation")
-                        elif md.get("user_message"):
-                            user_msg = md.get("user_message")[:300]  # Increased from 120 to 300 chars
-                            memory_text = f"[User said: \"{user_msg}\"]"
-                            
-                            if is_recent:
-                                recent_conversation_parts.append(memory_text)
-                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added RECENT from metadata user message")
-                            else:
-                                conversation_memory_parts.append(memory_text)
-                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added older from metadata user message")
-                        elif md.get("type") == "user_fact":
-                            memory_text = f"[Fact: {md.get('fact', '')[:300]}]"  # Increased from 120 to 300 chars
-                            conversation_memory_parts.append(memory_text)  # Facts are not time-sensitive
-                            logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata fact")
-                        else:
-                            logger.warning(f"🔍 MEMORY DEBUG: ❌ No valid content or metadata structure")
-                
-                # Build memory narrative with proper hierarchy: Facts (long-term) vs Summaries (medium-term)
-                memory_parts = []
-                
-                # Separate facts from conversations for better organization
-                user_facts = []
-                older_conversation_summaries = []  # Real summaries, not just topics
-                
-                # 🚀 PHASE 2: PostgreSQL fact retrieval (PRIMARY - 12-25x faster than string parsing)
-                postgres_facts = await self._get_user_facts_from_postgres(
-                    user_id=message_context.user_id,
-                    bot_name=get_normalized_bot_name_from_env()
-                )
-                if postgres_facts:
-                    user_facts.extend(postgres_facts)
-                    logger.info(f"✅ POSTGRES FACTS: Added {len(postgres_facts)} facts from PostgreSQL")
-                
-                # Legacy: Extract facts from memory content (FALLBACK - will be removed in Phase 1)
-                legacy_facts = self._extract_user_facts_from_memories(user_memories)
-                if legacy_facts and not postgres_facts:
-                    # Only use legacy facts if PostgreSQL didn't return any
-                    user_facts.extend(legacy_facts)
-                    logger.debug(f"⚠️ LEGACY FACTS: Used {len(legacy_facts)} facts from memory string parsing (fallback)")
-                
-                # ENHANCEMENT: Add Discord preferred name detection
-                if message_context.metadata:
-                    discord_name = message_context.metadata.get('discord_author_name')
-                    if discord_name:
-                        preferred_name = self._extract_preferred_name_from_discord(discord_name)
-                        if preferred_name and preferred_name != discord_name:
-                            # Add as user fact if not already present
-                            name_fact = f"[Preferred name: {preferred_name}]"
-                            if name_fact not in user_facts:
-                                user_facts.insert(0, name_fact)  # Put name first
-                
-                # Process OLDER conversation parts (beyond recent messages) - create REAL summaries
-                if conversation_memory_parts:
-                    for part in conversation_memory_parts:
-                        if "[Fact:" in part:
-                            user_facts.append(part)
-                        else:
-                            # Create actual summary, not just topic
-                            summary = self._create_conversation_summary(part)
-                            if summary:
-                                older_conversation_summaries.append(summary)
-                
-                # Process RECENT conversation parts - add directly without summarization
-                recent_conversation_summaries = []
-                if recent_conversation_parts:
-                    for part in recent_conversation_parts:
-                        if "[Fact:" not in part:  # Don't duplicate facts
-                            # Extract content without [Memory:] wrapper for cleaner context
-                            clean_part = part.replace('[Memory:', '').replace('[Previous conversation:', '').replace(']', '').strip()
-                            if len(clean_part) > 15:  # Skip very short content
-                                recent_conversation_summaries.append(clean_part[:1500])  # Keep substantial context (Discord messages can be up to 2000 chars)
-                
-                # Build organized memory narrative
-                if user_facts:
-                    memory_parts.append("USER FACTS: " + "; ".join(user_facts))
-                if recent_conversation_summaries:
-                    # Recent conversations get priority - add them directly
-                    unique_recent = list(dict.fromkeys(recent_conversation_summaries))[:10]  # Max 10 recent exchanges
-                    memory_parts.append("RECENT CONVERSATIONS: " + "; ".join(unique_recent))
-                if older_conversation_summaries:
-                    # Deduplicate and limit summaries
-                    unique_summaries = list(dict.fromkeys(older_conversation_summaries))[:5]  # Max 5 summaries
-                    memory_parts.append("PAST CONVERSATION SUMMARIES: " + "; ".join(unique_summaries))
-                
-                if memory_parts:
-                    memory_fragments.append(" ".join(memory_parts))
-                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(user_facts)} facts + {len(recent_conversation_summaries)} recent + {len(older_conversation_summaries)} older summaries")
-                else:
-                    logger.error(f"🤖 LLM CONTEXT DEBUG: FAILED - No valid memory content found from {len(user_memories)} memories")
-            else:
-                logger.info(f"🤖 LLM CONTEXT DEBUG: No memories to process (memories: {relevant_memories is not None})")
-        
-        memory_narrative = " ".join(memory_fragments)
-        logger.info(f"🤖 LLM CONTEXT DEBUG: Final memory narrative: '{memory_narrative[:200]}...'")
-        
-        # � CONVERSATION CACHE INTEGRATION: Restored sophisticated conversation history processing
-        try:
-            from src.utils.helpers import generate_conversation_summary
-            
-            # Get recent messages from conversation cache if available
-            recent_messages = []
-            if self.conversation_cache:
-                try:
-                    # Try to get recent messages from conversation cache
-                    cache_key = f"recent_messages_{user_id}"
-                    cached_messages = await self.conversation_cache.get(cache_key)
-                    if cached_messages:
-                        recent_messages = cached_messages
-                        logger.info(f"🔥 CONVERSATION CACHE: Retrieved {len(recent_messages)} cached messages")
-                except Exception as e:
-                    logger.debug(f"Conversation cache retrieval failed: {e}")
-            
-            # Fallback to memory manager conversation history
-            if not recent_messages:
-                conversation_history = await self.memory_manager.get_conversation_history(
-                    user_id=user_id, 
-                    limit=15  # Get more messages for better context (matching previous implementation)
-                )
-                
-                # 🚨 FIXED: No need to re-sort - Qdrant already sorts by timestamp and vector memory 
-                # returns them in correct chronological order (oldest to newest)
-                # Redundant sorting here was breaking the proper message order
-                if conversation_history:
-                    # Just take the limit, no re-sorting needed
-                    conversation_history = conversation_history[:15]  # Take only the 15 most recent
-                    
-                    logger.info(f"✅ MEMORY ORDER: Using {len(conversation_history)} messages in chronological order from memory system")
-                
-                # Convert to expected format for generate_conversation_summary
-                # 🚨 FIX: Include author_id so summary can filter user-specific messages
-                recent_messages = []
-                for msg in conversation_history:
-                    if isinstance(msg, dict):
-                        content = msg.get('content', '')
-                        role = msg.get('role', 'user')
-                        is_bot = role in ['assistant', 'bot']
-                        timestamp = msg.get('timestamp', '')
-                        
-                        recent_messages.append({
-                            'content': content,
-                            'author_id': user_id if not is_bot else 'bot',  # 🚨 FIX: Add author_id for filtering
-                            'role': role,
-                            'bot': is_bot,
-                            'timestamp': timestamp  # Preserve timestamp for debugging
-                        })
-                    else:
-                        content = getattr(msg, 'content', '')
-                        role = getattr(msg, 'role', 'user')
-                        is_bot = role in ['assistant', 'bot']
-                        timestamp = getattr(msg, 'timestamp', '')
-                        
-                        recent_messages.append({
-                            'content': content,
-                            'author_id': user_id if not is_bot else 'bot',  # 🚨 FIX: Add author_id for filtering
-                            'role': role,
-                            'bot': is_bot,
-                            'timestamp': timestamp  # Preserve timestamp for debugging
-                        })
-                
-                logger.info(f"🔥 FALLBACK: Using memory manager conversation history - {len(recent_messages)} messages")
-                
-                # 🚨 CONTEXT DIVERSITY CHECK: Detect if the same conversation context is being reused
-                # This prevents looping where the bot gets the same historical context repeatedly
-                import hashlib
-                
-                # Create a hash of the conversation content (not including timestamps)
-                context_signature = '|'.join([
-                    f"{msg.get('role', 'user')}:{msg.get('content', '')[:50]}" 
-                    for msg in recent_messages
-                ])
-                context_hash = hashlib.md5(context_signature.encode()).hexdigest()
-                
-                # Track last context hash for this user (using instance attribute)
-                last_context_attr = f'_last_context_hash_{user_id}'
-                last_context_hash = getattr(self, last_context_attr, None)
-                
-                if last_context_hash and context_hash == last_context_hash:
-                    logger.warning(
-                        f"⚠️ STALE CONTEXT DETECTED: Same conversation history reused for user {user_id} "
-                        f"(hash: {context_hash[:8]}). Context may be stuck - forcing fresh retrieval."
-                    )
-                    # Don't error, but log this for monitoring
-                    # The timestamp sorting above should prevent this, but we want to detect if it still happens
-                else:
-                    logger.debug(f"✅ CONTEXT DIVERSITY: New conversation context for user {user_id} (hash: {context_hash[:8]})")
-                
-                # Store the current context hash for next comparison
-                setattr(self, last_context_attr, context_hash)
-                
-                # 🚨 CRITICAL FIX: Ensure conversation context includes bot responses for continuity
-                # If the most recent messages are all user messages, this breaks LLM context
-                if recent_messages:
-                    # Count recent user vs bot messages
-                    # 🚨 FIX: Check 'role' field, not 'bot' field
-                    recent_5 = recent_messages[-5:] if len(recent_messages) >= 5 else recent_messages
-                    user_count = sum(1 for msg in recent_5 if msg.get('role', 'user') not in ['bot', 'assistant'])
-                    bot_count = sum(1 for msg in recent_5 if msg.get('role', 'user') in ['bot', 'assistant'])
-                    
-                    logger.info(f"🔥 CONTINUITY CHECK: Recent 5 messages - User: {user_count}, Bot: {bot_count}")
-                    
-                    # If no bot messages in recent 5, expand search to include at least 1 bot response
-                    if bot_count == 0 and len(recent_messages) > 5:
-                        logger.warning(f"🔥 CONTINUITY FIX: No bot responses in recent 5 messages - expanding search")
-                        # Look further back to find at least one bot response
-                        for i in range(5, min(15, len(recent_messages))):
-                            if recent_messages[-(i+1)].get('role', 'user') in ['bot', 'assistant']:
-                                # Include this bot message for context
-                                bot_msg = recent_messages[-(i+1)]
-                                recent_messages = recent_messages[-5:] + [bot_msg]
-                                logger.info(f"🔥 CONTINUITY FIX: Added bot response from position -{i+1} for context")
-                                break
-            
-            # ALWAYS generate conversation summary - NO CONDITIONAL FALLBACKS
-            conversation_summary = generate_conversation_summary(recent_messages, user_id)
-            if conversation_summary and len(conversation_summary) > 600:
-                conversation_summary = conversation_summary[:600] + "..."
-            
-            logger.info(f"📝 CONVERSATION SUMMARY: Generated summary ({len(conversation_summary)} chars)")
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Conversation cache integration failed: {e}")
-            conversation_summary = ""
-            recent_messages = []
-        
-        # 🚀 OPTIMIZED SYSTEM MESSAGE: Lean core prompt, memory/summary as bridge messages
-        
-        # Build lean system message - memory/summary moved to bridge position for better flow
-        system_prompt_content = f"CURRENT DATE & TIME: {time_context}"
-        
-        # 🔒 PRIVACY CONTEXT: Add channel awareness so bot knows if conversation is private or public
-        # Default to private for safety - only mark as public if explicitly guild channel
-        if message_context.channel_type == "guild":
-            channel_context = " CONVERSATION SETTING: This is a public server channel. Others are watching/reading this conversation."
-            logger.info("🔒 PRIVACY: Adding server context hint to system prompt (public conversation)")
-        else:
-            # Default to private (includes DM and unknown/None channel types)
-            channel_context = " CONVERSATION SETTING: This is a private 1-on-1 direct message. Just you and them."
-            logger.info("🔒 PRIVACY: Adding private context hint (channel_type=%s)", message_context.channel_type or "unknown")
-        
-        system_prompt_content += channel_context
-        
-        # Log what will become bridge messages
-        if memory_narrative:
-            logger.info(f"📚 MEMORY: Will add memory narrative as bridge message ({len(memory_narrative)} chars)")
-        
-        if conversation_summary:
-            logger.info(f"📝 SUMMARY: Will add conversation summary as bridge message ({len(conversation_summary)} chars)")
-        
-        # Add attachment guard if needed
-        attachment_guard = ""
-        if message_context.attachments and len(message_context.attachments) > 0:
-            bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
-            attachment_guard = (
-                f" Image policy: respond only in-character ({bot_name}), never output analysis sections, "
-                f"headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
-            )
-        
-        # Add guidance clause for natural conversation
-        bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
-        guidance_clause = (
-            f" Communication style: Respond naturally and authentically as {bot_name} - "
-            f"be warm, genuine, and conversational. No meta-analysis, breakdowns, bullet summaries, "
-            f"or section headings. Stay in character and speak like a real person would."
-        )
-        
-        # 🚨 FIX: Consolidate ALL system content at the beginning to maintain user/assistant alternation
-        # Memory narrative and conversation summary will be added to initial system message
-        # to prevent breaking alternation rules required by many LLM APIs
-        
-        core_system_parts = [system_prompt_content + attachment_guard + guidance_clause]
-        
-        # Add memory narrative to initial system message (not as separate message)
-        if memory_narrative:
-            core_system_parts.append(f"\n\nRELEVANT MEMORIES: {memory_narrative}")
-            logger.debug(f"🔥 SYSTEM CONSOLIDATION: Added memory narrative ({len(memory_narrative)} chars) to initial system message")
-        else:
-            # Add no-memory warning to initial system message
-            core_system_parts.append(
-                "\n\n⚠️ MEMORY STATUS: No previous conversation history found. If asked about past conversations, "
-                "politely say you don't have specific memories of those discussions yet. DO NOT invent or hallucinate conversation details."
-            )
-            logger.debug(f"🔥 SYSTEM CONSOLIDATION: Added NO MEMORY warning to initial system message")
-        
-        # Add conversation summary to initial system message (not as separate message)
-        if conversation_summary:
-            core_system_parts.append(f"\n\nCONVERSATION FLOW: {conversation_summary}")
-            logger.debug(f"🔥 SYSTEM CONSOLIDATION: Added conversation summary ({len(conversation_summary)} chars) to initial system message")
-        
-        # Create consolidated system message
-        consolidated_system = "".join(core_system_parts)
-        conversation_context.append({"role": "system", "content": consolidated_system})
-        
-        # 🚀 SOPHISTICATED RECENT MESSAGE PROCESSING with OPTIMIZED ASSEMBLY ORDER
-        try:
-            if recent_messages:
-                logger.info(f"🔥 CONTEXT DEBUG: Processing {len(recent_messages)} recent messages for conversation context")
-                
-                # OPTIMIZED: Split messages into OLDER (truncated) vs RECENT (detailed)
-                recent_full_count = 6  # Reduced from 20 to 6 (last 3 exchanges) to prevent verbose pattern-matching
-                older_messages = recent_messages[:-recent_full_count] if len(recent_messages) > recent_full_count else []
-                recent_full_messages = recent_messages[-recent_full_count:] if len(recent_messages) > recent_full_count else recent_messages
-
-                logger.info(f"🔥 CONTINUITY: Split into {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (400 chars)")
-                
-                # Add older messages first (truncated for space)
-                user_assistant_messages = []
-                skip_next_bot_response = False
-                
-                for msg in older_messages:
-                    msg_content = msg.get('content', '')
-                    # 🚨 FIX: Check 'role' field, not 'bot' field - memory returns role='bot' or role='user'
-                    role_value = msg.get('role', 'user')
-                    is_bot_msg = role_value in ['bot', 'assistant']
-                    
-                    if msg_content.startswith("!"):
-                        skip_next_bot_response = True
-                        continue
-
-                    if is_bot_msg and skip_next_bot_response:
-                        skip_next_bot_response = False
-                        continue
-
-                    if not is_bot_msg:
-                        skip_next_bot_response = False
-
-                    # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
-                    truncated_content = self._smart_truncate(msg_content, max_length=500)
-                    role = "assistant" if is_bot_msg else "user"
-                    user_assistant_messages.append({"role": role, "content": truncated_content})
-                    logger.debug(f"🔥 CONTEXT (OLDER): Added truncated [{role}]: '{truncated_content[:100]}...'")
-
-                # Add older messages to context
-                conversation_context.extend(user_assistant_messages)
-                
-                # 🚨 FIX: Memory narrative and conversation summary are now in initial system message
-                # Do NOT add them here as that breaks user/assistant alternation
-                # (Previously these were added as separate system messages mid-conversation)
-                
-                # Add recent messages (detailed)
-                for idx, msg in enumerate(recent_full_messages):
-                    msg_content = msg.get('content', '')
-                    # 🚨 FIX: Check 'role' field, not 'bot' field - memory returns role='bot' or role='user'
-                    role_value = msg.get('role', 'user')
-                    is_bot_msg = role_value in ['bot', 'assistant']
-                    
-                    logger.info(f"🔥 CONTEXT DEBUG: Processing RECENT message - is_bot: {is_bot_msg}, content: '{msg_content[:100]}...'")
-                    
-                    if msg_content.startswith("!"):
-                        logger.debug(f"Skipping command from conversation history: {msg_content[:50]}...")
-                        skip_next_bot_response = True
-                        continue
-
-                    if is_bot_msg and skip_next_bot_response:
-                        logger.debug(f"Skipping bot response to command: {msg_content[:50]}...")
-                        skip_next_bot_response = False
-                        continue
-
-                    if not is_bot_msg:
-                        skip_next_bot_response = False
-
-                    # TIERED APPROACH: Most recent 3 messages (last exchange + current) get FULL content
-                    # Older recent messages truncated to prevent verbose pattern-matching
-                    is_most_recent = idx >= len(recent_full_messages) - 3
-                    if is_most_recent:
-                        # Last 3 messages: FULL content for rich immediate context
-                        recent_content = msg_content
-                        logger.info(f"🔥 CONTEXT (MOST RECENT): Full message [{idx}]")
-                    else:
-                        # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
-                        recent_content = self._smart_truncate(msg_content, max_length=400)
-                        logger.info(f"🔥 CONTEXT (RECENT): Smart-truncated message [{idx}] to 400 chars")
-                    
-                    role = "assistant" if is_bot_msg else "user"
-                    conversation_context.append({"role": role, "content": recent_content})
-                    logger.info(f"🔥 CONTEXT (RECENT): Added [{role}] ({len(recent_content)} chars): '{recent_content[:100]}...'")
-                
-                logger.info(f"✅ OPTIMIZED CONTEXT: Added {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (tiered: 3 full + rest 400 chars) messages")
-            else:
-                logger.info("🔥 CONTEXT DEBUG: No recent messages available for context")
-                
-        except Exception as e:
-            logger.warning(f"⚠️ Recent message processing failed: {e}")
-        
-        # Add current user message
-        conversation_context.append({
-            "role": "user", 
-            "content": message_context.content
-        })
-        
-        logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
-        
-        return conversation_context
+    # REMOVED: Legacy _build_conversation_context method (~510 lines of dead code removed)
+    # The legacy method used string concatenation for prompt building.
+    # All prompt assembly now uses PromptComponent-based _build_conversation_context_structured method.
 
     async def _build_conversation_context_structured(
         self, 
@@ -4151,17 +3645,56 @@ class MessageProcessor:
         self, message_context: MessageContext, conversation_context: List[Dict[str, str]], ai_components: Dict[str, Any]
     ) -> List[Dict[str, str]]:
         """
-        Enhance conversation context with AI intelligence guidance.
+        Enhance conversation context with AI intelligence guidance using PromptAssembler.
         
-        ✅ This method ENHANCES the structured context from Phase 4,
-        it does NOT rebuild from scratch. We receive the pre-built structured context
-        and just add TrendWise adaptation and AI intelligence guidance to it.
+        ✅ REFACTORED APPROACH: Uses PromptAssembler for proper component ordering
+        
+        This method receives the Phase 4 structured context and enhances it with:
+        - TrendWise adaptive learning guidance (Priority 18)
+        - Emotional intelligence context (Priority 18.5)
+        - AI intelligence guidance (Priority 19)
+        - Final "Respond as [character] to [user]:" line (Priority 20 - ALWAYS LAST)
+        
+        Uses a two-pass assembly:
+        1. Phase 4 builds base prompt with CDL components and memory
+        2. Phase 5.5 (here) adds AI intelligence components using proper priority system
         """
-        # ✅ FIXED: Accept conversation_context as parameter instead of rebuilding
-        # The conversation_context is ALREADY built by _build_conversation_context_structured()
-        # We just enhance it with AI intelligence additions
+        from src.prompts.prompt_assembler import PromptAssembler
+        from src.prompts.prompt_components import (
+            PromptComponent, 
+            PromptComponentType,
+            create_ai_intelligence_component
+        )
         
-        # TrendWise Adaptive Learning: Add confidence adaptation guidance
+        # Create a second-pass assembler for AI intelligence components
+        ai_assembler = PromptAssembler(max_tokens=None)
+        
+        # Extract existing system prompt and parse out the final "Respond as" line
+        system_message_content = None
+        final_respond_line = None
+        base_system_content = None
+        
+        for i, msg in enumerate(conversation_context):
+            if msg.get("role") == "system":
+                system_message_content = msg["content"]
+                
+                # Extract the final "Respond as [character] to [user]:" line
+                respond_as_pattern = "\nRespond as "
+                last_respond_index = system_message_content.rfind(respond_as_pattern)
+                
+                if last_respond_index != -1:
+                    base_system_content = system_message_content[:last_respond_index]
+                    final_respond_line = system_message_content[last_respond_index:].strip()
+                    logger.debug("🔧 REFACTOR: Extracted final 'Respond as' line for re-assembly")
+                else:
+                    # No "Respond as" line found - use full content as base
+                    base_system_content = system_message_content
+                    logger.warning("🔧 REFACTOR: No 'Respond as' line found in system prompt")
+                break
+        
+        # ================================
+        # COMPONENT 1: TrendWise Adaptive Learning (Priority 18)
+        # ================================
         if self.confidence_adapter:
             try:
                 bot_name = get_normalized_bot_name_from_env()
@@ -4176,13 +3709,20 @@ class MessageProcessor:
                         adaptation_params
                     )
                     
-                    # Apply system prompt additions to existing system message
-                    for i, msg in enumerate(conversation_context):
-                        if msg.get("role") == "system":
-                            if adaptation_guidance and hasattr(adaptation_guidance, 'system_prompt_additions'):
-                                additional_guidance = " ".join(adaptation_guidance.system_prompt_additions)
-                                conversation_context[i]["content"] += f" {additional_guidance}"
-                            break
+                    if adaptation_guidance and hasattr(adaptation_guidance, 'system_prompt_additions'):
+                        additional_guidance = " ".join(adaptation_guidance.system_prompt_additions)
+                        
+                        # Add as proper component with priority 18
+                        trendwise_component = PromptComponent(
+                            type=PromptComponentType.GUIDANCE,
+                            content=additional_guidance,
+                            priority=18,
+                            required=False,
+                            metadata={'cdl_type': 'TRENDWISE_ADAPTATION', 'user_id': message_context.user_id}
+                        )
+                        ai_assembler.add_component(trendwise_component)
+                        logger.info("📈 TRENDWISE: Added adaptation component (priority 18, style: %s)",
+                                   adaptation_params.response_style.value)
                     
                     # Store adaptation context for monitoring
                     ai_components['trendwise_adaptation'] = {
@@ -4192,14 +3732,13 @@ class MessageProcessor:
                         'adaptation_reason': adaptation_params.adaptation_reason,
                         'parameters': adaptation_params
                     }
-                    logger.info("📈 TRENDWISE: Applied confidence adaptation for %s (style: %s, reason: %s)",
-                               message_context.user_id, adaptation_params.response_style.value, 
-                               adaptation_params.adaptation_reason)
                 
             except Exception as e:
                 logger.warning("TrendWise adaptation failed: %s", e)
         
-        # 🎭 EMOTIONAL INTELLIGENCE COMPONENT: Add user/bot emotional trajectory from InfluxDB
+        # ================================
+        # COMPONENT 2: Emotional Intelligence (Priority 18.5)
+        # ================================
         try:
             from src.prompts.emotional_intelligence_component import create_emotional_intelligence_component
             
@@ -4213,7 +3752,7 @@ class MessageProcessor:
                 current_bot_emotion=ai_components.get('bot_emotion'),
                 character_emotional_state=ai_components.get('character_emotional_state'),
                 temporal_client=self.temporal_client,
-                priority=9,  # After personality/voice, before knowledge
+                priority=19,  # Same priority as AI Intelligence (will appear before due to add order)
                 confidence_threshold=0.7,
                 intensity_threshold=0.5,
                 trajectory_window_minutes=60,  # Last hour
@@ -4221,19 +3760,15 @@ class MessageProcessor:
             )
             
             if emotional_component:
-                # Add to system message (first message with role="system")
-                for i, msg in enumerate(conversation_context):
-                    if msg.get("role") == "system":
-                        conversation_context[i]["content"] += f"\n\n{emotional_component.content}"
-                        logger.info(
-                            "🎭 EMOTIONAL INTELLIGENCE: Added component to prompt (user=%s, bot=%s, trajectory=%dm)",
-                            ai_components.get('emotion_data', {}).get('primary_emotion') if ai_components.get('emotion_data') else None,
-                            ai_components.get('bot_emotion', {}).get('primary_emotion') if ai_components.get('bot_emotion') else None,
-                            60
-                        )
-                        break
+                # Keep priority 19 but it will appear before AI Intelligence due to add order
+                ai_assembler.add_component(emotional_component)
+                logger.info(
+                    "🎭 EMOTIONAL INTELLIGENCE: Added component (priority 18.5, user=%s, bot=%s)",
+                    ai_components.get('emotion_data', {}).get('primary_emotion') if ai_components.get('emotion_data') else None,
+                    ai_components.get('bot_emotion', {}).get('primary_emotion') if ai_components.get('bot_emotion') else None
+                )
             
-            # Store trajectory metadata for footer display (even if component wasn't significant enough for prompt)
+            # Store trajectory metadata for footer display
             if trajectory_metadata:
                 ai_components['emotional_trajectory_data'] = trajectory_metadata
                 logger.debug("🎭 EMOTIONAL TRAJECTORY: Stored metadata for footer display")
@@ -4246,16 +3781,53 @@ class MessageProcessor:
         except (AttributeError, TypeError, KeyError) as component_err:
             logger.warning("Failed to create emotional intelligence component: %s", component_err)
         
-        # Add AI intelligence guidance to system messages
+        # ================================
+        # COMPONENT 3: AI Intelligence Guidance (Priority 19)
+        # ================================
         ai_guidance = self._build_ai_intelligence_guidance(ai_components)
         if ai_guidance:
-            # Insert AI guidance after the first system message but before user messages
-            for i, msg in enumerate(conversation_context):
-                if msg.get("role") == "system":
-                    # Append AI guidance to existing system message
-                    conversation_context[i]["content"] += ai_guidance
-                    logger.info("🤖 AI INTELLIGENCE: Added sophisticated guidance to conversation context")
-                    break
+            ai_intelligence_component = create_ai_intelligence_component(
+                content=ai_guidance,
+                priority=19,
+                required=False,
+                metadata={'ai_components_summary': True}
+            )
+            ai_assembler.add_component(ai_intelligence_component)
+            logger.info("🤖 AI INTELLIGENCE: Added guidance component (priority 19)")
+        
+        # ================================
+        # COMPONENT 4: Final Response Guidance (Priority 20 - ALWAYS LAST)
+        # ================================
+        if final_respond_line:
+            final_guidance_component = PromptComponent(
+                type=PromptComponentType.GUIDANCE,
+                content=final_respond_line,
+                priority=20,
+                required=True,
+                metadata={'cdl_type': 'FINAL_RESPONSE_GUIDANCE'}
+            )
+            ai_assembler.add_component(final_guidance_component)
+            logger.debug("🎯 FINAL GUIDANCE: Re-added 'Respond as' line (priority 20)")
+        
+        # ================================
+        # ASSEMBLE AI INTELLIGENCE ADDITIONS
+        # ================================
+        ai_additions = ai_assembler.assemble(model_type="generic")
+        
+        # Combine base content with AI intelligence additions
+        if base_system_content is None:
+            base_system_content = ""
+        
+        enhanced_system_content = base_system_content
+        if ai_additions.strip():
+            enhanced_system_content += "\n\n" + ai_additions
+        
+        # Update the system message in conversation_context
+        for i, msg in enumerate(conversation_context):
+            if msg.get("role") == "system":
+                conversation_context[i]["content"] = enhanced_system_content
+                logger.info("✅ AI INTELLIGENCE REFACTOR: Re-assembled system prompt with proper component ordering")
+                break
         
         return conversation_context
 
