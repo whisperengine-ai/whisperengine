@@ -1,9 +1,37 @@
 # Hybrid Query Routing Design Document
 
 **Date**: October 27, 2025  
-**Status**: Design Phase  
+**Status**: ⚠️ **DESIGN PHASE - PARTIALLY IMPLEMENTED**  
 **Author**: WhisperEngine Architecture  
 **Target**: Multi-Bot Production Platform (10+ characters)
+
+---
+
+## ⚠️ IMPLEMENTATION STATUS DISCLAIMER
+
+**This document contains BOTH design concepts and actual implementation details.**
+
+### ✅ What Was Actually Implemented (October 2025):
+- **SemanticKnowledgeRouter** with 10 LLM-callable tools (5 foundation + 5 self-reflection)
+- **Tool execution pipeline** in MessageProcessor (LLM decides which tools to call)
+- **Single master switch**: `ENABLE_LLM_TOOL_CALLING` environment variable
+- **PostgreSQL + Qdrant + InfluxDB** hybrid data storage working
+- **Bot self-reflection system** with dedicated PostgreSQL table + Qdrant namespace
+
+### ❌ What Was NOT Implemented (Design Concepts Only):
+- **Complexity-based routing threshold** (no automatic fast/intelligent path selection)
+- **`ENABLE_HYBRID_ROUTING` flag** (not used in code)
+- **`ENABLE_SEMANTIC_ROUTER` flag** (not used in code)
+- **Per-character routing configuration** (no `routing_config.yaml`)
+- **HybridQueryRouter class** (design only - not coded)
+- **Automatic query complexity assessment** (no _assess_query_complexity() method)
+
+### 🎯 Actual Behavior:
+- When `ENABLE_LLM_TOOL_CALLING=true`: LLM has access to all 10 tools, decides when to use them
+- When `ENABLE_LLM_TOOL_CALLING=false`: No tools available, standard conversation only
+- No automatic "fast path" vs "intelligent path" routing (LLM makes all tool decisions)
+
+**Read this document as a design reference, not implementation documentation.**
 
 ---
 
@@ -760,26 +788,45 @@ class HybridQueryRouter:
 ### Environment Variables
 
 ```bash
-# Enable hybrid routing (default: false for backward compatibility)
-ENABLE_HYBRID_ROUTING=true
-
-# Complexity threshold for routing decision (0.0-1.0)
-HYBRID_ROUTING_THRESHOLD=0.3
-
-# Enable LLM tool calling (requires tool manager)
+# Master switch for LLM tool calling system (enables semantic router + all tools)
+# This is the ONLY flag needed - enables all hybrid routing functionality
 ENABLE_LLM_TOOL_CALLING=true
 
-# Maximum tool iterations per query
-MAX_TOOL_ITERATIONS=3
+# NOTE: The following flags are DESIGN CONCEPTS ONLY (not implemented):
+# - ENABLE_HYBRID_ROUTING (not used in actual code)
+# - ENABLE_SEMANTIC_ROUTER (not used in actual code)
+# - HYBRID_ROUTING_THRESHOLD (not implemented)
+# - MAX_TOOL_ITERATIONS (not implemented)
+# - TOOL_CALLING_TIMEOUT (not implemented)
 
-# Tool calling timeout (ms)
-TOOL_CALLING_TIMEOUT=30000
+# Actual implementation:
+# - SemanticKnowledgeRouter is ALWAYS initialized when available
+# - Tool calling is controlled by ENABLE_LLM_TOOL_CALLING
+# - No complexity-based routing threshold (all tools available when flag is true)
 ```
 
 ### Per-Character Configuration
 
+**NOTE:** The per-character routing configuration shown below is a **design concept** that was NOT implemented.
+
+**Actual Implementation:**
+- Tool calling is enabled/disabled globally via `ENABLE_LLM_TOOL_CALLING` environment variable
+- Each bot's `.env` file controls whether that bot has tool calling enabled
+- No per-character complexity thresholds (design concept only)
+- No `routing_config.yaml` file (not implemented)
+
+**Example (Actual):**
+```bash
+# .env.elena
+ENABLE_LLM_TOOL_CALLING=true  # Elena has all tools available
+
+# .env.jake  
+ENABLE_LLM_TOOL_CALLING=false  # Jake has no tools (simple character)
+```
+
+**Design Concept (NOT IMPLEMENTED):**
 ```yaml
-# config/routing_config.yaml
+# config/routing_config.yaml (DOES NOT EXIST)
 characters:
   elena:
     enable_hybrid_routing: true
