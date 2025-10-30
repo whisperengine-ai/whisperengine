@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 import asyncio
 from datetime import datetime
+import numpy as np
 
 # WhisperEngine imports
 from src.intelligence.advanced_emotional_state import AdvancedEmotionalState
@@ -109,6 +110,108 @@ class AdvancedEmotionDetector:
         self.logger.info(f"✅ Supporting {len(self.CORE_EMOTIONS)} emotions via RoBERTa + synthesis")
         self.logger.info(f"✅ Multi-modal: RoBERTa + {len(self.emoji_mapper.EMOJI_EMOTION_MAP)} emoji mappings")
         self.logger.info(f"✅ Advanced synthesis: {len(self.EMOTION_SYNTHESIS_RULES)} extended emotions")
+    
+    # ==================== EMA SMOOTHING FOR TRAJECTORY ANALYSIS ====================
+    
+    def _calculate_ema(
+        self,
+        current: float,
+        previous_ema: Optional[float] = None,
+        alpha: float = 0.3
+    ) -> float:
+        """
+        Calculate Exponential Moving Average for emotion smoothing.
+        
+        Used for trajectory analysis (not for immediate crisis response).
+        Smooths emotional intensity to reveal true trends vs noise from filler messages.
+        
+        Args:
+            current: Current raw emotional intensity (0.0-1.0)
+            previous_ema: Previous EMA value (None for first message)
+            alpha: Smoothing factor (0.15-0.45)
+                - 0.2: Heavy smoothing (support conversations)
+                - 0.3: Moderate smoothing (default, general chat)
+                - 0.4: Light smoothing (group chats, fast-paced)
+        
+        Returns:
+            Smoothed emotional intensity (0.0-1.0)
+        
+        Formula:
+            EMA = α × I_t + (1 - α) × EMA_(t-1)
+        """
+        if previous_ema is None:
+            # Cold start: First message, EMA = raw intensity
+            return np.clip(float(current), 0.0, 1.0)
+        
+        # Standard EMA calculation
+        ema_value = alpha * current + (1 - alpha) * previous_ema
+        
+        # Ensure value stays within valid range
+        return np.clip(float(ema_value), 0.0, 1.0)
+    
+    async def _get_previous_ema(
+        self,
+        user_id: str,
+        limit: int = 1
+    ) -> Optional[float]:
+        """
+        Retrieve the most recent EMA value for a user from memory.
+        
+        Used in EMA calculation to get previous smoothed value.
+        Gracefully handles cold start (first message) and backward compatibility
+        with old payloads that don't have EMA field.
+        
+        Args:
+            user_id: User identifier
+            limit: Number of recent records to check (default: 1)
+        
+        Returns:
+            Previous EMA value (0.0-1.0), or None if not found
+        """
+        try:
+            if not self.memory_manager:
+                self.logger.debug("Memory manager not available, cannot retrieve previous EMA")
+                return None
+            
+            # Retrieve recent emotional memories
+            recent_memories = await self.memory_manager.retrieve_relevant_memories(
+                user_id=user_id,
+                query="emotion emotional feeling intensity",
+                limit=limit
+            )
+            
+            if not recent_memories or len(recent_memories) == 0:
+                # No previous memories (first message)
+                return None
+            
+            # Extract EMA from most recent memory
+            most_recent = recent_memories[0]
+            payload = most_recent.get('payload', {})
+            
+            # Try EMA field first, fall back to raw intensity for old payloads
+            ema = payload.get('emotional_intensity_ema')
+            if ema is not None:
+                return float(ema)
+            
+            # Fallback: Use raw intensity if EMA not available (backward compatibility)
+            intensity = payload.get('emotional_intensity')
+            if intensity is not None:
+                self.logger.debug(
+                    "No EMA found in payload, using raw intensity as fallback for %s",
+                    user_id
+                )
+                return float(intensity)
+            
+            # No emotional data found
+            return None
+            
+        except Exception as e:
+            self.logger.warning(
+                "Could not retrieve previous EMA for %s: %s",
+                user_id,
+                str(e)
+            )
+            return None
     
     @handle_errors(category=ErrorCategory.MEMORY_SYSTEM, severity=ErrorSeverity.MEDIUM)
     async def detect_advanced_emotions(self, 
@@ -395,6 +498,55 @@ class AdvancedEmotionDetector:
         # Calculate final intensity
         final_intensity = sum(intensity_factors)
         return min(max(final_intensity, 0.1), 1.0)  # Clamp to 0.1-1.0
+    
+    async def _calculate_emotional_intensity_with_ema(self,
+                                                      roberta_result: Optional[EmotionAnalysisResult],
+                                                      emoji_analysis: Dict[str, float],
+                                                      text: str,
+                                                      user_id: str,
+                                                      alpha: float = 0.3) -> Dict[str, Any]:
+        """
+        Calculate emotional intensity with EMA smoothing for trajectory analysis.
+        
+        Returns both raw intensity (for crisis detection) and smoothed EMA (for trajectory).
+        
+        Args:
+            roberta_result: RoBERTa emotion analysis
+            emoji_analysis: Emoji sentiment contributions
+            text: Original message text
+            user_id: User identifier for retrieving previous EMA
+            alpha: EMA smoothing factor (0.3 = default, balanced)
+        
+        Returns:
+            Dict with 'raw' (unsmoothed) and 'ema' (smoothed) intensity values
+        """
+        # Calculate raw intensity (same as before)
+        raw_intensity = self._calculate_emotional_intensity_from_roberta(
+            roberta_result, emoji_analysis, text
+        )
+        
+        # Get previous EMA value from memory
+        previous_ema = await self._get_previous_ema(user_id)
+        
+        # Calculate EMA using the formula: EMA = α × I_t + (1 - α) × EMA_prev
+        ema_intensity = self._calculate_ema(
+            current=raw_intensity,
+            previous_ema=previous_ema,
+            alpha=alpha
+        )
+        
+        self.logger.debug(
+            f"📊 EMA Calculation for {user_id}: raw={raw_intensity:.3f}, "
+            f"ema_prev={previous_ema if previous_ema is None else f'{previous_ema:.3f}'}, "
+            f"ema_new={ema_intensity:.3f} (α={alpha})"
+        )
+        
+        return {
+            'raw': raw_intensity,          # For crisis detection (use unsmoothed)
+            'ema': ema_intensity,          # For trajectory analysis (use smoothed)
+            'alpha': alpha,                # Alpha factor used
+            'previous_ema': previous_ema   # Previous value (for debugging)
+        }
     
     def _extract_roberta_indicators(self, roberta_result: Optional[EmotionAnalysisResult]) -> List[str]:
         """Extract text indicators from RoBERTa analysis results."""

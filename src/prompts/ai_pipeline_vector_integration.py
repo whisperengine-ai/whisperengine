@@ -43,6 +43,14 @@ except ImportError:
     logger.warning("VectorNativePersonalityAnalyzer not available")
     VectorNativePersonalityAnalyzer = None
 
+# Import Phase 2 Task 2: CDL Trajectory Integration
+try:
+    from src.prompts.cdl_trajectory_integration import CDLTrajectoryIntegration, create_cdl_trajectory_integration
+except ImportError:
+    logger.warning("CDLTrajectoryIntegration not available")
+    CDLTrajectoryIntegration = None
+    create_cdl_trajectory_integration = None
+
 
 @dataclass
 class VectorAIPipelineResult:
@@ -114,6 +122,18 @@ class VectorAIPipelineIntegration:
                 logger.info("SimplifiedEmotionManager initialized")
             except Exception as e:
                 logger.warning("Failed to initialize SimplifiedEmotionManager: %s", e)
+        
+        # Initialize Phase 2 Task 2: CDL Trajectory Integration
+        self.cdl_trajectory_integration = None
+        if CDLTrajectoryIntegration:
+            try:
+                # Create instance directly (factory is async, we'll use it elsewhere if needed)
+                self.cdl_trajectory_integration = CDLTrajectoryIntegration(
+                    memory_manager=vector_memory_system
+                )
+                logger.info("✅ CDL Trajectory Integration initialized")
+            except Exception as e:
+                logger.warning("Failed to initialize CDLTrajectoryIntegration: %s", e)
     
     async def process_message_with_ai_pipeline(
         self, 
@@ -690,11 +710,56 @@ class VectorAIPipelineIntegration:
                 if analysis.get('mood_trend') and analysis['mood_trend'] != 'stable':
                     emotion_context.append(f"trend: {analysis['mood_trend']}")
                     
-                # 🎭 TRAJECTORY: Add emotional progression if available
-                trajectory = analysis.get('emotional_trajectory', [])
-                if trajectory and len(trajectory) > 1:
-                    recent_trajectory = trajectory[-3:]  # Last 3 emotions
-                    emotion_context.append(f"progression: {' → '.join(recent_trajectory)}")
+                # 🎭 TRAJECTORY: Phase 2 Task 2 - CDL Trajectory Integration
+                # Use enhanced trajectory analysis with quality metrics and character awareness
+                if self.cdl_trajectory_integration:
+                    try:
+                        # Get trajectory context asynchronously
+                        # This retrieves EMA-based emotional trends from Qdrant
+                        import asyncio
+                        trajectory_context = asyncio.run(
+                            self.cdl_trajectory_integration.get_trajectory_context_for_cdl(
+                                user_id=user_id,
+                                lookback_messages=15
+                            )
+                        )
+                        
+                        # Check if trajectory data is available and high quality
+                        if trajectory_context and trajectory_context.get('has_trajectory'):
+                            # Determine character archetype (default to real-world)
+                            character_archetype = analysis.get('character_archetype', 'real-world')
+                            
+                            # Format trajectory for CDL prompt injection
+                            trajectory_prompt = self.cdl_trajectory_integration.format_for_cdl_prompt(
+                                trajectory_context,
+                                character_archetype=character_archetype,
+                                include_time_reference=True
+                            )
+                            
+                            # Decide whether to inject based on quality thresholds
+                            prompt_word_count = len(str(emotional_insights).split())
+                            should_inject = self.cdl_trajectory_integration.should_inject_trajectory_into_prompt(
+                                trajectory_context,
+                                prompt_word_count=prompt_word_count
+                            )
+                            
+                            if should_inject and trajectory_prompt:
+                                emotion_context.append(trajectory_prompt)
+                                logger.debug(f"Trajectory injected: {trajectory_context.get('trend_type')} "
+                                           f"(confidence: {trajectory_context.get('confidence'):.2f})")
+                    except Exception as e:
+                        logger.debug(f"Trajectory injection error (falling back): {e}")
+                        # Fallback to basic trajectory if available
+                        trajectory = analysis.get('emotional_trajectory', [])
+                        if trajectory and len(trajectory) > 1:
+                            recent_trajectory = trajectory[-3:]  # Last 3 emotions
+                            emotion_context.append(f"progression: {' → '.join(recent_trajectory)}")
+                else:
+                    # Fallback when CDL trajectory integration not available
+                    trajectory = analysis.get('emotional_trajectory', [])
+                    if trajectory and len(trajectory) > 1:
+                        recent_trajectory = trajectory[-3:]  # Last 3 emotions
+                        emotion_context.append(f"progression: {' → '.join(recent_trajectory)}")
             
             # 🎭 SPECTRUM: Add emotional complexity from all_emotions
             all_emotions = emotional_insights.get('all_emotions', {})

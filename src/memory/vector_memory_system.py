@@ -4027,6 +4027,33 @@ class VectorMemoryManager:
         """Get system health and performance stats"""
         return await self.vector_store.get_stats()
     
+    async def _get_previous_ema_for_user(self, user_id: str) -> Optional[float]:
+        """
+        Retrieve previous EMA value from memory for EMA trajectory calculation.
+        
+        Returns:
+            - Previous EMA value if available (as float)
+            - None if no previous memory (cold start scenario)
+        """
+        try:
+            recent_memories = await self.retrieve_relevant_memories(
+                user_id=user_id, query="emotion", limit=1
+            )
+            if recent_memories:
+                payload = recent_memories[0].get('payload', {})
+                # Try new EMA field first
+                ema = payload.get('emotional_intensity_ema')
+                if ema is not None:
+                    return float(ema)
+                # Fallback to raw intensity for old payloads
+                intensity = payload.get('emotional_intensity')
+                if intensity is not None:
+                    return float(intensity)
+            return None
+        except Exception as e:
+            logger.debug(f"Could not retrieve previous EMA for {user_id}: {e}")
+            return None
+    
     # === PROTOCOL COMPLIANCE METHODS ===
     # These methods ensure VectorMemoryManager implements MemoryManagerProtocol
     
@@ -4064,7 +4091,43 @@ class VectorMemoryManager:
             from datetime import datetime, timedelta
             base_timestamp = datetime.utcnow()
             
-            # � FIX: Store user message first with base timestamp
+            # EMA CALCULATION: Calculate smoothed emotional intensity for trajectory analysis
+            ema_data = {}
+            if pre_analyzed_emotion_data:
+                try:
+                    # Extract raw emotional intensity from emotion data
+                    raw_intensity = pre_analyzed_emotion_data.get('emotional_intensity', 0.5)
+                    
+                    # Get previous EMA from memory (if available)
+                    previous_ema = await self._get_previous_ema_for_user(user_id)
+                    
+                    # Calculate EMA: EMA_t = alpha * I_t + (1 - alpha) * EMA_(t-1)
+                    alpha = 0.3  # Default smoothing factor
+                    if previous_ema is None:
+                        # Cold start: first message EMA = raw intensity
+                        ema_intensity = raw_intensity
+                    else:
+                        # Standard EMA formula
+                        ema_intensity = alpha * raw_intensity + (1 - alpha) * previous_ema
+                        ema_intensity = min(max(ema_intensity, 0.0), 1.0)  # Clip to [0, 1]
+                    
+                    ema_data = {
+                        'emotional_intensity_ema': ema_intensity,
+                        'ema_alpha': alpha,
+                        'ema_previous': previous_ema,
+                        'emotional_intensity_raw': raw_intensity
+                    }
+                    
+                    logger.debug(
+                        f"EMA Storage: user={user_id}, raw={raw_intensity:.3f}, "
+                        f"ema_prev={previous_ema:.3f if previous_ema is not None else 'None'}, "
+                        f"ema_new={ema_intensity:.3f}"
+                    )
+                except Exception as e:
+                    logger.warning(f"EMA Calculation failed: {e}, using raw intensity instead")
+                    ema_data = {}
+            
+            # FIX: Store user message first with base timestamp
             user_memory = VectorMemory(
                 id=str(uuid4()),
                 user_id=user_id,
@@ -4077,6 +4140,7 @@ class VectorMemoryManager:
                     "channel_type": channel_type,
                     "emotion_data": pre_analyzed_emotion_data,
                     "role": "user",
+                    **ema_data,  # Include EMA calculation results
                     **(metadata or {})
                 }
             )
@@ -5102,19 +5166,23 @@ class VectorMemoryManager:
             else:
                 # Fallback if QueryClassifier not initialized
                 logger.warning("QueryClassifier not available - falling back to legacy routing")
-                return await self.retrieve_relevant_memories(
+                return await self._legacy_retrieve_relevant_memories(
                     user_id=user_id,
                     query=query,
-                    limit=limit
+                    limit=limit,
+                    emotion_data=emotion_data,
+                    channel_type=channel_type
                 )
         
         except Exception as e:
             logger.error("Phase 2 routing failed: %s", str(e))
             # Fallback to legacy method
-            return await self.retrieve_relevant_memories(
+            return await self._legacy_retrieve_relevant_memories(
                 user_id=user_id,
                 query=query,
-                limit=limit
+                limit=limit,
+                emotion_data=emotion_data,
+                channel_type=channel_type
             )
     
     async def retrieve_relevant_memories_fidelity_first(
