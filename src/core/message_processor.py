@@ -3530,13 +3530,13 @@ class MessageProcessor:
             max_length: Maximum length (including ellipsis marker)
             
         Returns:
-            Truncated text with format: "beginning... [MIDDLE CUT] ...ending"
+            Truncated text with format: "beginning...ending"
         """
         if len(text) <= max_length:
             return text
         
-        # Reserve space for ellipsis markers
-        ellipsis = "... [MIDDLE CUT] ..."
+        # Reserve space for ellipsis marker
+        ellipsis = "..."
         available_length = max_length - len(ellipsis)
         
         if available_length < 100:  # Not enough space for meaningful truncation
