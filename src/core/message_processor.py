@@ -4455,14 +4455,6 @@ class MessageProcessor:
         if not comprehensive_context:
             return ""
         
-        # Context Switch Detection (Phase 3)
-        context_switches = comprehensive_context.get('context_switches')
-        if context_switches and isinstance(context_switches, dict):
-            switch_type = context_switches.get('switch_type', 'none')
-            confidence = context_switches.get('confidence', 0)
-            if switch_type != 'none' and confidence > 0.6:
-                guidance_parts.append(f"🔄 TOPIC TRANSITION: {switch_type} detected (confidence: {confidence:.2f}) - acknowledge the shift naturally")
-        
         # Proactive Engagement Analysis (Phase 4.3)
         proactive_engagement_analysis = comprehensive_context.get('proactive_engagement_analysis')
         if proactive_engagement_analysis and isinstance(proactive_engagement_analysis, dict):
@@ -5346,65 +5338,6 @@ class MessageProcessor:
             
         except Exception as e:
             logger.debug(f"Human-like memory optimization failed: {e}")
-            return None
-
-    async def _analyze_conversation_patterns(self, content: str, conversation_context: List[Dict[str, str]], 
-                                           user_id: str) -> Dict[str, Any]:
-        """Analyze conversation patterns for enhanced response guidance."""
-        try:
-            # Analyze conversation patterns and provide guidance
-            analysis = {
-                'mode': 'standard',
-                'interaction_type': 'general',
-                'personality_type': 'default',
-                'relationship_level': 'acquaintance',
-                'response_guidance': 'Respond naturally and authentically'
-            }
-            
-            # Detect conversation patterns
-            content_lower = content.lower()
-            
-            if any(word in content_lower for word in ['how are you', 'how have you been', 'whats up']):
-                analysis['interaction_type'] = 'greeting'
-                analysis['response_guidance'] = 'Respond warmly to greeting'
-            elif any(word in content_lower for word in ['help', 'assist', 'support']):
-                analysis['interaction_type'] = 'assistance_request'
-                analysis['response_guidance'] = 'Provide helpful guidance'
-            elif any(word in content_lower for word in ['tell me about', 'explain', 'what is']):
-                analysis['interaction_type'] = 'information_seeking'
-                analysis['response_guidance'] = 'Provide informative explanation'
-            
-            logger.debug(f"Conversation pattern analysis successful for user {user_id}")
-            return analysis
-            
-        except Exception as e:
-            logger.debug(f"Conversation pattern analysis failed: {e}")
-            return {
-                'mode': 'standard',
-                'interaction_type': 'general',
-                'personality_type': 'default',
-                'relationship_level': 'acquaintance',
-                'response_guidance': 'Respond naturally and authentically'
-            }
-
-    async def _detect_context_switches(self, content: str, conversation_context: List[Dict[str, str]], 
-                                     user_id: str) -> Optional[Dict[str, Any]]:
-        """Detect context switches for conversation flow management."""
-        try:
-            if not self.bot_core or not hasattr(self.bot_core, 'context_switch_detector'):
-                return None
-            
-            # Detect context switches
-            context_switches = await self.bot_core.context_switch_detector.detect_context_switches(
-                user_id=user_id,
-                new_message=content
-            )
-            
-            logger.debug(f"Context switch detection successful for user {user_id}")
-            return context_switches
-            
-        except Exception as e:
-            logger.debug(f"Context switch detection failed: {e}")
             return None
 
     async def _process_attachments(self, message_context: MessageContext, 
