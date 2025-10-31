@@ -785,16 +785,10 @@ class MessageProcessor:
                     message_context, conversation_context
                 )
             
-            # Phase 6.5: Bot Emotional Self-Awareness (NEW - Phase 7.6)
-            # Retrieve bot's recent emotional history for self-aware responses
-            bot_emotional_state = await self._analyze_bot_emotional_trajectory(message_context)
-            if bot_emotional_state:
-                ai_components['bot_emotional_state'] = bot_emotional_state
-                logger.debug(
-                    "🎭 BOT SELF-AWARENESS: Current state - %s (trajectory: %s)",
-                    bot_emotional_state.get('current_emotion', 'unknown'),
-                    bot_emotional_state.get('trajectory_direction', 'stable')
-                )
+            # Phase 6.5: REMOVED - Bot Emotional Self-Awareness (redundant)
+            # Bot trajectory is already handled by emotional_intelligence_component when needed.
+            # That component uses character_emotional_state (richer) and queries InfluxDB on-demand.
+            # Removing this saves an extra Influx/Qdrant query per message with no prompt impact.
             
             # Phase 6.7: Adaptive Learning Intelligence (Relationship & Confidence)
             # Retrieve relationship scores and conversation trends BEFORE response generation
@@ -4237,22 +4231,15 @@ class MessageProcessor:
             # NOTE: Advanced emotion analysis moved to serial execution after parallel tasks
             # to avoid RoBERTa model race conditions
             
-            # Task 1.8: Memory Aging Intelligence (if enabled)
-            memory_aging_task = self._analyze_memory_aging_intelligence(
-                message_context.user_id,
-                message_context
-            )
-            tasks.append(memory_aging_task)
-            task_names.append("memory_aging_intelligence")
-            
-            # Task 1.9: Character Performance Intelligence
-            character_performance_task = self._analyze_character_performance_intelligence(
-                message_context.user_id,
-                message_context,
-                conversation_context
-            )
-            tasks.append(character_performance_task)
-            task_names.append("character_performance_intelligence")
+            # PHASE 2 OPTIMIZATION: Strategic components removed from hot path
+            # These will be moved to background workers with <5min freshness target:
+            # - Memory Aging Intelligence (Task 1.8)
+            # - Character Performance Intelligence (Task 1.9)
+            # - Dynamic Personality Profiling (Task 3)
+            # - Context Switch Detection (Task 9)
+            # - Human-Like Memory Optimization (Task 7)
+            # - Conversation Pattern Analysis (Task 8)
+            # - Proactive Engagement (Task 7 - conditional, moved to background)
             
             # Task 2: Enhanced context analysis using hybrid detector
             context_task = self._analyze_enhanced_context(
@@ -4262,16 +4249,6 @@ class MessageProcessor:
             )
             tasks.append(context_task)
             task_names.append("context_analysis")
-            
-            # Task 3: Dynamic personality profiling if available
-            if self.bot_core and hasattr(self.bot_core, 'dynamic_personality_profiler'):
-                personality_task = self._analyze_dynamic_personality(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(personality_task)
-                task_names.append("personality_analysis")
             
             # Task 4: Phase 4 human-like intelligence processing
             logger.debug(f"🎯 TASK DEBUG: bot_core exists: {self.bot_core is not None}")
@@ -4302,54 +4279,23 @@ class MessageProcessor:
                 tasks.append(character_intelligence_task)
                 task_names.append("unified_character_intelligence")
                 
-            # Task 6: Thread management analysis (Advanced Thread Management)
-            if self.bot_core and hasattr(self.bot_core, 'conversation_thread_manager'):
-                thread_task = self._process_thread_management(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(thread_task)
-                task_names.append("thread_management")
+            # Task 6: REMOVED - Thread management (dead code - manager never initialized)
+            # The conversation_thread_manager attribute is never set on bot_core,
+            # so this hasattr check always fails and returns None.
+            # Removing to avoid unnecessary parallel task overhead.
             
-            # Task 6: Proactive engagement analysis (Phase 4.3)
-            if self.bot_core and hasattr(self.bot_core, 'engagement_engine'):
-                engagement_task = self._process_proactive_engagement(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(engagement_task)
-                task_names.append("proactive_engagement")
+            # Task 7: REMOVED - Proactive engagement (moved to background)
+            # Heavy analysis (~50-150ms) that rarely contributes guidance.
+            # Will be processed by background worker with cached state in PostgreSQL.
             
-            # Task 7: Human-like memory optimization
-            if self.memory_manager and hasattr(self.memory_manager, 'human_like_optimizer'):
-                memory_task = self._process_human_like_memory(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(memory_task)
-                task_names.append("human_like_memory")
+            # Task 8: REMOVED - Human-like memory optimization (moved to background)
+            # Strategic memory optimization can be pre-computed and cached.
             
-            # Task 8: Conversation analysis for enhanced guidance
-            conversation_analysis_task = self._analyze_conversation_patterns(
-                message_context.content,
-                conversation_context,
-                message_context.user_id
-            )
-            tasks.append(conversation_analysis_task)
-            task_names.append("conversation_analysis")
+            # Task 9: REMOVED - Conversation pattern analysis (moved to background)
+            # Pattern detection provides guidance but can be pre-computed.
             
-            # Task 9: Context switch detection for conversation flow
-            if self.bot_core and hasattr(self.bot_core, 'context_switch_detector'):
-                context_switch_task = self._detect_context_switches(
-                    message_context.content,
-                    conversation_context,
-                    message_context.user_id
-                )
-                tasks.append(context_switch_task)
-                task_names.append("context_switches")
+            # Task 10: REMOVED - Context switch detection (moved to background)
+            # Context switches can be detected by background worker analyzing conversation flow.
             
             logger.info(f"🧠 SOPHISTICATED AI PROCESSING: Executing {len(tasks)} components in parallel")
             
