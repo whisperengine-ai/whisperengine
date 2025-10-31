@@ -23,6 +23,7 @@ import asyncpg
 from src.enrichment.config import config
 from src.enrichment.summarization_engine import SummarizationEngine
 from src.enrichment.fact_extraction_engine import FactExtractionEngine
+from src.enrichment.memory_aging_engine import MemoryAgingEngine
 from src.llm.llm_protocol import create_llm_client
 
 # Configure logging
@@ -88,6 +89,12 @@ class EnrichmentWorker:
             preprocessor=self._nlp_preprocessor
         )
         
+        # Initialize memory aging engine for strategic intelligence
+        self.memory_aging_engine = MemoryAgingEngine(
+            qdrant_client=self.qdrant_client,
+            postgres_pool=self.db_pool
+        )
+        
         logger.info("EnrichmentWorker initialized - Qdrant: %s:%s, Summary Model: %s, Fact Model: %s",
                    config.QDRANT_HOST, config.QDRANT_PORT, 
                    config.LLM_CHAT_MODEL, config.LLM_FACT_EXTRACTION_MODEL)
@@ -121,6 +128,7 @@ class EnrichmentWorker:
         total_preferences_extracted = 0
         total_emoji_feedback_processed = 0
         total_reflections_created = 0
+        total_strategic_intelligence_processed = 0
         
         for collection_name in collections:
             bot_name = await self._extract_bot_name(collection_name)
@@ -166,14 +174,22 @@ class EnrichmentWorker:
                 
                 total_reflections_created += reflections_created
                 
+                # Process strategic intelligence (memory aging, character performance, etc.)
+                strategic_count = await self._process_strategic_intelligence(
+                    collection_name=collection_name,
+                    bot_name=bot_name
+                )
+                
+                total_strategic_intelligence_processed += strategic_count
+                
             except Exception as e:
                 logger.error("Error processing collection %s: %s", collection_name, e)
                 continue
         
         cycle_duration = (datetime.now(timezone.utc) - cycle_start).total_seconds()
-        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback, %s reflections in %.2fs",
+        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback, %s reflections, %s strategic intelligence in %.2fs",
                    total_summaries_created, total_facts_extracted, total_preferences_extracted, 
-                   total_emoji_feedback_processed, total_reflections_created, cycle_duration)
+                   total_emoji_feedback_processed, total_reflections_created, total_strategic_intelligence_processed, cycle_duration)
     
     async def _process_conversation_summaries(
         self,
@@ -550,6 +566,74 @@ class EnrichmentWorker:
                     updated_at = NOW()
             """, user_id, bot_name, summary_text, start_timestamp, end_timestamp,
                  message_count, key_topics, emotional_tone, compression_ratio, confidence_score)
+    
+    async def _process_strategic_intelligence(
+        self,
+        collection_name: str,
+        bot_name: str
+    ) -> int:
+        """
+        Process strategic intelligence components for a bot collection
+        
+        Currently implements:
+        - Memory aging analysis (memory health, retrieval trends, forgetting risks)
+        
+        Future engines (Phase 3B completion):
+        - Character performance analysis
+        - Personality profile modeling
+        - Context switch detection
+        - Human memory behavior simulation
+        - Conversation pattern analysis
+        - Proactive engagement opportunities
+        
+        Returns:
+            Number of users processed with strategic intelligence
+        """
+        logger.info("🧠 Processing strategic intelligence for %s...", bot_name)
+        
+        # Get users with conversations in this collection
+        users = await self._get_users_in_collection(collection_name)
+        logger.debug("Found %s users for strategic analysis", len(users))
+        
+        processed_count = 0
+        
+        # Process in batches to avoid overwhelming the system
+        batch_size = 10  # Process 10 users at a time
+        
+        for i in range(0, len(users), batch_size):
+            batch = users[i:i + batch_size]
+            
+            for user_id in batch:
+                try:
+                    # Memory Aging Engine: Analyze memory health
+                    memory_health = await self.memory_aging_engine.analyze_memory_health(
+                        user_id=user_id,
+                        bot_name=bot_name,
+                        collection_name=collection_name
+                    )
+                    
+                    if memory_health:
+                        # Store in strategic cache table (returns MemoryHealthMetrics object)
+                        await self.memory_aging_engine.store_memory_health(
+                            metrics=memory_health
+                        )
+                        processed_count += 1
+                        logger.debug("✅ Strategic intelligence stored for user %s", user_id)
+                    else:
+                        logger.debug("⏭️  Skipped user %s (insufficient data)", user_id)
+                        
+                except Exception as e:
+                    logger.error("❌ Failed to process strategic intelligence for user %s: %s", 
+                               user_id, e, exc_info=True)
+                    continue
+            
+            # Brief pause between batches to avoid resource contention
+            if i + batch_size < len(users):
+                await asyncio.sleep(0.5)
+        
+        logger.info("✅ Processed strategic intelligence for %s/%s users in %s",
+                   processed_count, len(users), bot_name)
+        return processed_count
     
     def _get_bot_collections(self) -> List[str]:
         """Get list of all bot collections from Qdrant"""
