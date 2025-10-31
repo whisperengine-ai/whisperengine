@@ -31,14 +31,14 @@ class ContextSwitchEngine:
     - Switch likelihood prediction
     """
     
-    def __init__(self, vector_memory_manager):
+    def __init__(self, qdrant_client):
         """
         Initialize the Context Switch Engine.
         
         Args:
-            vector_memory_manager: VectorMemoryManager for querying conversations
+            qdrant_client: QdrantClient for querying conversations directly
         """
-        self.vector_memory = vector_memory_manager
+        self.qdrant_client = qdrant_client
     
     async def analyze_context_switches(
         self,
@@ -114,10 +114,48 @@ class ContextSwitchEngine:
     ) -> List[Dict[str, Any]]:
         """Get chronologically ordered conversation history."""
         try:
-            # Query vector memory for conversations
-            # Note: Placeholder - actual implementation depends on vector_memory API
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            
+            collection_name = f"whisperengine_memory_{bot_name}"
+            
             logger.debug(f"Querying conversation history for context analysis: {bot_name}/{user_id}")
-            return []
+            
+            # Query Qdrant for user's conversation history via qdrant_client
+            search_result = self.qdrant_client.scroll(
+                collection_name=collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id)),
+                        FieldCondition(key="memory_type", match=MatchValue(value="conversation"))
+                    ]
+                ),
+                limit=500,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            # Extract payloads and filter by timestamp
+            conversations = []
+            for point in search_result[0]:
+                payload = point.payload
+                if payload:
+                    timestamp_str = payload.get('timestamp', '')
+                    if timestamp_str:
+                        try:
+                            msg_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                            # Ensure timezone-aware comparison
+                            if msg_time.tzinfo is None:
+                                msg_time = msg_time.replace(tzinfo=timezone.utc)
+                            if start_time <= msg_time <= end_time:
+                                conversations.append(payload)
+                        except (ValueError, AttributeError):
+                            continue
+            
+            # Sort chronologically for context analysis
+            conversations.sort(key=lambda x: x.get('timestamp', ''))
+            
+            logger.debug(f"Retrieved {len(conversations)} conversations for context analysis")
+            return conversations
             
         except Exception as e:
             logger.error(f"Error retrieving conversation history: {e}")

@@ -122,22 +122,21 @@ class ConversationPatternEngine:
     ) -> List[Dict[str, Any]]:
         """Retrieve conversation history from Qdrant."""
         try:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            from datetime import timezone
             
-            cutoff_timestamp = (datetime.now() - timedelta(days=time_window_days)).timestamp()
+            cutoff_time = datetime.now(timezone.utc) - timedelta(days=time_window_days)
             collection_name = f"whisperengine_memory_{bot_name}"
             
             # Query Qdrant for user's conversation history
+            # Note: Filtering on timestamp in Qdrant is unreliable due to ISO string format
+            # Fetch all conversations and filter in Python
             search_result = self.qdrant_client.scroll(
                 collection_name=collection_name,
                 scroll_filter=Filter(
                     must=[
                         FieldCondition(key="user_id", match=MatchValue(value=user_id)),
-                        FieldCondition(key="memory_type", match=MatchValue(value="conversation")),
-                        FieldCondition(
-                            key="timestamp",
-                            range=Range(gte=cutoff_timestamp)
-                        )
+                        FieldCondition(key="memory_type", match=MatchValue(value="conversation"))
                     ]
                 ),
                 limit=500,
@@ -145,17 +144,28 @@ class ConversationPatternEngine:
                 with_vectors=False
             )
             
-            # Extract payloads
+            # Extract payloads and filter by timestamp
             memories = []
             for point in search_result[0]:
                 payload = point.payload
                 if payload:
-                    memories.append(payload)
+                    # Parse timestamp and filter
+                    timestamp_str = payload.get('timestamp', '')
+                    if timestamp_str:
+                        try:
+                            msg_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                            # Ensure timezone-aware comparison
+                            if msg_time.tzinfo is None:
+                                msg_time = msg_time.replace(tzinfo=timezone.utc)
+                            if msg_time >= cutoff_time:
+                                memories.append(payload)
+                        except (ValueError, AttributeError):
+                            continue
             
             # Sort chronologically
-            memories.sort(key=lambda x: x.get('timestamp', 0))
+            memories.sort(key=lambda x: x.get('timestamp', ''))
             
-            logger.debug("Retrieved %d conversation memories", len(memories))
+            logger.debug("Retrieved %d conversation memories for %s/%s", len(memories), bot_name, user_id)
             return memories
             
         except Exception as e:

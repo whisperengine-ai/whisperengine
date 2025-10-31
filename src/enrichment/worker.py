@@ -123,13 +123,13 @@ class EnrichmentWorker:
         
         # Initialize personality profile engine (user behavior modeling)
         self.personality_profile_engine = PersonalityProfileEngine(
-            vector_memory_manager=self.vector_memory,
+            qdrant_client=self.qdrant_client,
             temporal_client=self.temporal_client
         )
         
         # Initialize context switch engine (topic transition analysis)
         self.context_switch_engine = ContextSwitchEngine(
-            vector_memory_manager=self.vector_memory
+            qdrant_client=self.qdrant_client
         )
         
         # Initialize human memory behavior engine (forgetting curves)
