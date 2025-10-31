@@ -674,6 +674,230 @@ class MessageProcessor:
             return (self.character_insight_storage is not None and 
                    self.character_insight_extractor is not None)
 
+    # ============================================================================
+    # PHASE 3A: STRATEGIC COMPONENT CACHE HELPERS
+    # ============================================================================
+    # Cache helper methods for reading pre-computed strategic component results
+    # from PostgreSQL cache tables. These support the background worker pattern
+    # where expensive strategic computations happen async and are cached for fast
+    # hot-path retrieval.
+    # 
+    # Target performance: <5ms cache read latency
+    # ============================================================================
+
+    async def _get_cached_memory_health(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached memory health analysis from PostgreSQL.
+        
+        Returns Dict with fields: memory_snapshot, avg_memory_age_hours,
+        retrieval_frequency_trend, forgetting_risk_memories, computed_at
+        
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                logger.debug("PostgreSQL pool not available for memory health cache")
+                return None
+            
+            query = """
+                SELECT memory_snapshot, avg_memory_age_hours, retrieval_frequency_trend,
+                       forgetting_risk_memories, computed_at, expires_at
+                FROM strategic_memory_health
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY computed_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    age_seconds = (datetime.utcnow() - row['computed_at']).total_seconds()
+                    logger.debug(
+                        f"✅ Memory health cache hit: {bot_name}/{user_id[:8]} "
+                        f"(age: {age_seconds:.1f}s)"
+                    )
+                    return {
+                        'memory_snapshot': row['memory_snapshot'],
+                        'avg_memory_age_hours': row['avg_memory_age_hours'],
+                        'retrieval_frequency_trend': row['retrieval_frequency_trend'],
+                        'forgetting_risk_memories': row['forgetting_risk_memories'],
+                        'computed_at': row['computed_at']
+                    }
+                else:
+                    logger.debug(f"❌ Memory health cache miss: {bot_name}/{user_id[:8]}")
+                    return None
+                    
+        except Exception as e:
+            logger.warning(
+                f"Memory health cache read error ({bot_name}/{user_id[:8]}): {e}",
+                exc_info=False
+            )
+            return None
+
+    async def _get_cached_personality_profile(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached personality profile analysis from PostgreSQL.
+        
+        Returns Dict with fields: dominant_traits, user_response_patterns,
+        adaptation_suggestions, trait_evolution_history, computed_at
+        
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                logger.debug("PostgreSQL pool not available for personality profile cache")
+                return None
+            
+            query = """
+                SELECT dominant_traits, user_response_patterns, adaptation_suggestions,
+                       trait_evolution_history, computed_at, expires_at
+                FROM strategic_personality_profiles
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY computed_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    age_seconds = (datetime.utcnow() - row['computed_at']).total_seconds()
+                    logger.debug(
+                        f"✅ Personality profile cache hit: {bot_name}/{user_id[:8]} "
+                        f"(age: {age_seconds:.1f}s)"
+                    )
+                    return {
+                        'dominant_traits': row['dominant_traits'],
+                        'user_response_patterns': row['user_response_patterns'],
+                        'adaptation_suggestions': row['adaptation_suggestions'],
+                        'trait_evolution_history': row['trait_evolution_history'],
+                        'computed_at': row['computed_at']
+                    }
+                else:
+                    logger.debug(f"❌ Personality profile cache miss: {bot_name}/{user_id[:8]}")
+                    return None
+                    
+        except Exception as e:
+            logger.warning(
+                f"Personality profile cache read error ({bot_name}/{user_id[:8]}): {e}",
+                exc_info=False
+            )
+            return None
+
+    async def _get_cached_conversation_patterns(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached conversation patterns from PostgreSQL.
+        
+        Returns Dict with fields: recent_topics, avg_topic_duration_minutes,
+        context_switch_frequency, predicted_switch_likelihood, computed_at
+        
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                logger.debug("PostgreSQL pool not available for conversation patterns cache")
+                return None
+            
+            query = """
+                SELECT recent_topics, avg_topic_duration_minutes, context_switch_frequency,
+                       predicted_switch_likelihood, topic_transition_graph, computed_at, expires_at
+                FROM strategic_conversation_patterns
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY computed_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    age_seconds = (datetime.utcnow() - row['computed_at']).total_seconds()
+                    logger.debug(
+                        f"✅ Conversation patterns cache hit: {bot_name}/{user_id[:8]} "
+                        f"(age: {age_seconds:.1f}s)"
+                    )
+                    return {
+                        'recent_topics': row['recent_topics'],
+                        'avg_topic_duration_minutes': row['avg_topic_duration_minutes'],
+                        'context_switch_frequency': row['context_switch_frequency'],
+                        'predicted_switch_likelihood': row['predicted_switch_likelihood'],
+                        'topic_transition_graph': row['topic_transition_graph'],
+                        'computed_at': row['computed_at']
+                    }
+                else:
+                    logger.debug(f"❌ Conversation patterns cache miss: {bot_name}/{user_id[:8]}")
+                    return None
+                    
+        except Exception as e:
+            logger.warning(
+                f"Conversation patterns cache read error ({bot_name}/{user_id[:8]}): {e}",
+                exc_info=False
+            )
+            return None
+
+    async def _check_strategic_cache_freshness(
+        self, 
+        table_name: str,
+        user_id: str, 
+        bot_name: str,
+        max_age_seconds: int = 300  # 5 minutes default
+    ) -> bool:
+        """
+        Check if cached strategic data exists and is fresh enough.
+        
+        Useful for deciding whether to wait for background worker processing
+        or proceed without strategic intelligence.
+        
+        Args:
+            table_name: Strategic cache table name (e.g., 'strategic_memory_health')
+            user_id: User identifier
+            bot_name: Normalized bot name
+            max_age_seconds: Maximum acceptable cache age (default 300s = 5min)
+            
+        Returns:
+            True if cache exists and is fresh, False otherwise
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return False
+            
+            query = f"""
+                SELECT computed_at
+                FROM {table_name}
+                WHERE user_id = $1 AND bot_name = $2
+                AND computed_at > NOW() - INTERVAL '{max_age_seconds} seconds'
+                ORDER BY computed_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                return row is not None
+                
+        except Exception as e:
+            logger.debug(f"Cache freshness check error for {table_name}: {e}")
+            return False
+
     @handle_errors(category=ErrorCategory.VALIDATION, severity=ErrorSeverity.HIGH)
     async def process_message(self, message_context: MessageContext) -> ProcessingResult:
         """
