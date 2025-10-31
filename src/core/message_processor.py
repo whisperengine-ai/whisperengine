@@ -17,7 +17,7 @@ import logging
 import os
 import re
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
@@ -724,7 +724,7 @@ class MessageProcessor:
                 
                 if row:
                     cache_hit = True
-                    age_seconds = (datetime.utcnow() - row['computed_at']).total_seconds()
+                    age_seconds = (datetime.now(timezone.utc) - row['computed_at']).total_seconds()
                     logger.debug(
                         f"✅ Memory health cache hit: {bot_name}/{user_id[:8]} "
                         f"(age: {age_seconds:.1f}s)"
