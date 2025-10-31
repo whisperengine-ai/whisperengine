@@ -386,14 +386,14 @@ class MemoryAgingEngine:
     async def store_memory_health(
         self,
         metrics: MemoryHealthMetrics,
-        ttl_minutes: int = 5
+        ttl_minutes: int = 15
     ) -> bool:
         """
         Store memory health metrics in PostgreSQL strategic cache.
         
         Args:
             metrics: Memory health metrics to store
-            ttl_minutes: Time-to-live in minutes (default: 5)
+            ttl_minutes: Time-to-live in minutes (default: 15, longer than 11-minute enrichment cycle)
             
         Returns:
             True if stored successfully, False otherwise

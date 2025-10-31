@@ -1242,11 +1242,31 @@ class MessageProcessor:
             # Store in ai_components for CDL prompt enhancement (Phase 3G-3)
             ai_components = {'strategic_intelligence': strategic_intelligence}
             
+            # DEBUG: Log strategic_intelligence content before additional components
+            logger.info("🔍 DEBUG Phase 4.5: strategic_intelligence keys BEFORE additional: %s", 
+                       list(strategic_intelligence.keys()) if strategic_intelligence else "empty")
+            if strategic_intelligence.get('memory_health'):
+                logger.info("🔍 DEBUG Phase 4.5: memory_health exists with keys: %s", 
+                           list(strategic_intelligence['memory_health'].keys()))
+            
             # Phase 5: AI component processing (parallel)
             ai_components_additional = await self._process_ai_components_parallel(
                 message_context, conversation_context
             )
+            
+            # DEBUG: Check if additional components contains strategic_intelligence
+            logger.info("🔍 DEBUG Phase 5: ai_components_additional keys: %s", 
+                       list(ai_components_additional.keys()))
+            if 'strategic_intelligence' in ai_components_additional:
+                logger.warning("⚠️ WARNING: ai_components_additional contains strategic_intelligence! Value: %s",
+                              ai_components_additional['strategic_intelligence'])
+            
             ai_components.update(ai_components_additional)
+            
+            # DEBUG: Verify strategic_intelligence AFTER update
+            logger.info("🔍 DEBUG After Update: ai_components keys: %s", list(ai_components.keys()))
+            logger.info("🔍 DEBUG After Update: strategic_intelligence value: %s", 
+                       ai_components.get('strategic_intelligence'))
             
             # Phase 5.5: Enhanced conversation context with AI intelligence
             conversation_context = await self._build_conversation_context_with_ai_intelligence(
@@ -4312,7 +4332,17 @@ class MessageProcessor:
                 
                 if memory_health:
                     avg_age_hours = memory_health.get('avg_memory_age_hours', 0)
-                    forgetting_risk = memory_health.get('forgetting_risk_memories', [])
+                    forgetting_risk_raw = memory_health.get('forgetting_risk_memories', [])
+                    
+                    # Parse forgetting_risk if it's a JSON string
+                    import json
+                    if isinstance(forgetting_risk_raw, str):
+                        try:
+                            forgetting_risk = json.loads(forgetting_risk_raw)
+                        except json.JSONDecodeError:
+                            forgetting_risk = []
+                    else:
+                        forgetting_risk = forgetting_risk_raw if isinstance(forgetting_risk_raw, list) else []
                     
                     if avg_age_hours > 168:  # >7 days
                         memory_guidance = f"Note: User's conversation history is aging (avg {avg_age_hours/24:.0f} days old). Consider referencing past topics to reinforce memories."
@@ -4320,7 +4350,7 @@ class MessageProcessor:
                         logger.debug("🧠 STRATEGIC: Added memory aging awareness")
                     
                     if forgetting_risk and len(forgetting_risk) > 0:
-                        topics_at_risk = [m.get('topic', '') for m in forgetting_risk[:3] if m.get('topic')]
+                        topics_at_risk = [m.get('topic', '') for m in forgetting_risk[:3] if isinstance(m, dict) and m.get('topic')]
                         if topics_at_risk:
                             risk_guidance = f"Topics at risk of being forgotten: {', '.join(topics_at_risk)}. Consider natural references if relevant."
                             strategic_guidance_parts.append(risk_guidance)

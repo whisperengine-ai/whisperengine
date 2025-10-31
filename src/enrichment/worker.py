@@ -642,7 +642,7 @@ class EnrichmentWorker:
         
         Incremental processing:
         - Only processes users with stale/missing cache entries
-        - Respects TTL (5-minute cache expiration)
+        - Respects TTL (15-minute cache expiration, longer than 11-minute enrichment cycle)
         - Avoids redundant computation
         
         Returns:
@@ -2846,7 +2846,7 @@ Respond in JSON format only."""
                         performance_summary = EXCLUDED.performance_summary,
                         recommendations = EXCLUDED.recommendations,
                         updated_at = NOW(),
-                        expires_at = NOW() + INTERVAL '5 minutes'
+                        expires_at = NOW() + INTERVAL '15 minutes'
                 """,
                     user_id, bot_name,
                     performance.get('avg_response_time', 0.0),
@@ -2900,7 +2900,7 @@ Respond in JSON format only."""
                         preferred_times = EXCLUDED.preferred_times,
                         personality_summary = EXCLUDED.personality_summary,
                         updated_at = NOW(),
-                        expires_at = NOW() + INTERVAL '5 minutes'
+                        expires_at = NOW() + INTERVAL '15 minutes'
                 """,
                     user_id, bot_name,
                     personality.get('communication_style', 'balanced'),
@@ -2949,7 +2949,7 @@ Respond in JSON format only."""
                         abrupt_switch_rate = EXCLUDED.abrupt_switch_rate,
                         context_coherence_score = EXCLUDED.context_coherence_score,
                         updated_at = NOW(),
-                        expires_at = NOW() + INTERVAL '5 minutes'
+                        expires_at = NOW() + INTERVAL '15 minutes'
                 """,
                     user_id, bot_name,
                     context_switches.get('switch_count', 0),
