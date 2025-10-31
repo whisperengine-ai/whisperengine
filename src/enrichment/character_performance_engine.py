@@ -38,7 +38,8 @@ class CharacterPerformanceEngine:
             temporal_client: TemporalIntelligenceClient for querying InfluxDB
         """
         self.temporal_client = temporal_client
-        self.influx_client = temporal_client.influx_client if temporal_client else None
+        self.influx_client = temporal_client.client if temporal_client else None
+        self.query_api = temporal_client.query_api if temporal_client else None
     
     async def analyze_performance(
         self,
