@@ -184,20 +184,30 @@ async def test_incremental_processing():
         print()
         
         # Test 5: Process strategic intelligence (should skip fresh users)
-        print("🔍 Test 5: Running _process_strategic_intelligence...")
-        print("   (This should only process users with stale/missing cache)\n")
+        # Test 5: Validate incremental processing on subsequent run
+        print("🔍 Test 5: Validating incremental processing on subsequent run...")
         
-        processed_count = await worker._process_strategic_intelligence(
-            TEST_COLLECTION, TEST_BOT
+        # First, populate cache for ALL users (simulating a full run)
+        print("   Populating cache for all users (simulating initial run)...")
+        processed_first = await worker._process_strategic_intelligence(
+            collection_name=TEST_COLLECTION,
+            bot_name=TEST_BOT
+        )
+        print(f"   ✅ First run: Processed {processed_first} users")
+        
+        # Now run again - should process 0 users (all have fresh cache)
+        print("   Running again immediately (all cache should be fresh)...")
+        processed_second = await worker._process_strategic_intelligence(
+            collection_name=TEST_COLLECTION,
+            bot_name=TEST_BOT
         )
         
-        print(f"\n✅ Processed {processed_count} users")
-        print(f"   Expected: {len(users_needing_analysis)} (stale/missing cache)")
+        print(f"\n✅ Second run: Processed {processed_second} users")
         
-        if processed_count <= len(users_needing_analysis) + 1:  # +1 for expired user
-            print(f"   ✅ Incremental processing working correctly!")
+        if processed_second == 0:
+            print(f"   ✅ Incremental processing working correctly - skipped all users with fresh cache")
         else:
-            print(f"   ⚠️  Processed more users than expected")
+            print(f"   ⚠️  Expected 0 users, processed {processed_second} (cache may have expired)")
         
         print()
         
