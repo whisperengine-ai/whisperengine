@@ -121,14 +121,23 @@ class MemoryAgingEngine:
                 try:
                     if isinstance(timestamp_str, str):
                         if 'T' in timestamp_str:
+                            # ISO format with timezone
                             timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
                         else:
+                            # Simple format without timezone - assume UTC
                             timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
-                            timestamp = timestamp.replace(tzinfo=timezone.utc)
+                            if timestamp.tzinfo is None:
+                                timestamp = timestamp.replace(tzinfo=timezone.utc)
                     else:
+                        # Unix timestamp
                         timestamp = datetime.fromtimestamp(timestamp_str, tz=timezone.utc)
+                    
+                    # Ensure timezone-aware datetime
+                    if timestamp.tzinfo is None:
+                        timestamp = timestamp.replace(tzinfo=timezone.utc)
+                        
                 except Exception as e:
-                    logger.warning(f"Failed to parse timestamp: {e}")
+                    logger.warning(f"Failed to parse timestamp '{timestamp_str}': {e}")
                     continue
                 
                 age_hours = (now - timestamp).total_seconds() / 3600
@@ -390,6 +399,7 @@ class MemoryAgingEngine:
             True if stored successfully, False otherwise
         """
         import json
+        from datetime import timedelta
         
         try:
             query = """
@@ -397,7 +407,7 @@ class MemoryAgingEngine:
                 (user_id, bot_name, memory_snapshot, avg_memory_age_hours, 
                  retrieval_frequency_trend, forgetting_risk_memories, 
                  computed_at, expires_at)
-                VALUES ($1, $2, $3::jsonb, $4, $5, $6::jsonb, NOW(), NOW() + $7::interval)
+                VALUES ($1, $2, $3::jsonb, $4, $5, $6::jsonb, NOW(), NOW() + $7)
                 ON CONFLICT (user_id, bot_name) 
                 DO UPDATE SET 
                     memory_snapshot = EXCLUDED.memory_snapshot,
@@ -418,7 +428,7 @@ class MemoryAgingEngine:
                     metrics.avg_memory_age_hours,
                     metrics.retrieval_frequency_trend,
                     json.dumps(metrics.forgetting_risk_memories),
-                    f"{ttl_minutes} minutes"
+                    timedelta(minutes=ttl_minutes)
                 )
                 
                 logger.info(
