@@ -586,6 +586,11 @@ class EnrichmentWorker:
         - Conversation pattern analysis
         - Proactive engagement opportunities
         
+        Incremental processing:
+        - Only processes users with stale/missing cache entries
+        - Respects TTL (5-minute cache expiration)
+        - Avoids redundant computation
+        
         Returns:
             Number of users processed with strategic intelligence
         """
@@ -595,13 +600,23 @@ class EnrichmentWorker:
         users = await self._get_users_in_collection(collection_name)
         logger.debug("Found %s users for strategic analysis", len(users))
         
+        # Filter to users needing analysis (stale or missing cache)
+        users_to_process = await self._get_users_needing_strategic_analysis(users, bot_name)
+        
+        if not users_to_process:
+            logger.info("✅ All users have fresh strategic intelligence cache")
+            return 0
+        
+        logger.info("📊 Strategic analysis needed for %s/%s users (cache stale/missing)", 
+                   len(users_to_process), len(users))
+        
         processed_count = 0
         
         # Process in batches to avoid overwhelming the system
         batch_size = 10  # Process 10 users at a time
         
-        for i in range(0, len(users), batch_size):
-            batch = users[i:i + batch_size]
+        for i in range(0, len(users_to_process), batch_size):
+            batch = users_to_process[i:i + batch_size]
             
             for user_id in batch:
                 try:
@@ -628,12 +643,61 @@ class EnrichmentWorker:
                     continue
             
             # Brief pause between batches to avoid resource contention
-            if i + batch_size < len(users):
+            if i + batch_size < len(users_to_process):
                 await asyncio.sleep(0.5)
         
         logger.info("✅ Processed strategic intelligence for %s/%s users in %s",
-                   processed_count, len(users), bot_name)
+                   processed_count, len(users_to_process), bot_name)
         return processed_count
+    
+    async def _get_users_needing_strategic_analysis(
+        self,
+        users: List[str],
+        bot_name: str
+    ) -> List[str]:
+        """
+        Filter users to those needing strategic analysis (stale/missing cache).
+        
+        Returns only users where:
+        - No cache entry exists in strategic_memory_health, OR
+        - Cache entry has expired (expires_at < NOW())
+        
+        This prevents redundant re-processing on every enrichment cycle.
+        """
+        if not users:
+            return []
+        
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Get users with fresh cache (expires_at > NOW())
+                rows = await conn.fetch("""
+                    SELECT DISTINCT user_id
+                    FROM strategic_memory_health
+                    WHERE bot_name = $1
+                      AND user_id = ANY($2::text[])
+                      AND expires_at > NOW()
+                """, bot_name, users)
+                
+                users_with_fresh_cache = {row['user_id'] for row in rows}
+                
+                # Return users NOT in fresh cache set
+                users_needing_analysis = [
+                    user_id for user_id in users 
+                    if user_id not in users_with_fresh_cache
+                ]
+                
+                logger.debug(
+                    "Strategic cache status: %s fresh, %s stale/missing",
+                    len(users_with_fresh_cache),
+                    len(users_needing_analysis)
+                )
+                
+                return users_needing_analysis
+                
+        except Exception as e:
+            logger.error("Failed to check strategic cache status: %s", e)
+            # On error, process all users (safe fallback)
+            return users
     
     def _get_bot_collections(self) -> List[str]:
         """Get list of all bot collections from Qdrant"""
