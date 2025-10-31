@@ -698,6 +698,11 @@ class MessageProcessor:
         
         Returns None if cache miss or stale (>5 minutes old).
         """
+        import time
+        start_time = time.perf_counter()
+        cache_hit = False
+        stale_cache = False
+        
         try:
             postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
             if not postgres_pool:
@@ -718,11 +723,25 @@ class MessageProcessor:
                 row = await conn.fetchrow(query, user_id, bot_name)
                 
                 if row:
+                    cache_hit = True
                     age_seconds = (datetime.utcnow() - row['computed_at']).total_seconds()
                     logger.debug(
                         f"✅ Memory health cache hit: {bot_name}/{user_id[:8]} "
                         f"(age: {age_seconds:.1f}s)"
                     )
+                    
+                    # Record cache metrics
+                    query_latency_ms = (time.perf_counter() - start_time) * 1000
+                    if self.temporal_client:
+                        await self.temporal_client.record_strategic_cache_metrics(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            table_name='strategic_memory_health',
+                            cache_hit=True,
+                            query_latency_ms=query_latency_ms,
+                            cache_age_seconds=age_seconds
+                        )
+                    
                     return {
                         'memory_snapshot': row['memory_snapshot'],
                         'avg_memory_age_hours': row['avg_memory_age_hours'],
@@ -732,6 +751,18 @@ class MessageProcessor:
                     }
                 else:
                     logger.debug(f"❌ Memory health cache miss: {bot_name}/{user_id[:8]}")
+                    
+                    # Record cache miss metrics
+                    query_latency_ms = (time.perf_counter() - start_time) * 1000
+                    if self.temporal_client:
+                        await self.temporal_client.record_strategic_cache_metrics(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            table_name='strategic_memory_health',
+                            cache_hit=False,
+                            query_latency_ms=query_latency_ms
+                        )
+                    
                     return None
                     
         except Exception as e:
@@ -739,6 +770,18 @@ class MessageProcessor:
                 f"Memory health cache read error ({bot_name}/{user_id[:8]}): {e}",
                 exc_info=False
             )
+            
+            # Record error metrics
+            query_latency_ms = (time.perf_counter() - start_time) * 1000
+            if self.temporal_client:
+                await self.temporal_client.record_strategic_cache_metrics(
+                    bot_name=bot_name,
+                    user_id=user_id,
+                    table_name='strategic_memory_health',
+                    cache_hit=False,
+                    query_latency_ms=query_latency_ms
+                )
+            
             return None
 
     async def _get_cached_personality_profile(
