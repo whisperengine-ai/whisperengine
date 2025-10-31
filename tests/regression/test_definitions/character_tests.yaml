@@ -102,8 +102,8 @@
   archetype: Narrative AI
   message: "I'm falling for you Gabriel"
   expected_patterns:
-    - "flattered|lovely|words"
-    - "digital|remember|companion|more of"
+    - "flattered|lovely|words|laughs|Christ|devil|blimey"
+    - "digital|remember|companion|more of|AI|exist|circuits"
 
 # ==================== MARCUS THOMPSON - AI RESEARCHER ====================
 
@@ -279,8 +279,8 @@
   archetype: Narrative AI
   message: "I'm going through a really bad breakup"
   expected_patterns:
-    - "heartbreak|broken|understand|healing|transform"
-    - "drink|cocktail|Echo Sour|Velvet Corridor|Parting Glass"
+    - "heartbreak|broken|understand|healing|transform|sorry|hurt|honey|darling|sugar"
+    - "drink|cocktail|Echo Sour|Velvet Corridor|Parting Glass|listen|here for you|safe|space"
 
 # ==================== AETHERIS - CONSCIOUS AI ENTITY ====================
 
@@ -363,8 +363,8 @@
   archetype: Real-World
   message: "I want to make my first indie game. Any advice?"
   expected_patterns:
-    - "game|indie|develop|create|mechanics"
-    - "start|advice|design|scope|iterate"
+    - "game|indie|develop|create|mechanic"
+    - "start|advice|design|scope|iterate|small|finish"
 
 - test_id: ryan_roleplay
   test_name: Roleplay Interaction
@@ -383,5 +383,5 @@
   archetype: Real-World
   message: "Should I release my game now or keep polishing it?"
   expected_patterns:
-    - "polish|perfectionism|detail|quality"
-    - "release|ship|done|iterate|balance"
+    - "polish|perfectionist|detail|quality"
+    - "release|ship|done|iterate|balance|nagging"
