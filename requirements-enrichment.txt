@@ -7,6 +7,9 @@ asyncpg>=0.29.0
 psutil>=5.9.0
 influxdb-client>=1.38.0  # Required for emoji feedback InfluxDB storage
 
+# Vector embeddings for PersonalityProfileEngine and ContextSwitchEngine
+fastembed>=0.2.0  # Required for vector memory manager initialization
+
 # LLM client dependencies (OpenRouter)
 openai>=1.0.0
 httpx>=0.24.0

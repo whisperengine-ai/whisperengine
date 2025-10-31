@@ -101,7 +101,14 @@ class EnrichmentWorker:
         self.temporal_client, _ = create_temporal_intelligence_system()
         
         # Initialize vector memory manager (used by personality/context engines)
-        self.vector_memory = create_memory_manager(memory_type="vector")
+        # Note: Only initialize if fastembed is available (not in minimal enrichment containers)
+        try:
+            self.vector_memory = create_memory_manager(memory_type="vector")
+            logger.info("✅ Vector memory manager initialized for personality/context engines")
+        except ImportError as e:
+            logger.warning("⚠️ Vector memory manager unavailable (fastembed not installed): %s", e)
+            logger.warning("PersonalityProfileEngine and ContextSwitchEngine will be skipped")
+            self.vector_memory = None
         
         # Initialize memory aging engine for strategic intelligence
         self.memory_aging_engine = MemoryAgingEngine(
@@ -688,24 +695,30 @@ class EnrichmentWorker:
                         logger.debug("✅ [2/7] Character performance analysis complete for %s", user_id)
                     
                     # Engine 3: Personality Profile - Model user personality from conversations
-                    personality = await self.personality_profile_engine.analyze_personality(
-                        bot_name=bot_name,
-                        user_id=user_id,
-                        lookback_days=30
-                    )
-                    if personality and personality.get('message_count', 0) > 0:
-                        await self._store_personality_profile(user_id, bot_name, personality)
-                        logger.debug("✅ [3/7] Personality profile analysis complete for %s", user_id)
+                    if self.vector_memory:
+                        personality = await self.personality_profile_engine.analyze_personality(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            lookback_days=30
+                        )
+                        if personality and personality.get('message_count', 0) > 0:
+                            await self._store_personality_profile(user_id, bot_name, personality)
+                            logger.debug("✅ [3/7] Personality profile analysis complete for %s", user_id)
+                    else:
+                        logger.debug("⏭️  [3/7] Personality profile skipped (vector memory unavailable)")
                     
                     # Engine 4: Context Switch - Detect topic transitions
-                    context_switches = await self.context_switch_engine.analyze_context_switches(
-                        bot_name=bot_name,
-                        user_id=user_id,
-                        lookback_days=30
-                    )
-                    if context_switches and context_switches.get('switch_count', 0) > 0:
-                        await self._store_context_patterns(user_id, bot_name, context_switches)
-                        logger.debug("✅ [4/7] Context switch analysis complete for %s", user_id)
+                    if self.vector_memory:
+                        context_switches = await self.context_switch_engine.analyze_context_switches(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            lookback_days=30
+                        )
+                        if context_switches and context_switches.get('switch_count', 0) > 0:
+                            await self._store_context_patterns(user_id, bot_name, context_switches)
+                            logger.debug("✅ [4/7] Context switch analysis complete for %s", user_id)
+                    else:
+                        logger.debug("⏭️  [4/7] Context switch skipped (vector memory unavailable)")
                     
                     # Engine 5: Human Memory Behavior - Forgetting curve simulation
                     memory_behavior = await self.human_memory_behavior_engine.analyze_memory_behavior(
