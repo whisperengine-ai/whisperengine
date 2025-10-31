@@ -179,36 +179,34 @@ class MessageProcessor:
         except ImportError as e:
             logger.warning("Enhanced AI Ethics not available: %s", e)
         
-        # TrendWise Adaptive Learning: Initialize trend analysis and confidence adaptation
+        # TrendWise Adaptive Learning: Initialize trend analysis (ConfidenceAdapter removed)
         self.trend_analyzer = None
-        self.confidence_adapter = None
         
         if self.temporal_client:
             try:
                 from src.analytics.trend_analyzer import create_trend_analyzer
-                # DISABLED: ConfidenceAdapter was contaminating character personalities with overly-detailed instructions
-                # from src.adaptation.confidence_adapter import create_confidence_adapter
                 
                 self.trend_analyzer = create_trend_analyzer(self.temporal_client)
-                # self.confidence_adapter = create_confidence_adapter(self.trend_analyzer)
-                self.confidence_adapter = None  # DISABLED - was causing flat, literary responses
-                logger.info("TrendWise Adaptive Learning: Trend analysis initialized (ConfidenceAdapter disabled)")
+                logger.info("TrendWise Adaptive Learning: Trend analysis initialized")
             except ImportError as e:
                 logger.warning("TrendWise components not available: %s", e)
                 self.trend_analyzer = None
-                self.confidence_adapter = None
         
         # Relationship Intelligence: Lazy initialization (postgres_pool may not be ready yet)
         self.relationship_engine = None
         self.trust_recovery = None
         self._relationship_init_attempted = False  # Track if we've tried initializing
         
-        # Learning Intelligence Orchestrator: Initialize unified learning coordination
+        # Learning Intelligence Orchestrator: Feature-flagged initialization (Sprint 6 experimental)
+        # DISABLED by default (35-40MB memory per bot, never used in production)
+        # Enable via: ENABLE_SPRINT_6_ORCHESTRATION=true
         self.learning_orchestrator = None
         self.predictive_engine = None
         self.learning_pipeline = None
         
-        if self.temporal_client:
+        enable_sprint_6 = os.getenv('ENABLE_SPRINT_6_ORCHESTRATION', 'false').lower() == 'true'
+        
+        if enable_sprint_6 and self.temporal_client:
             try:
                 from src.orchestration.learning_orchestrator import LearningOrchestrator
                 from src.adaptation.predictive_engine import PredictiveAdaptationEngine
@@ -217,7 +215,7 @@ class MessageProcessor:
                 # Initialize Learning Intelligence components with available adaptive learning dependencies
                 self.learning_orchestrator = LearningOrchestrator(
                     trend_analyzer=self.trend_analyzer,
-                    confidence_adapter=self.confidence_adapter,
+                    confidence_adapter=None,  # ConfidenceAdapter removed
                     memory_manager=self.memory_manager,
                     temporal_client=self.temporal_client,
                     postgres_pool=getattr(bot_core, 'postgres_pool', None) if bot_core else None
@@ -226,13 +224,13 @@ class MessageProcessor:
                 # Pass dependencies to Predictive Engine
                 self.predictive_engine = PredictiveAdaptationEngine(
                     trend_analyzer=self.trend_analyzer,
-                    confidence_adapter=self.confidence_adapter,
+                    confidence_adapter=None,  # ConfidenceAdapter removed
                     temporal_client=self.temporal_client,
                     memory_manager=self.memory_manager
                 )
                 self.learning_pipeline = LearningPipelineManager()
                 
-                logger.info("Learning Intelligence Orchestrator: Learning coordination components initialized")
+                logger.info("Learning Intelligence Orchestrator: Learning coordination components initialized (Sprint 6 experimental)")
             except ImportError as e:
                 logger.warning("Learning Intelligence Orchestrator components not available: %s", e)
                 self.learning_orchestrator = None
@@ -274,11 +272,9 @@ class MessageProcessor:
             except ImportError as e:
                 logger.debug("ML Shadow Mode: Not available - %s", e)
         
-        # Character Emotional State Manager: Track bot's own emotional state across conversations
-        # Note: Uses lazy initialization since postgres_pool is initialized asynchronously
-        self.character_state_manager = None
-        self._character_state_manager_initialized = False
-        self._character_state_manager_lock = asyncio.Lock()
+        # REMOVED: Character Emotional State Manager (overengineered - CDL personality is sufficient)
+        # Was tracking bot's own emotional state with 11-emotion biochemical modeling
+        # Added 100-150ms overhead per message with no clear value
         
         # Unified Character Intelligence Coordinator: PHASE 4A Integration
         self.character_intelligence_coordinator = None
@@ -433,43 +429,8 @@ class MessageProcessor:
         self._last_security_validation = None
         self._last_emotional_context = None
     
-    async def _ensure_character_state_manager_initialized(self):
-        """
-        Ensure character emotional state manager is initialized (lazy initialization).
-        
-        This is async because it needs to wait for postgres_pool which is initialized
-        asynchronously during bot startup. Only initializes once.
-        
-        Returns:
-            bool: True if manager is available (either already initialized or just initialized)
-        """
-        # Fast path: already initialized
-        if self._character_state_manager_initialized:
-            return self.character_state_manager is not None
-        
-        # Use lock to prevent multiple simultaneous initialization attempts
-        async with self._character_state_manager_lock:
-            # Double-check after acquiring lock (another coroutine may have initialized)
-            if self._character_state_manager_initialized:
-                return self.character_state_manager is not None
-            
-            try:
-                from src.intelligence.character_emotional_state_v2 import CharacterEmotionalStateManager
-                
-                self.character_state_manager = CharacterEmotionalStateManager()
-                logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (v2 - 11-emotion spectrum)")
-            
-            except ImportError as e:
-                logger.warning("🎭 CHARACTER STATE: Tracking not available: %s", e)
-                self.character_state_manager = None
-            except Exception as e:
-                logger.error("🎭 CHARACTER STATE: Initialization failed: %s", e)
-                self.character_state_manager = None
-            
-            # Mark as initialized (even if it failed, don't retry every message)
-            self._character_state_manager_initialized = True
-            
-            return self.character_state_manager is not None
+    # REMOVED: _ensure_character_state_manager_initialized() method
+    # Character emotional state tracking was overengineered and removed
     
     @staticmethod
     def _is_tool_worthy_query(message: str) -> bool:
@@ -1290,31 +1251,8 @@ class MessageProcessor:
                 message_context, ai_components, relevant_memories
             )
             
-            # Phase 6.8: Character Emotional State (Biochemical Modeling - Bot's Own Emotional State)
-            # Get character's current emotional state to influence response generation
-            # Note: Uses lazy initialization to wait for postgres_pool availability
-            await self._ensure_character_state_manager_initialized()
-            
-            if self.character_state_manager:
-                try:
-                    from src.utils.bot_name_utils import get_normalized_bot_name_from_env
-                    character_name = get_normalized_bot_name_from_env()
-                    
-                    if character_name:
-                        character_state = await self.character_state_manager.get_character_state(
-                            character_name=character_name,
-                            user_id=message_context.user_id
-                        )
-                        
-                        # Add to AI components for CDL prompt building
-                        ai_components['character_emotional_state'] = character_state
-                        logger.info(
-                            "🎭 CHARACTER STATE: Retrieved for %s - %s (joy=%.2f, intensity=%.2f)",
-                            character_name, character_state.dominant_emotion,
-                            character_state.joy, character_state.emotional_intensity
-                        )
-                except Exception as e:
-                    logger.debug("Failed to retrieve character emotional state: %s", e)
+            # REMOVED: Phase 6.8 Character Emotional State (CharacterEmotionalStateManager)
+            # Overengineered - CDL personality system already handles character emotional expression
             
             # Phase 6.9: Hybrid Query Routing (LLM Tool Calling)
             # PERFORMANCE NOTE: This feature adds significant overhead (~2x processing time)
@@ -1402,66 +1340,8 @@ class MessageProcessor:
             bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
             ai_components['bot_emotion'] = bot_emotion
             
-            # Phase 7.5b: Update character's own emotional state (biochemical modeling - bot emotions)
-            # Note: Manager should already be initialized from Phase 6.8, but ensure just in case
-            await self._ensure_character_state_manager_initialized()
-            
-            if self.character_state_manager and bot_emotion:
-                try:
-                    character_name = get_normalized_bot_name_from_env()
-                    
-                    if character_name:
-                        # Calculate interaction quality (can be enhanced later with more metrics)
-                        interaction_quality = 0.7  # Default neutral quality
-                        
-                        # Boost quality if relationship is strong
-                        relationship_data = ai_components.get('relationship_state')
-                        if relationship_data and isinstance(relationship_data, dict):
-                            trust = relationship_data.get('trust', 0.5)
-                            affection = relationship_data.get('affection', 0.5)
-                            interaction_quality = (trust + affection) / 2.0
-                        
-                        # Update character's emotional state based on this conversation
-                        updated_state = await self.character_state_manager.update_character_state(
-                            character_name=character_name,
-                            user_id=message_context.user_id,
-                            bot_emotion_data=bot_emotion,
-                            user_emotion_data=ai_components.get('emotion_data'),
-                            interaction_quality=interaction_quality
-                        )
-                        logger.debug("🎭 Updated character emotional state for %s", character_name)
-                        
-                        # Phase 7.5c: Record character emotional state to InfluxDB for temporal analysis
-                        if updated_state and self.temporal_client:
-                            try:
-                                # Record v2 11-emotion format
-                                await self.temporal_client.record_character_emotional_state(
-                                    bot_name=character_name,
-                                    user_id=message_context.user_id,
-                                    joy=updated_state.joy,
-                                    anger=updated_state.anger,
-                                    sadness=updated_state.sadness,
-                                    fear=updated_state.fear,
-                                    love=updated_state.love,
-                                    trust=updated_state.trust,
-                                    optimism=updated_state.optimism,
-                                    pessimism=updated_state.pessimism,
-                                    anticipation=updated_state.anticipation,
-                                    surprise=updated_state.surprise,
-                                    disgust=updated_state.disgust,
-                                    emotional_intensity=updated_state.emotional_intensity,
-                                    emotional_valence=updated_state.emotional_valence,
-                                    dominant_emotion=updated_state.dominant_emotion
-                                )
-                                logger.debug(
-                                    "📊 TEMPORAL: Recorded character emotional state to InfluxDB (v2 11-emotion format, dominant: %s, intensity: %.2f)",
-                                    updated_state.dominant_emotion, updated_state.emotional_intensity
-                                )
-                            except Exception as e:
-                                logger.debug("Failed to record character emotional state to InfluxDB: %s", e)
-                                
-                except Exception as e:
-                    logger.debug("Failed to update character emotional state: %s", e)
+            # REMOVED: Phase 7.5b/7.5c Character Emotional State Updates & InfluxDB Recording
+            # Overengineered - CDL personality system already handles character emotional expression
             
             # Phase 7.6: Intelligent Emoji Decoration (NEW - Database-driven post-LLM enhancement)
             # Try to initialize emoji selector if not yet available (lazy initialization)
@@ -4215,49 +4095,7 @@ class MessageProcessor:
                     logger.warning("🔧 REFACTOR: No 'Respond as' line found in system prompt")
                 break
         
-        # ================================
-        # COMPONENT 1: TrendWise Adaptive Learning (Priority 18)
-        # ================================
-        if self.confidence_adapter:
-            try:
-                bot_name = get_normalized_bot_name_from_env()
-                adaptation_params = await self.confidence_adapter.adjust_response_style(
-                    user_id=message_context.user_id,
-                    bot_name=bot_name
-                )
-                
-                if adaptation_params:
-                    # Generate adaptation guidance for system prompt
-                    adaptation_guidance = self.confidence_adapter.generate_adaptation_guidance(
-                        adaptation_params
-                    )
-                    
-                    if adaptation_guidance and hasattr(adaptation_guidance, 'system_prompt_additions'):
-                        additional_guidance = " ".join(adaptation_guidance.system_prompt_additions)
-                        
-                        # Add as proper component with priority 18
-                        trendwise_component = PromptComponent(
-                            type=PromptComponentType.GUIDANCE,
-                            content=additional_guidance,
-                            priority=18,
-                            required=False,
-                            metadata={'cdl_type': 'TRENDWISE_ADAPTATION', 'user_id': message_context.user_id}
-                        )
-                        ai_assembler.add_component(trendwise_component)
-                        logger.info("📈 TRENDWISE: Added adaptation component (priority 18, style: %s)",
-                                   adaptation_params.response_style.value)
-                    
-                    # Store adaptation context for monitoring
-                    ai_components['trendwise_adaptation'] = {
-                        'response_style': adaptation_params.response_style.value,
-                        'explanation_level': adaptation_params.explanation_level.value,
-                        'detail_enhancement': adaptation_params.detail_enhancement,
-                        'adaptation_reason': adaptation_params.adaptation_reason,
-                        'parameters': adaptation_params
-                    }
-                
-            except Exception as e:
-                logger.warning("TrendWise adaptation failed: %s", e)
+        # REMOVED: COMPONENT 1 TrendWise ConfidenceAdapter (was contaminating personalities)
         
         # ================================
         # COMPONENT 2: Emotional Intelligence (Priority 18.5)
