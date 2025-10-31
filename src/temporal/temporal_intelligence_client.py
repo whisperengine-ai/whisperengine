@@ -1022,6 +1022,77 @@ class TemporalIntelligenceClient:
             logger.error("Failed to record bot self-reflection: %s", e)
             return False
 
+    async def record_strategic_cache_metrics(
+        self,
+        bot_name: str,
+        user_id: str,
+        table_name: str,
+        cache_hit: bool,
+        query_latency_ms: float,
+        cache_age_seconds: Optional[float] = None,
+        stale_cache: bool = False,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record strategic component cache performance metrics
+        
+        Tracks cache hit rates, query latency, and cache age for the Phase 3
+        background worker system. Essential for monitoring cache effectiveness
+        and identifying performance bottlenecks.
+        
+        Args:
+            bot_name: Name of the bot (elena, marcus, etc.)
+            user_id: User identifier
+            table_name: Strategic cache table name (strategic_memory_health, etc.)
+            cache_hit: True if cache data was found and fresh
+            query_latency_ms: PostgreSQL query time in milliseconds
+            cache_age_seconds: Age of cached data (if cache hit)
+            stale_cache: True if data existed but was expired
+            timestamp: Optional timestamp (defaults to now)
+            
+        Returns:
+            bool: Success status
+            
+        Example:
+            await temporal_client.record_strategic_cache_metrics(
+                bot_name='elena',
+                user_id='user_12345',
+                table_name='strategic_memory_health',
+                cache_hit=True,
+                query_latency_ms=0.75,
+                cache_age_seconds=120.5
+            )
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("strategic_cache") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("table", table_name) \
+                .field("cache_hit", 1 if cache_hit else 0) \
+                .field("cache_miss", 0 if cache_hit else 1) \
+                .field("query_latency_ms", query_latency_ms) \
+                .field("stale_cache", 1 if stale_cache else 0)
+            
+            if cache_age_seconds is not None:
+                point = point.field("cache_age_seconds", cache_age_seconds)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug(
+                "Recorded strategic cache metrics: %s/%s/%s (hit=%s, latency=%.2fms)",
+                bot_name, user_id[:8], table_name, cache_hit, query_latency_ms
+            )
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record strategic cache metrics: %s", e)
+            return False
+
     async def record_point(
         self,
         point: Any,

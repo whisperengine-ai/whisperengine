@@ -15,6 +15,8 @@ COPY src/enrichment/ ./src/enrichment/
 COPY src/llm/ ./src/llm/
 COPY src/database/ ./src/database/
 COPY src/utils/ ./src/utils/
+COPY src/memory/ ./src/memory/
+COPY src/temporal/ ./src/temporal/
 
 # Create logs directory
 RUN mkdir -p logs/enrichment

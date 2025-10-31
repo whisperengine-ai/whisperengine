@@ -202,6 +202,10 @@ services:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
       
+      # Embedding model configuration (must match main bots)
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
+      
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

@@ -23,7 +23,16 @@ import asyncpg
 from src.enrichment.config import config
 from src.enrichment.summarization_engine import SummarizationEngine
 from src.enrichment.fact_extraction_engine import FactExtractionEngine
+from src.enrichment.memory_aging_engine import MemoryAgingEngine
+from src.enrichment.character_performance_engine import CharacterPerformanceEngine
+from src.enrichment.personality_profile_engine import PersonalityProfileEngine
+from src.enrichment.context_switch_engine import ContextSwitchEngine
+from src.enrichment.human_memory_behavior_engine import HumanMemoryBehaviorEngine
+from src.enrichment.conversation_pattern_engine import ConversationPatternEngine
+from src.enrichment.proactive_engagement_engine import ProactiveEngagementEngine
 from src.llm.llm_protocol import create_llm_client
+from src.temporal.temporal_protocol import create_temporal_intelligence_system
+from src.memory.memory_protocol import create_memory_manager
 
 # Configure logging
 logging.basicConfig(
@@ -88,9 +97,63 @@ class EnrichmentWorker:
             preprocessor=self._nlp_preprocessor
         )
         
+        # Initialize temporal client for InfluxDB metrics (used by CharacterPerformanceEngine)
+        self.temporal_client, _ = create_temporal_intelligence_system()
+        
+        # Initialize vector memory manager (used by personality/context engines)
+        # Note: Only initialize if fastembed is available (not in minimal enrichment containers)
+        try:
+            self.vector_memory = create_memory_manager(memory_type="vector")
+            logger.info("✅ Vector memory manager initialized for personality/context engines")
+        except ImportError as e:
+            logger.warning("⚠️ Vector memory manager unavailable (fastembed not installed): %s", e)
+            logger.warning("PersonalityProfileEngine and ContextSwitchEngine will be skipped")
+            self.vector_memory = None
+        
+        # Initialize memory aging engine for strategic intelligence
+        self.memory_aging_engine = MemoryAgingEngine(
+            qdrant_client=self.qdrant_client,
+            postgres_pool=self.db_pool
+        )
+        
+        # Initialize character performance engine (InfluxDB metrics analysis)
+        self.character_performance_engine = CharacterPerformanceEngine(
+            temporal_client=self.temporal_client
+        )
+        
+        # Initialize personality profile engine (user behavior modeling)
+        self.personality_profile_engine = PersonalityProfileEngine(
+            qdrant_client=self.qdrant_client,
+            temporal_client=self.temporal_client
+        )
+        
+        # Initialize context switch engine (topic transition analysis)
+        self.context_switch_engine = ContextSwitchEngine(
+            qdrant_client=self.qdrant_client
+        )
+        
+        # Initialize human memory behavior engine (forgetting curves)
+        self.human_memory_behavior_engine = HumanMemoryBehaviorEngine(
+            qdrant_client=self.qdrant_client,
+            postgres_pool=self.db_pool
+        )
+        
+        # Initialize conversation pattern engine (behavioral patterns)
+        self.conversation_pattern_engine = ConversationPatternEngine(
+            qdrant_client=self.qdrant_client,
+            postgres_pool=self.db_pool
+        )
+        
+        # Initialize proactive engagement engine (re-engagement opportunities)
+        self.proactive_engagement_engine = ProactiveEngagementEngine(
+            qdrant_client=self.qdrant_client,
+            postgres_pool=self.db_pool
+        )
+        
         logger.info("EnrichmentWorker initialized - Qdrant: %s:%s, Summary Model: %s, Fact Model: %s",
                    config.QDRANT_HOST, config.QDRANT_PORT, 
                    config.LLM_CHAT_MODEL, config.LLM_FACT_EXTRACTION_MODEL)
+        logger.info("✅ Strategic Intelligence Engines initialized: 7/7 engines ready")
     
     async def run(self):
         """Main worker loop - runs forever in container"""
@@ -121,6 +184,7 @@ class EnrichmentWorker:
         total_preferences_extracted = 0
         total_emoji_feedback_processed = 0
         total_reflections_created = 0
+        total_strategic_intelligence_processed = 0
         
         for collection_name in collections:
             bot_name = await self._extract_bot_name(collection_name)
@@ -166,14 +230,22 @@ class EnrichmentWorker:
                 
                 total_reflections_created += reflections_created
                 
+                # Process strategic intelligence (memory aging, character performance, etc.)
+                strategic_count = await self._process_strategic_intelligence(
+                    collection_name=collection_name,
+                    bot_name=bot_name
+                )
+                
+                total_strategic_intelligence_processed += strategic_count
+                
             except Exception as e:
                 logger.error("Error processing collection %s: %s", collection_name, e)
                 continue
         
         cycle_duration = (datetime.now(timezone.utc) - cycle_start).total_seconds()
-        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback, %s reflections in %.2fs",
+        logger.info("✅ Enrichment cycle complete - %s summaries, %s facts, %s preferences, %s emoji feedback, %s reflections, %s strategic intelligence in %.2fs",
                    total_summaries_created, total_facts_extracted, total_preferences_extracted, 
-                   total_emoji_feedback_processed, total_reflections_created, cycle_duration)
+                   total_emoji_feedback_processed, total_reflections_created, total_strategic_intelligence_processed, cycle_duration)
     
     async def _process_conversation_summaries(
         self,
@@ -550,6 +622,195 @@ class EnrichmentWorker:
                     updated_at = NOW()
             """, user_id, bot_name, summary_text, start_timestamp, end_timestamp,
                  message_count, key_topics, emotional_tone, compression_ratio, confidence_score)
+    
+    async def _process_strategic_intelligence(
+        self,
+        collection_name: str,
+        bot_name: str
+    ) -> int:
+        """
+        Process strategic intelligence components for a bot collection
+        
+        Implements all 7 strategic intelligence engines:
+        1. Memory aging analysis (memory health, retrieval trends, forgetting risks)
+        2. Character performance analysis (InfluxDB metrics)
+        3. Personality profile modeling (user behavior patterns)
+        4. Context switch detection (topic transitions)
+        5. Human memory behavior simulation (forgetting curves)
+        6. Conversation pattern analysis (behavioral patterns)
+        7. Proactive engagement opportunities (re-engagement signals)
+        
+        Incremental processing:
+        - Only processes users with stale/missing cache entries
+        - Respects TTL (15-minute cache expiration, longer than 11-minute enrichment cycle)
+        - Avoids redundant computation
+        
+        Returns:
+            Number of users processed with strategic intelligence
+        """
+        logger.info("🧠 Processing strategic intelligence for %s...", bot_name)
+        
+        # Get users with conversations in this collection
+        users = await self._get_users_in_collection(collection_name)
+        logger.debug("Found %s users for strategic analysis", len(users))
+        
+        # Filter to users needing analysis (stale or missing cache)
+        users_to_process = await self._get_users_needing_strategic_analysis(users, bot_name)
+        
+        if not users_to_process:
+            logger.info("✅ All users have fresh strategic intelligence cache")
+            return 0
+        
+        logger.info("📊 Strategic analysis needed for %s/%s users (cache stale/missing)", 
+                   len(users_to_process), len(users))
+        
+        processed_count = 0
+        
+        # Process in batches to avoid overwhelming the system
+        batch_size = 10  # Process 10 users at a time
+        
+        for i in range(0, len(users_to_process), batch_size):
+            batch = users_to_process[i:i + batch_size]
+            
+            for user_id in batch:
+                try:
+                    # Engine 1: Memory Aging - Analyze memory health
+                    memory_health = await self.memory_aging_engine.analyze_memory_health(
+                        user_id=user_id,
+                        bot_name=bot_name,
+                        collection_name=collection_name
+                    )
+                    if memory_health:
+                        await self.memory_aging_engine.store_memory_health(metrics=memory_health)
+                        logger.debug("✅ [1/7] Memory aging analysis complete for %s", user_id)
+                        
+                    # Engine 2: Character Performance - Analyze bot performance from InfluxDB
+                    performance = await self.character_performance_engine.analyze_performance(
+                        bot_name=bot_name,
+                        user_id=user_id,
+                        lookback_hours=168  # 7 days
+                    )
+                    if performance and performance.get('metrics_available'):
+                        await self._store_character_performance(user_id, bot_name, performance)
+                        logger.debug("✅ [2/7] Character performance analysis complete for %s", user_id)
+                    
+                    # Engine 3: Personality Profile - Model user personality from conversations
+                    if self.vector_memory:
+                        personality = await self.personality_profile_engine.analyze_personality(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            lookback_days=30
+                        )
+                        if personality and personality.get('message_count', 0) > 0:
+                            await self._store_personality_profile(user_id, bot_name, personality)
+                            logger.debug("✅ [3/7] Personality profile analysis complete for %s", user_id)
+                    else:
+                        logger.debug("⏭️  [3/7] Personality profile skipped (vector memory unavailable)")
+                    
+                    # Engine 4: Context Switch - Detect topic transitions
+                    if self.vector_memory:
+                        context_switches = await self.context_switch_engine.analyze_context_switches(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            lookback_days=30
+                        )
+                        if context_switches and context_switches.get('switch_count', 0) > 0:
+                            await self._store_context_patterns(user_id, bot_name, context_switches)
+                            logger.debug("✅ [4/7] Context switch analysis complete for %s", user_id)
+                    else:
+                        logger.debug("⏭️  [4/7] Context switch skipped (vector memory unavailable)")
+                    
+                    # Engine 5: Human Memory Behavior - Forgetting curve simulation
+                    memory_behavior = await self.human_memory_behavior_engine.analyze_memory_behavior(
+                        user_id=user_id,
+                        bot_name=bot_name,
+                        time_window_days=30
+                    )
+                    if memory_behavior and memory_behavior.get('conversation_count', 0) > 0:
+                        logger.debug("✅ [5/7] Memory behavior analysis complete for %s", user_id)
+                    
+                    # Engine 6: Conversation Pattern - Behavioral pattern detection
+                    patterns = await self.conversation_pattern_engine.analyze_conversation_patterns(
+                        user_id=user_id,
+                        bot_name=bot_name,
+                        time_window_days=30
+                    )
+                    if patterns and patterns.get('conversation_count', 0) > 0:
+                        logger.debug("✅ [6/7] Conversation pattern analysis complete for %s", user_id)
+                    
+                    # Engine 7: Proactive Engagement - Re-engagement opportunity detection
+                    engagement = await self.proactive_engagement_engine.analyze_engagement_opportunities(
+                        user_id=user_id,
+                        bot_name=bot_name,
+                        time_window_days=30
+                    )
+                    if engagement and engagement.get('conversation_count', 0) > 0:
+                        logger.debug("✅ [7/7] Proactive engagement analysis complete for %s", user_id)
+                    
+                    processed_count += 1
+                    logger.debug("✅ All 7 strategic engines processed for user %s", user_id)
+                        
+                except Exception as e:
+                    logger.error("❌ Failed to process strategic intelligence for user %s: %s", 
+                               user_id, e, exc_info=True)
+                    continue
+            
+            # Brief pause between batches to avoid resource contention
+            if i + batch_size < len(users_to_process):
+                await asyncio.sleep(0.5)
+        
+        logger.info("✅ Processed strategic intelligence (7 engines) for %s/%s users in %s",
+                   processed_count, len(users_to_process), bot_name)
+        return processed_count
+    
+    async def _get_users_needing_strategic_analysis(
+        self,
+        users: List[str],
+        bot_name: str
+    ) -> List[str]:
+        """
+        Filter users to those needing strategic analysis (stale/missing cache).
+        
+        Returns only users where:
+        - No cache entry exists in strategic_memory_health, OR
+        - Cache entry has expired (expires_at < NOW())
+        
+        This prevents redundant re-processing on every enrichment cycle.
+        """
+        if not users:
+            return []
+        
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Get users with fresh cache (expires_at > NOW())
+                rows = await conn.fetch("""
+                    SELECT DISTINCT user_id
+                    FROM strategic_memory_health
+                    WHERE bot_name = $1
+                      AND user_id = ANY($2::text[])
+                      AND expires_at > NOW()
+                """, bot_name, users)
+                
+                users_with_fresh_cache = {row['user_id'] for row in rows}
+                
+                # Return users NOT in fresh cache set
+                users_needing_analysis = [
+                    user_id for user_id in users 
+                    if user_id not in users_with_fresh_cache
+                ]
+                
+                logger.debug(
+                    "Strategic cache status: %s fresh, %s stale/missing",
+                    len(users_with_fresh_cache),
+                    len(users_needing_analysis)
+                )
+                
+                return users_needing_analysis
+                
+        except Exception as e:
+            logger.error("Failed to check strategic cache status: %s", e)
+            # On error, process all users (safe fallback)
+            return users
     
     def _get_bot_collections(self) -> List[str]:
         """Get list of all bot collections from Qdrant"""
@@ -2550,6 +2811,157 @@ Respond in JSON format only."""
             
         except Exception as e:
             logger.error("Error storing reflection in InfluxDB: %s", e)
+    
+    async def _store_character_performance(
+        self,
+        user_id: str,
+        bot_name: str,
+        performance: Dict[str, Any]
+    ):
+        """Store character performance analysis in strategic_character_performance table"""
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO strategic_character_performance (
+                        user_id, bot_name, 
+                        avg_response_time, response_time_trend,
+                        avg_quality_score, quality_trend,
+                        avg_engagement_score, engagement_trend,
+                        conversation_count, analysis_period_hours,
+                        performance_summary, recommendations,
+                        expires_at
+                    ) VALUES (
+                        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                        NOW() + INTERVAL '5 minutes'
+                    )
+                    ON CONFLICT (user_id, bot_name) DO UPDATE SET
+                        avg_response_time = EXCLUDED.avg_response_time,
+                        response_time_trend = EXCLUDED.response_time_trend,
+                        avg_quality_score = EXCLUDED.avg_quality_score,
+                        quality_trend = EXCLUDED.quality_trend,
+                        avg_engagement_score = EXCLUDED.avg_engagement_score,
+                        engagement_trend = EXCLUDED.engagement_trend,
+                        conversation_count = EXCLUDED.conversation_count,
+                        analysis_period_hours = EXCLUDED.analysis_period_hours,
+                        performance_summary = EXCLUDED.performance_summary,
+                        recommendations = EXCLUDED.recommendations,
+                        updated_at = NOW(),
+                        expires_at = NOW() + INTERVAL '15 minutes'
+                """,
+                    user_id, bot_name,
+                    performance.get('avg_response_time', 0.0),
+                    performance.get('response_time_trend', 'stable'),
+                    performance.get('avg_quality_score', 0.0),
+                    performance.get('quality_trend', 'stable'),
+                    performance.get('avg_engagement_score', 0.0),
+                    performance.get('engagement_trend', 'stable'),
+                    performance.get('conversation_count', 0),
+                    performance.get('analysis_period_hours', 168),
+                    performance.get('performance_summary', ''),
+                    json.dumps(performance.get('recommendations', []))
+                )
+        except Exception as e:
+            logger.error("Error storing character performance for %s/%s: %s", bot_name, user_id, e)
+    
+    async def _store_personality_profile(
+        self,
+        user_id: str,
+        bot_name: str,
+        personality: Dict[str, Any]
+    ):
+        """Store personality profile analysis in strategic_personality_profiles table"""
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO strategic_personality_profiles (
+                        user_id, bot_name,
+                        communication_style, formality_level, verbosity_level,
+                        primary_topics, topic_diversity_score,
+                        emotional_range, dominant_emotions,
+                        question_frequency, avg_message_length,
+                        interaction_frequency_pattern, preferred_times,
+                        personality_summary,
+                        expires_at
+                    ) VALUES (
+                        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                        NOW() + INTERVAL '5 minutes'
+                    )
+                    ON CONFLICT (user_id, bot_name) DO UPDATE SET
+                        communication_style = EXCLUDED.communication_style,
+                        formality_level = EXCLUDED.formality_level,
+                        verbosity_level = EXCLUDED.verbosity_level,
+                        primary_topics = EXCLUDED.primary_topics,
+                        topic_diversity_score = EXCLUDED.topic_diversity_score,
+                        emotional_range = EXCLUDED.emotional_range,
+                        dominant_emotions = EXCLUDED.dominant_emotions,
+                        question_frequency = EXCLUDED.question_frequency,
+                        avg_message_length = EXCLUDED.avg_message_length,
+                        interaction_frequency_pattern = EXCLUDED.interaction_frequency_pattern,
+                        preferred_times = EXCLUDED.preferred_times,
+                        personality_summary = EXCLUDED.personality_summary,
+                        updated_at = NOW(),
+                        expires_at = NOW() + INTERVAL '15 minutes'
+                """,
+                    user_id, bot_name,
+                    personality.get('communication_style', 'balanced'),
+                    personality.get('formality_level', 'moderate'),
+                    personality.get('verbosity_level', 'moderate'),
+                    json.dumps(personality.get('primary_topics', [])),
+                    personality.get('topic_diversity_score', 0.5),
+                    personality.get('emotional_range', 'moderate'),
+                    json.dumps(personality.get('dominant_emotions', [])),
+                    personality.get('question_frequency', 0.0),
+                    personality.get('avg_message_length', 0),
+                    personality.get('interaction_frequency_pattern', 'irregular'),
+                    json.dumps(personality.get('preferred_times', [])),
+                    personality.get('personality_summary', '')
+                )
+        except Exception as e:
+            logger.error("Error storing personality profile for %s/%s: %s", bot_name, user_id, e)
+    
+    async def _store_context_patterns(
+        self,
+        user_id: str,
+        bot_name: str,
+        context_switches: Dict[str, Any]
+    ):
+        """Store context switch patterns in strategic_context_patterns table"""
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO strategic_context_patterns (
+                        user_id, bot_name,
+                        switch_count, switch_frequency,
+                        avg_topic_duration_minutes, switch_patterns,
+                        common_transitions, abrupt_switch_rate,
+                        context_coherence_score,
+                        expires_at
+                    ) VALUES (
+                        $1, $2, $3, $4, $5, $6, $7, $8, $9,
+                        NOW() + INTERVAL '5 minutes'
+                    )
+                    ON CONFLICT (user_id, bot_name) DO UPDATE SET
+                        switch_count = EXCLUDED.switch_count,
+                        switch_frequency = EXCLUDED.switch_frequency,
+                        avg_topic_duration_minutes = EXCLUDED.avg_topic_duration_minutes,
+                        switch_patterns = EXCLUDED.switch_patterns,
+                        common_transitions = EXCLUDED.common_transitions,
+                        abrupt_switch_rate = EXCLUDED.abrupt_switch_rate,
+                        context_coherence_score = EXCLUDED.context_coherence_score,
+                        updated_at = NOW(),
+                        expires_at = NOW() + INTERVAL '15 minutes'
+                """,
+                    user_id, bot_name,
+                    context_switches.get('switch_count', 0),
+                    context_switches.get('switch_frequency', 0.0),
+                    context_switches.get('avg_topic_duration_minutes', 0.0),
+                    json.dumps(context_switches.get('switch_patterns', [])),
+                    json.dumps(context_switches.get('common_transitions', [])),
+                    context_switches.get('abrupt_switch_rate', 0.0),
+                    context_switches.get('context_coherence_score', 0.5)
+                )
+        except Exception as e:
+            logger.error("Error storing context patterns for %s/%s: %s", bot_name, user_id, e)
 
 
 async def main():

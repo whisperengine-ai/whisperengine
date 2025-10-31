@@ -1,103 +1,42 @@
 """
 Proactive Engagement Engine Protocol and Factory for WhisperEngine
 
-Provides a clean, extensible interface for proactive engagement functionality with factory pattern
-for simplified dependency injection and configuration management.
+DEPRECATED: ProactiveConversationEngagementEngine was removed (orphaned code).
+The active production system is in src/enrichment/proactive_engagement_engine.py
+which runs in background workers and caches results in PostgreSQL.
+
+This factory now only returns NoOpEngagementEngine for backward compatibility.
 """
 
 import logging
-import os
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
 async def create_engagement_engine(
-    engagement_engine_type: Optional[str] = None,
-    thread_manager: Optional[Any] = None,
-    memory_moments: Optional[Any] = None,
-    emotional_engine: Optional[Any] = None,
-    personality_profiler: Optional[Any] = None,
-    memory_manager: Optional[Any] = None
+    engagement_engine_type: Optional[str] = None,  # noqa: ARG001
+    thread_manager: Optional[Any] = None,  # noqa: ARG001
+    memory_moments: Optional[Any] = None,  # noqa: ARG001
+    emotional_engine: Optional[Any] = None,  # noqa: ARG001
+    personality_profiler: Optional[Any] = None,  # noqa: ARG001
+    memory_manager: Optional[Any] = None  # noqa: ARG001
 ) -> Any:
     """
-    Factory function to create proactive engagement engine instances.
+    Factory function for proactive engagement engine - DEPRECATED.
     
-    Args:
-        engagement_engine_type: Type of engagement engine ('full', 'basic', 'disabled', 'mock')
-        thread_manager: Conversation thread manager (optional)
-        memory_moments: Memory moments system (optional)
-        emotional_engine: Emotional context engine (optional)
-        personality_profiler: Personality profiler (optional)
-        memory_manager: Vector memory manager (optional)
-        
+    The conversation-based ProactiveConversationEngagementEngine was removed after
+    Phase 1-2 optimization (commit 9c17d66). The production system runs in the
+    enrichment worker and caches results in PostgreSQL strategic_engagement_opportunities.
+    
+    This factory now always returns NoOpEngagementEngine for backward compatibility.
+    All parameters are kept for API compatibility but ignored.
+    
     Returns:
-        Engagement engine implementation
+        NoOpEngagementEngine instance
     """
-    if engagement_engine_type is None:
-        engagement_engine_type = os.getenv("ENGAGEMENT_ENGINE_TYPE", "full")
-    
-    engagement_engine_type = engagement_engine_type.lower()
-    
-    logger.info("Creating engagement engine: %s", engagement_engine_type)
-    
-    if engagement_engine_type == "disabled":
-        return NoOpEngagementEngine()
-    
-    elif engagement_engine_type == "full":
-        try:
-            # Create the main engagement engine with simplified component handling
-            from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
-            
-            engine = ProactiveConversationEngagementEngine(
-                thread_manager=thread_manager,  # Pass through - None is fine
-                memory_moments=memory_moments,  # Pass through - None is fine  
-                emotional_engine=emotional_engine,  # Pass through - None is fine
-                personality_profiler=personality_profiler,  # Pass through - None is fine
-                memory_manager=memory_manager
-            )
-            
-            logger.info("Full engagement engine initialized")
-            return engine
-            
-        except ImportError as e:
-            logger.warning("Failed to import engagement engine dependencies: %s", e)
-            logger.info("Falling back to disabled engagement engine")
-            return NoOpEngagementEngine()
-        except (OSError, RuntimeError, ValueError) as e:
-            logger.error("Failed to initialize engagement engine: %s", e)
-            logger.info("Falling back to disabled engagement engine")
-            return NoOpEngagementEngine()
-    
-    elif engagement_engine_type == "basic":
-        try:
-            # Create basic engagement engine without optional components
-            from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
-            
-            engine = ProactiveConversationEngagementEngine(
-                thread_manager=None,
-                memory_moments=None,
-                emotional_engine=None,
-                personality_profiler=None,
-                memory_manager=memory_manager
-            )
-            
-            logger.info("Basic engagement engine initialized")
-            return engine
-            
-        except ImportError as e:
-            logger.warning("Failed to import basic engagement engine: %s", e)
-            logger.info("Falling back to disabled engagement engine")
-            return NoOpEngagementEngine()
-    
-    elif engagement_engine_type == "mock":
-        # For testing - could implement a mock engagement engine
-        logger.info("Mock engagement engine not implemented, using disabled")
-        return NoOpEngagementEngine()
-    
-    else:
-        logger.warning("Unknown engagement engine type: %s, using disabled", engagement_engine_type)
-        return NoOpEngagementEngine()
+    logger.info("ProactiveConversationEngagementEngine removed - using NoOpEngagementEngine (enrichment worker provides real functionality)")
+    return NoOpEngagementEngine()
 
 
 class NoOpEngagementEngine:

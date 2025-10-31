@@ -17,7 +17,7 @@ import logging
 import os
 import re
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
@@ -179,36 +179,34 @@ class MessageProcessor:
         except ImportError as e:
             logger.warning("Enhanced AI Ethics not available: %s", e)
         
-        # TrendWise Adaptive Learning: Initialize trend analysis and confidence adaptation
+        # TrendWise Adaptive Learning: Initialize trend analysis (ConfidenceAdapter removed)
         self.trend_analyzer = None
-        self.confidence_adapter = None
         
         if self.temporal_client:
             try:
                 from src.analytics.trend_analyzer import create_trend_analyzer
-                # DISABLED: ConfidenceAdapter was contaminating character personalities with overly-detailed instructions
-                # from src.adaptation.confidence_adapter import create_confidence_adapter
                 
                 self.trend_analyzer = create_trend_analyzer(self.temporal_client)
-                # self.confidence_adapter = create_confidence_adapter(self.trend_analyzer)
-                self.confidence_adapter = None  # DISABLED - was causing flat, literary responses
-                logger.info("TrendWise Adaptive Learning: Trend analysis initialized (ConfidenceAdapter disabled)")
+                logger.info("TrendWise Adaptive Learning: Trend analysis initialized")
             except ImportError as e:
                 logger.warning("TrendWise components not available: %s", e)
                 self.trend_analyzer = None
-                self.confidence_adapter = None
         
         # Relationship Intelligence: Lazy initialization (postgres_pool may not be ready yet)
         self.relationship_engine = None
         self.trust_recovery = None
         self._relationship_init_attempted = False  # Track if we've tried initializing
         
-        # Learning Intelligence Orchestrator: Initialize unified learning coordination
+        # Learning Intelligence Orchestrator: Feature-flagged initialization (Sprint 6 experimental)
+        # DISABLED by default (35-40MB memory per bot, never used in production)
+        # Enable via: ENABLE_SPRINT_6_ORCHESTRATION=true
         self.learning_orchestrator = None
         self.predictive_engine = None
         self.learning_pipeline = None
         
-        if self.temporal_client:
+        enable_sprint_6 = os.getenv('ENABLE_SPRINT_6_ORCHESTRATION', 'false').lower() == 'true'
+        
+        if enable_sprint_6 and self.temporal_client:
             try:
                 from src.orchestration.learning_orchestrator import LearningOrchestrator
                 from src.adaptation.predictive_engine import PredictiveAdaptationEngine
@@ -217,7 +215,7 @@ class MessageProcessor:
                 # Initialize Learning Intelligence components with available adaptive learning dependencies
                 self.learning_orchestrator = LearningOrchestrator(
                     trend_analyzer=self.trend_analyzer,
-                    confidence_adapter=self.confidence_adapter,
+                    confidence_adapter=None,  # ConfidenceAdapter removed
                     memory_manager=self.memory_manager,
                     temporal_client=self.temporal_client,
                     postgres_pool=getattr(bot_core, 'postgres_pool', None) if bot_core else None
@@ -226,13 +224,13 @@ class MessageProcessor:
                 # Pass dependencies to Predictive Engine
                 self.predictive_engine = PredictiveAdaptationEngine(
                     trend_analyzer=self.trend_analyzer,
-                    confidence_adapter=self.confidence_adapter,
+                    confidence_adapter=None,  # ConfidenceAdapter removed
                     temporal_client=self.temporal_client,
                     memory_manager=self.memory_manager
                 )
                 self.learning_pipeline = LearningPipelineManager()
                 
-                logger.info("Learning Intelligence Orchestrator: Learning coordination components initialized")
+                logger.info("Learning Intelligence Orchestrator: Learning coordination components initialized (Sprint 6 experimental)")
             except ImportError as e:
                 logger.warning("Learning Intelligence Orchestrator components not available: %s", e)
                 self.learning_orchestrator = None
@@ -274,11 +272,9 @@ class MessageProcessor:
             except ImportError as e:
                 logger.debug("ML Shadow Mode: Not available - %s", e)
         
-        # Character Emotional State Manager: Track bot's own emotional state across conversations
-        # Note: Uses lazy initialization since postgres_pool is initialized asynchronously
-        self.character_state_manager = None
-        self._character_state_manager_initialized = False
-        self._character_state_manager_lock = asyncio.Lock()
+        # REMOVED: Character Emotional State Manager (overengineered - CDL personality is sufficient)
+        # Was tracking bot's own emotional state with 11-emotion biochemical modeling
+        # Added 100-150ms overhead per message with no clear value
         
         # Unified Character Intelligence Coordinator: PHASE 4A Integration
         self.character_intelligence_coordinator = None
@@ -387,41 +383,10 @@ class MessageProcessor:
             logger.warning("Emotional context engine initialization failed: %s", e)
             self.emotional_context_engine = None
         
-        # Initialize Proactive Conversation Engagement Engine for natural topic suggestions
-        try:
-            from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
-            
-            # Get personality profiler if available (for personality-based topic suggestions)
-            personality_profiler = None
-            if hasattr(self, 'bot_core') and self.bot_core:
-                personality_profiler = getattr(self.bot_core, 'personality_profiler', None)
-            
-            self.engagement_engine = ProactiveConversationEngagementEngine(
-                emotional_engine=self._shared_emotion_analyzer,  # Correct parameter name
-                personality_profiler=personality_profiler,
-                memory_manager=self.memory_manager,  # Add memory manager for conversation history
-                stagnation_threshold_minutes=10,  # Conservative: 10 min before suggesting topics
-                engagement_check_interval_minutes=5,  # Check every 5 min
-                max_proactive_suggestions_per_hour=3  # Conservative: max 3 suggestions/hour
-            )
-            logger.info("🎯 Proactive Conversation Engagement Engine initialized")
-            
-            # Store in bot_core for access by integration point (line 3041)
-            if hasattr(self, 'bot_core') and self.bot_core:
-                self.bot_core.engagement_engine = self.engagement_engine
-            
-            # Log configuration for debugging
-            logger.info("🎯 ENGAGEMENT CONFIG: Stagnation threshold: %d min, Check interval: %d min, Max suggestions: %d/hour",
-                       self.engagement_engine.stagnation_threshold.total_seconds() / 60,
-                       self.engagement_engine.engagement_check_interval.total_seconds() / 60,
-                       self.engagement_engine.max_suggestions_per_hour)
-                       
-        except ImportError as e:
-            logger.warning("Proactive engagement engine not available: %s", e)
-            self.engagement_engine = None
-        except Exception as e:
-            logger.error("Proactive engagement engine initialization failed: %s", e)
-            self.engagement_engine = None
+        # REMOVED: ProactiveConversationEngagementEngine initialization
+        # This was orphaned code - the method _process_proactive_engagement() was never called
+        # after Phase 1-2 optimization (commit 9c17d66). The enrichment worker version
+        # (src/enrichment/proactive_engagement_engine.py) is the active production system.
         
         # Character Learning Persistence: Layer 1 (PostgreSQL) - Lazy initialization
         self.character_insight_storage = None
@@ -433,43 +398,8 @@ class MessageProcessor:
         self._last_security_validation = None
         self._last_emotional_context = None
     
-    async def _ensure_character_state_manager_initialized(self):
-        """
-        Ensure character emotional state manager is initialized (lazy initialization).
-        
-        This is async because it needs to wait for postgres_pool which is initialized
-        asynchronously during bot startup. Only initializes once.
-        
-        Returns:
-            bool: True if manager is available (either already initialized or just initialized)
-        """
-        # Fast path: already initialized
-        if self._character_state_manager_initialized:
-            return self.character_state_manager is not None
-        
-        # Use lock to prevent multiple simultaneous initialization attempts
-        async with self._character_state_manager_lock:
-            # Double-check after acquiring lock (another coroutine may have initialized)
-            if self._character_state_manager_initialized:
-                return self.character_state_manager is not None
-            
-            try:
-                from src.intelligence.character_emotional_state_v2 import CharacterEmotionalStateManager
-                
-                self.character_state_manager = CharacterEmotionalStateManager()
-                logger.info("🎭 CHARACTER STATE: Emotional state tracking initialized (v2 - 11-emotion spectrum)")
-            
-            except ImportError as e:
-                logger.warning("🎭 CHARACTER STATE: Tracking not available: %s", e)
-                self.character_state_manager = None
-            except Exception as e:
-                logger.error("🎭 CHARACTER STATE: Initialization failed: %s", e)
-                self.character_state_manager = None
-            
-            # Mark as initialized (even if it failed, don't retry every message)
-            self._character_state_manager_initialized = True
-            
-            return self.character_state_manager is not None
+    # REMOVED: _ensure_character_state_manager_initialized() method
+    # Character emotional state tracking was overengineered and removed
     
     @staticmethod
     def _is_tool_worthy_query(message: str) -> bool:
@@ -674,6 +604,395 @@ class MessageProcessor:
             return (self.character_insight_storage is not None and 
                    self.character_insight_extractor is not None)
 
+    # ============================================================================
+    # PHASE 3A: STRATEGIC COMPONENT CACHE HELPERS
+    # ============================================================================
+    # Cache helper methods for reading pre-computed strategic component results
+    # from PostgreSQL cache tables. These support the background worker pattern
+    # where expensive strategic computations happen async and are cached for fast
+    # hot-path retrieval.
+    # 
+    # Target performance: <5ms cache read latency
+    # ============================================================================
+
+    async def _get_cached_memory_health(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached memory health analysis from PostgreSQL.
+        
+        Returns Dict with fields: memory_snapshot, avg_memory_age_hours,
+        retrieval_frequency_trend, forgetting_risk_memories, computed_at
+        
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        import time
+        start_time = time.perf_counter()
+        cache_hit = False
+        stale_cache = False
+        
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                logger.debug("PostgreSQL pool not available for memory health cache")
+                return None
+            
+            query = """
+                SELECT memory_snapshot, avg_memory_age_hours, retrieval_frequency_trend,
+                       forgetting_risk_memories, computed_at, expires_at
+                FROM strategic_memory_health
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY computed_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    cache_hit = True
+                    age_seconds = (datetime.now(timezone.utc) - row['computed_at']).total_seconds()
+                    logger.debug(
+                        f"✅ Memory health cache hit: {bot_name}/{user_id[:8]} "
+                        f"(age: {age_seconds:.1f}s)"
+                    )
+                    
+                    # Record cache metrics
+                    query_latency_ms = (time.perf_counter() - start_time) * 1000
+                    if self.temporal_client:
+                        await self.temporal_client.record_strategic_cache_metrics(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            table_name='strategic_memory_health',
+                            cache_hit=True,
+                            query_latency_ms=query_latency_ms,
+                            cache_age_seconds=age_seconds
+                        )
+                    
+                    return {
+                        'memory_snapshot': row['memory_snapshot'],
+                        'avg_memory_age_hours': row['avg_memory_age_hours'],
+                        'retrieval_frequency_trend': row['retrieval_frequency_trend'],
+                        'forgetting_risk_memories': row['forgetting_risk_memories'],
+                        'computed_at': row['computed_at']
+                    }
+                else:
+                    logger.debug(f"❌ Memory health cache miss: {bot_name}/{user_id[:8]}")
+                    
+                    # Record cache miss metrics
+                    query_latency_ms = (time.perf_counter() - start_time) * 1000
+                    if self.temporal_client:
+                        await self.temporal_client.record_strategic_cache_metrics(
+                            bot_name=bot_name,
+                            user_id=user_id,
+                            table_name='strategic_memory_health',
+                            cache_hit=False,
+                            query_latency_ms=query_latency_ms
+                        )
+                    
+                    return None
+                    
+        except Exception as e:
+            logger.warning(
+                f"Memory health cache read error ({bot_name}/{user_id[:8]}): {e}",
+                exc_info=False
+            )
+            
+            # Record error metrics
+            query_latency_ms = (time.perf_counter() - start_time) * 1000
+            if self.temporal_client:
+                await self.temporal_client.record_strategic_cache_metrics(
+                    bot_name=bot_name,
+                    user_id=user_id,
+                    table_name='strategic_memory_health',
+                    cache_hit=False,
+                    query_latency_ms=query_latency_ms
+                )
+            
+            return None
+
+    async def _get_cached_personality_profile(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached personality profile analysis from PostgreSQL.
+        
+        Returns Dict with user personality traits and communication patterns.
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return None
+            
+            query = """
+                SELECT communication_style, formality_level, verbosity_level,
+                       primary_topics, topic_diversity_score, emotional_range,
+                       dominant_emotions, question_frequency, avg_message_length,
+                       interaction_frequency_pattern, preferred_times,
+                       personality_summary, updated_at
+                FROM strategic_personality_profiles
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY updated_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    return dict(row)
+                return None
+                    
+        except Exception as e:
+            logger.debug(f"Personality profile cache read error: {e}")
+            return None
+
+    async def _get_cached_conversation_patterns(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached conversation patterns from PostgreSQL.
+        
+        Returns Dict with fields: recent_topics, avg_topic_duration_minutes,
+        context_switch_frequency, predicted_switch_likelihood, computed_at
+        
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return None
+            
+            query = """
+                SELECT question_patterns, temporal_patterns, length_patterns,
+                       initiation_patterns, topic_patterns, style_evolution,
+                       analysis_timestamp
+                FROM strategic_conversation_patterns
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY analysis_timestamp DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    return dict(row)
+                return None
+                    
+        except Exception as e:
+            logger.debug(f"Conversation patterns cache read error: {e}")
+            return None
+
+    async def _get_cached_character_performance(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached character performance analysis from PostgreSQL.
+        
+        Returns Dict with performance metrics from InfluxDB analysis.
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return None
+            
+            query = """
+                SELECT avg_response_time, response_time_trend, avg_quality_score,
+                       quality_trend, avg_engagement_score, engagement_trend,
+                       conversation_count, performance_summary, recommendations,
+                       updated_at
+                FROM strategic_character_performance
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY updated_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    return dict(row)
+                return None
+                    
+        except Exception as e:
+            logger.debug(f"Character performance cache read error: {e}")
+            return None
+
+    async def _get_cached_context_patterns(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached context switch patterns from PostgreSQL.
+        
+        Returns Dict with topic transition analysis.
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return None
+            
+            query = """
+                SELECT switch_count, switch_frequency, avg_topic_duration_minutes,
+                       switch_patterns, common_transitions, abrupt_switch_rate,
+                       context_coherence_score, updated_at
+                FROM strategic_context_patterns
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY updated_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    return dict(row)
+                return None
+                    
+        except Exception as e:
+            logger.debug(f"Context patterns cache read error: {e}")
+            return None
+
+    async def _get_cached_memory_behavior(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached memory behavior analysis from PostgreSQL.
+        
+        Returns Dict with forgetting curve and retrieval pattern analysis.
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return None
+            
+            query = """
+                SELECT decay_rate, retention_baseline, reinforced_topic_count,
+                       total_retrieval_count, avg_retrieval_interval_days,
+                       reinforcement_opportunities, optimal_recall_days,
+                       recall_strategy, confidence, analysis_timestamp
+                FROM strategic_memory_behavior
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY analysis_timestamp DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    return dict(row)
+                return None
+                    
+        except Exception as e:
+            logger.debug(f"Memory behavior cache read error: {e}")
+            return None
+
+    async def _get_cached_engagement_opportunities(
+        self, 
+        user_id: str, 
+        bot_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached proactive engagement opportunities from PostgreSQL.
+        
+        Returns Dict with re-engagement recommendations and optimal timing.
+        Returns None if cache miss or stale (>5 minutes old).
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return None
+            
+            query = """
+                SELECT is_in_lull, hours_since_last_message, lull_severity,
+                       unresolved_topic_count, milestone_count,
+                       optimal_engagement_hour, optimal_engagement_day,
+                       recommendations, analysis_timestamp
+                FROM strategic_engagement_opportunities
+                WHERE user_id = $1 AND bot_name = $2
+                AND expires_at > NOW()
+                ORDER BY analysis_timestamp DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                
+                if row:
+                    return dict(row)
+                return None
+                    
+        except Exception as e:
+            logger.debug(f"Engagement opportunities cache read error: {e}")
+            return None
+
+    async def _check_strategic_cache_freshness(
+        self, 
+        table_name: str,
+        user_id: str, 
+        bot_name: str,
+        max_age_seconds: int = 300  # 5 minutes default
+    ) -> bool:
+        """
+        Check if cached strategic data exists and is fresh enough.
+        
+        Useful for deciding whether to wait for background worker processing
+        or proceed without strategic intelligence.
+        
+        Args:
+            table_name: Strategic cache table name (e.g., 'strategic_memory_health')
+            user_id: User identifier
+            bot_name: Normalized bot name
+            max_age_seconds: Maximum acceptable cache age (default 300s = 5min)
+            
+        Returns:
+            True if cache exists and is fresh, False otherwise
+        """
+        try:
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if not postgres_pool:
+                return False
+            
+            query = f"""
+                SELECT computed_at
+                FROM {table_name}
+                WHERE user_id = $1 AND bot_name = $2
+                AND computed_at > NOW() - INTERVAL '{max_age_seconds} seconds'
+                ORDER BY computed_at DESC
+                LIMIT 1
+            """
+            
+            async with postgres_pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id, bot_name)
+                return row is not None
+                
+        except Exception as e:
+            logger.debug(f"Cache freshness check error for {table_name}: {e}")
+            return False
+
     @handle_errors(category=ErrorCategory.VALIDATION, severity=ErrorSeverity.HIGH)
     async def process_message(self, message_context: MessageContext) -> ProcessingResult:
         """
@@ -760,8 +1079,33 @@ class MessageProcessor:
                     logger.debug(f"Early emotion analysis failed, using neutral context: {e}")
                     early_emotion_context = "neutral"
             
+            # Phase 2.8: Strategic intelligence cache retrieval (background-computed insights)
+            # Retrieves pre-computed memory health, forgetting risks, and other strategic insights
+            # from PostgreSQL cache populated by enrichment worker
+            memory_health_cache = None
+            if self.bot_core.postgres_pool:
+                try:
+                    memory_health_cache = await self._get_cached_memory_health(
+                        message_context.user_id,
+                        self.character_name
+                    )
+                    if memory_health_cache:
+                        logger.info(
+                            f"📊 STRATEGIC INTELLIGENCE: Retrieved memory health cache "
+                            f"(avg_age={memory_health_cache.get('avg_memory_age_hours', 0) / 24:.1f}d, "
+                            f"trend={memory_health_cache.get('retrieval_frequency_trend', 'unknown')})"
+                        )
+                    else:
+                        logger.debug(f"Strategic cache miss for {self.character_name}/{message_context.user_id[:8]}")
+                except Exception as e:
+                    logger.warning(f"Strategic cache retrieval failed (non-blocking): {e}", exc_info=True)
+            
             # Phase 3: Memory retrieval with emotional context-aware filtering
-            relevant_memories = await self._retrieve_relevant_memories(message_context, early_emotion_context)
+            relevant_memories = await self._retrieve_relevant_memories(
+                message_context, 
+                early_emotion_context,
+                memory_health_cache
+            )
             
             # Phase 4: Conversation history and context building
             # 🚀 Structured Prompt Assembly (default - no feature flag!)
@@ -769,10 +1113,90 @@ class MessageProcessor:
                 message_context, relevant_memories
             )
             
+            # Phase 4.5: Comprehensive strategic intelligence retrieval (7 engines)
+            # Retrieve all pre-computed strategic insights from PostgreSQL cache
+            # populated by enrichment worker (11-minute background analysis cycle)
+            strategic_intelligence = {}
+            if self.bot_core and hasattr(self.bot_core, 'postgres_pool') and self.bot_core.postgres_pool:
+                try:
+                    # Retrieve all 7 strategic intelligence engines in parallel
+                    bot_name = self.character_name or get_normalized_bot_name_from_env()
+                    user_id = message_context.user_id
+                    
+                    import asyncio
+                    strategic_results = await asyncio.gather(
+                        self._get_cached_memory_health(user_id, bot_name),
+                        self._get_cached_character_performance(user_id, bot_name),
+                        self._get_cached_personality_profile(user_id, bot_name),
+                        self._get_cached_context_patterns(user_id, bot_name),
+                        self._get_cached_conversation_patterns(user_id, bot_name),
+                        self._get_cached_memory_behavior(user_id, bot_name),
+                        self._get_cached_engagement_opportunities(user_id, bot_name),
+                        return_exceptions=True
+                    )
+                    
+                    # Store results in strategic_intelligence dict
+                    engine_names = [
+                        'memory_health',
+                        'character_performance', 
+                        'personality_profile',
+                        'context_patterns',
+                        'conversation_patterns',
+                        'memory_behavior',
+                        'engagement_opportunities'
+                    ]
+                    
+                    cache_hits = 0
+                    for i, (name, result) in enumerate(zip(engine_names, strategic_results)):
+                        if isinstance(result, Exception):
+                            logger.debug(f"Strategic cache retrieval error ({name}): {result}")
+                            strategic_intelligence[name] = None
+                        elif result:
+                            strategic_intelligence[name] = result
+                            cache_hits += 1
+                        else:
+                            strategic_intelligence[name] = None
+                    
+                    if cache_hits > 0:
+                        logger.info(
+                            f"🧠 STRATEGIC INTELLIGENCE: Retrieved {cache_hits}/7 engines "
+                            f"({', '.join(n for n, r in zip(engine_names, strategic_results) if r and not isinstance(r, Exception))})"
+                        )
+                    else:
+                        logger.debug(f"Strategic intelligence: No cached data available (enrichment worker may not have run yet)")
+                        
+                except Exception as e:
+                    logger.warning(f"Strategic intelligence retrieval failed (non-blocking): {e}")
+                    strategic_intelligence = {}
+            
+            # Store in ai_components for CDL prompt enhancement (Phase 3G-3)
+            ai_components = {'strategic_intelligence': strategic_intelligence}
+            
+            # DEBUG: Log strategic_intelligence content before additional components
+            logger.info("🔍 DEBUG Phase 4.5: strategic_intelligence keys BEFORE additional: %s", 
+                       list(strategic_intelligence.keys()) if strategic_intelligence else "empty")
+            if strategic_intelligence.get('memory_health'):
+                logger.info("🔍 DEBUG Phase 4.5: memory_health exists with keys: %s", 
+                           list(strategic_intelligence['memory_health'].keys()))
+            
             # Phase 5: AI component processing (parallel)
-            ai_components = await self._process_ai_components_parallel(
+            ai_components_additional = await self._process_ai_components_parallel(
                 message_context, conversation_context
             )
+            
+            # DEBUG: Check if additional components contains strategic_intelligence
+            logger.info("🔍 DEBUG Phase 5: ai_components_additional keys: %s", 
+                       list(ai_components_additional.keys()))
+            if 'strategic_intelligence' in ai_components_additional:
+                logger.warning("⚠️ WARNING: ai_components_additional contains strategic_intelligence! Value: %s",
+                              ai_components_additional['strategic_intelligence'])
+            
+            ai_components.update(ai_components_additional)
+            
+            # DEBUG: Verify strategic_intelligence AFTER update
+            logger.info("🔍 DEBUG After Update: ai_components keys: %s", list(ai_components.keys()))
+            logger.info("🔍 DEBUG After Update: strategic_intelligence value: %s", 
+                       ai_components.get('strategic_intelligence'))
             
             # Phase 5.5: Enhanced conversation context with AI intelligence
             conversation_context = await self._build_conversation_context_with_ai_intelligence(
@@ -785,16 +1209,10 @@ class MessageProcessor:
                     message_context, conversation_context
                 )
             
-            # Phase 6.5: Bot Emotional Self-Awareness (NEW - Phase 7.6)
-            # Retrieve bot's recent emotional history for self-aware responses
-            bot_emotional_state = await self._analyze_bot_emotional_trajectory(message_context)
-            if bot_emotional_state:
-                ai_components['bot_emotional_state'] = bot_emotional_state
-                logger.debug(
-                    "🎭 BOT SELF-AWARENESS: Current state - %s (trajectory: %s)",
-                    bot_emotional_state.get('current_emotion', 'unknown'),
-                    bot_emotional_state.get('trajectory_direction', 'stable')
-                )
+            # Phase 6.5: REMOVED - Bot Emotional Self-Awareness (redundant)
+            # Bot trajectory is already handled by emotional_intelligence_component when needed.
+            # That component uses character_emotional_state (richer) and queries InfluxDB on-demand.
+            # Removing this saves an extra Influx/Qdrant query per message with no prompt impact.
             
             # Phase 6.7: Adaptive Learning Intelligence (Relationship & Confidence)
             # Retrieve relationship scores and conversation trends BEFORE response generation
@@ -802,31 +1220,8 @@ class MessageProcessor:
                 message_context, ai_components, relevant_memories
             )
             
-            # Phase 6.8: Character Emotional State (Biochemical Modeling - Bot's Own Emotional State)
-            # Get character's current emotional state to influence response generation
-            # Note: Uses lazy initialization to wait for postgres_pool availability
-            await self._ensure_character_state_manager_initialized()
-            
-            if self.character_state_manager:
-                try:
-                    from src.utils.bot_name_utils import get_normalized_bot_name_from_env
-                    character_name = get_normalized_bot_name_from_env()
-                    
-                    if character_name:
-                        character_state = await self.character_state_manager.get_character_state(
-                            character_name=character_name,
-                            user_id=message_context.user_id
-                        )
-                        
-                        # Add to AI components for CDL prompt building
-                        ai_components['character_emotional_state'] = character_state
-                        logger.info(
-                            "🎭 CHARACTER STATE: Retrieved for %s - %s (joy=%.2f, intensity=%.2f)",
-                            character_name, character_state.dominant_emotion,
-                            character_state.joy, character_state.emotional_intensity
-                        )
-                except Exception as e:
-                    logger.debug("Failed to retrieve character emotional state: %s", e)
+            # REMOVED: Phase 6.8 Character Emotional State (CharacterEmotionalStateManager)
+            # Overengineered - CDL personality system already handles character emotional expression
             
             # Phase 6.9: Hybrid Query Routing (LLM Tool Calling)
             # PERFORMANCE NOTE: This feature adds significant overhead (~2x processing time)
@@ -914,66 +1309,8 @@ class MessageProcessor:
             bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
             ai_components['bot_emotion'] = bot_emotion
             
-            # Phase 7.5b: Update character's own emotional state (biochemical modeling - bot emotions)
-            # Note: Manager should already be initialized from Phase 6.8, but ensure just in case
-            await self._ensure_character_state_manager_initialized()
-            
-            if self.character_state_manager and bot_emotion:
-                try:
-                    character_name = get_normalized_bot_name_from_env()
-                    
-                    if character_name:
-                        # Calculate interaction quality (can be enhanced later with more metrics)
-                        interaction_quality = 0.7  # Default neutral quality
-                        
-                        # Boost quality if relationship is strong
-                        relationship_data = ai_components.get('relationship_state')
-                        if relationship_data and isinstance(relationship_data, dict):
-                            trust = relationship_data.get('trust', 0.5)
-                            affection = relationship_data.get('affection', 0.5)
-                            interaction_quality = (trust + affection) / 2.0
-                        
-                        # Update character's emotional state based on this conversation
-                        updated_state = await self.character_state_manager.update_character_state(
-                            character_name=character_name,
-                            user_id=message_context.user_id,
-                            bot_emotion_data=bot_emotion,
-                            user_emotion_data=ai_components.get('emotion_data'),
-                            interaction_quality=interaction_quality
-                        )
-                        logger.debug("🎭 Updated character emotional state for %s", character_name)
-                        
-                        # Phase 7.5c: Record character emotional state to InfluxDB for temporal analysis
-                        if updated_state and self.temporal_client:
-                            try:
-                                # Record v2 11-emotion format
-                                await self.temporal_client.record_character_emotional_state(
-                                    bot_name=character_name,
-                                    user_id=message_context.user_id,
-                                    joy=updated_state.joy,
-                                    anger=updated_state.anger,
-                                    sadness=updated_state.sadness,
-                                    fear=updated_state.fear,
-                                    love=updated_state.love,
-                                    trust=updated_state.trust,
-                                    optimism=updated_state.optimism,
-                                    pessimism=updated_state.pessimism,
-                                    anticipation=updated_state.anticipation,
-                                    surprise=updated_state.surprise,
-                                    disgust=updated_state.disgust,
-                                    emotional_intensity=updated_state.emotional_intensity,
-                                    emotional_valence=updated_state.emotional_valence,
-                                    dominant_emotion=updated_state.dominant_emotion
-                                )
-                                logger.debug(
-                                    "📊 TEMPORAL: Recorded character emotional state to InfluxDB (v2 11-emotion format, dominant: %s, intensity: %.2f)",
-                                    updated_state.dominant_emotion, updated_state.emotional_intensity
-                                )
-                            except Exception as e:
-                                logger.debug("Failed to record character emotional state to InfluxDB: %s", e)
-                                
-                except Exception as e:
-                    logger.debug("Failed to update character emotional state: %s", e)
+            # REMOVED: Phase 7.5b/7.5c Character Emotional State Updates & InfluxDB Recording
+            # Overengineered - CDL personality system already handles character emotional expression
             
             # Phase 7.6: Intelligent Emoji Decoration (NEW - Database-driven post-LLM enhancement)
             # Try to initialize emoji selector if not yet available (lazy initialization)
@@ -2032,7 +2369,8 @@ class MessageProcessor:
     async def _retrieve_relevant_memories(
         self, 
         message_context: MessageContext,
-        emotional_context: Optional[str] = None
+        emotional_context: Optional[str] = None,
+        memory_health_cache: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieve relevant memories with multi-vector intelligence and MemoryBoost optimization.
@@ -2048,6 +2386,32 @@ class MessageProcessor:
         try:
             # Start timing memory retrieval
             memory_start_time = datetime.now()
+            
+            # 📊 STRATEGIC INTELLIGENCE: Use memory health cache to adapt retrieval
+            # Adjust retrieval parameters based on background-computed insights
+            retrieval_limit = 20  # Default
+            boost_stale_memories = False
+            
+            if memory_health_cache:
+                avg_age_hours = memory_health_cache.get('avg_memory_age_hours', 0)
+                avg_age_days = avg_age_hours / 24
+                trend = memory_health_cache.get('retrieval_frequency_trend', 'stable')
+                forgetting_risks = memory_health_cache.get('forgetting_risk_memories', [])
+                
+                # Adaptation logic: Increase retrieval for aging memories
+                if avg_age_days > 7 or trend == 'declining':
+                    retrieval_limit = 30  # Pull more memories to combat forgetting
+                    boost_stale_memories = True
+                    logger.info(
+                        f"📊 STRATEGIC ADAPTATION: Increased retrieval to {retrieval_limit} "
+                        f"(avg_age={avg_age_days:.1f}d, trend={trend})"
+                    )
+                
+                # Prioritize at-risk memories if available
+                if forgetting_risks and len(forgetting_risks) > 0:
+                    logger.info(
+                        f"📊 STRATEGIC PRIORITY: {len(forgetting_risks)} memories at forgetting risk"
+                    )
             
             # Create platform-agnostic message context classification
             classified_context = self._classify_message_context(message_context)
@@ -2074,10 +2438,11 @@ class MessageProcessor:
                     conversation_context = self._build_conversation_context_for_memoryboost(message_context)
                     
                     # Use MemoryBoost enhanced retrieval with channel privacy filtering
+                    # Apply strategic intelligence adaptations (retrieval_limit adjusted based on memory health)
                     memoryboost_result = await self.memory_manager.retrieve_relevant_memories_with_memoryboost(
                         user_id=message_context.user_id,
                         query=message_context.content,
-                        limit=20,
+                        limit=retrieval_limit,  # 📊 STRATEGIC: Adjusted based on memory health
                         conversation_context=conversation_context,
                         apply_quality_scoring=True,
                         apply_optimizations=True,
@@ -3699,49 +4064,7 @@ class MessageProcessor:
                     logger.warning("🔧 REFACTOR: No 'Respond as' line found in system prompt")
                 break
         
-        # ================================
-        # COMPONENT 1: TrendWise Adaptive Learning (Priority 18)
-        # ================================
-        if self.confidence_adapter:
-            try:
-                bot_name = get_normalized_bot_name_from_env()
-                adaptation_params = await self.confidence_adapter.adjust_response_style(
-                    user_id=message_context.user_id,
-                    bot_name=bot_name
-                )
-                
-                if adaptation_params:
-                    # Generate adaptation guidance for system prompt
-                    adaptation_guidance = self.confidence_adapter.generate_adaptation_guidance(
-                        adaptation_params
-                    )
-                    
-                    if adaptation_guidance and hasattr(adaptation_guidance, 'system_prompt_additions'):
-                        additional_guidance = " ".join(adaptation_guidance.system_prompt_additions)
-                        
-                        # Add as proper component with priority 18
-                        trendwise_component = PromptComponent(
-                            type=PromptComponentType.GUIDANCE,
-                            content=additional_guidance,
-                            priority=18,
-                            required=False,
-                            metadata={'cdl_type': 'TRENDWISE_ADAPTATION', 'user_id': message_context.user_id}
-                        )
-                        ai_assembler.add_component(trendwise_component)
-                        logger.info("📈 TRENDWISE: Added adaptation component (priority 18, style: %s)",
-                                   adaptation_params.response_style.value)
-                    
-                    # Store adaptation context for monitoring
-                    ai_components['trendwise_adaptation'] = {
-                        'response_style': adaptation_params.response_style.value,
-                        'explanation_level': adaptation_params.explanation_level.value,
-                        'detail_enhancement': adaptation_params.detail_enhancement,
-                        'adaptation_reason': adaptation_params.adaptation_reason,
-                        'parameters': adaptation_params
-                    }
-                
-            except Exception as e:
-                logger.warning("TrendWise adaptation failed: %s", e)
+        # REMOVED: COMPONENT 1 TrendWise ConfidenceAdapter (was contaminating personalities)
         
         # ================================
         # COMPONENT 2: Emotional Intelligence (Priority 18.5)
@@ -3787,6 +4110,123 @@ class MessageProcessor:
             logger.warning("Could not import emotional intelligence component: %s", import_err)
         except (AttributeError, TypeError, KeyError) as component_err:
             logger.warning("Failed to create emotional intelligence component: %s", component_err)
+        
+        # ================================
+        # COMPONENT 2.5: Strategic Intelligence (Priority 18.7)
+        # ================================
+        # Integrate background-computed strategic insights from enrichment worker
+        # Provides personality-aware, memory-aware, and proactive engagement guidance
+        strategic_intelligence = ai_components.get('strategic_intelligence', {})
+        if strategic_intelligence and any(strategic_intelligence.values()):
+            try:
+                strategic_guidance_parts = []
+                
+                # 1. User Personality Awareness (from personality_profile engine)
+                personality = strategic_intelligence.get('personality_profile')
+                if personality:
+                    comm_style = personality.get('communication_style', '')
+                    formality = personality.get('formality_level', '')
+                    verbosity = personality.get('verbosity_level', '')
+                    
+                    if comm_style or formality or verbosity:
+                        personality_guidance = f"User communication style: {comm_style or 'unknown'}, formality: {formality or 'unknown'}, verbosity: {verbosity or 'unknown'}."
+                        strategic_guidance_parts.append(personality_guidance)
+                        logger.debug("🧠 STRATEGIC: Added personality awareness")
+                
+                # 2. Memory Health Awareness (from memory_health + memory_behavior engines)
+                memory_health = strategic_intelligence.get('memory_health')
+                memory_behavior = strategic_intelligence.get('memory_behavior')
+                
+                if memory_health:
+                    avg_age_hours = memory_health.get('avg_memory_age_hours', 0)
+                    forgetting_risk_raw = memory_health.get('forgetting_risk_memories', [])
+                    
+                    # Parse forgetting_risk if it's a JSON string
+                    import json
+                    if isinstance(forgetting_risk_raw, str):
+                        try:
+                            forgetting_risk = json.loads(forgetting_risk_raw)
+                        except json.JSONDecodeError:
+                            forgetting_risk = []
+                    else:
+                        forgetting_risk = forgetting_risk_raw if isinstance(forgetting_risk_raw, list) else []
+                    
+                    if avg_age_hours > 168:  # >7 days
+                        memory_guidance = f"Note: User's conversation history is aging (avg {avg_age_hours/24:.0f} days old). Consider referencing past topics to reinforce memories."
+                        strategic_guidance_parts.append(memory_guidance)
+                        logger.debug("🧠 STRATEGIC: Added memory aging awareness")
+                    
+                    if forgetting_risk and len(forgetting_risk) > 0:
+                        topics_at_risk = [m.get('topic', '') for m in forgetting_risk[:3] if isinstance(m, dict) and m.get('topic')]
+                        if topics_at_risk:
+                            risk_guidance = f"Topics at risk of being forgotten: {', '.join(topics_at_risk)}. Consider natural references if relevant."
+                            strategic_guidance_parts.append(risk_guidance)
+                            logger.debug("🧠 STRATEGIC: Added forgetting risk awareness")
+                
+                # 3. Proactive Engagement Opportunities (from engagement_opportunities engine)
+                engagement = strategic_intelligence.get('engagement_opportunities')
+                if engagement:
+                    is_in_lull = engagement.get('is_in_lull', False)
+                    unresolved_count = engagement.get('unresolved_topic_count', 0)
+                    recommendations = engagement.get('recommendations', [])
+                    
+                    if is_in_lull and recommendations:
+                        # Extract recommendation texts from JSONB array
+                        if isinstance(recommendations, list) and len(recommendations) > 0:
+                            rec_text = recommendations[0] if isinstance(recommendations[0], str) else str(recommendations[0])
+                            engagement_guidance = f"Conversation lull detected. Consider: {rec_text}"
+                            strategic_guidance_parts.append(engagement_guidance)
+                            logger.debug("🧠 STRATEGIC: Added proactive engagement suggestion")
+                    
+                    if unresolved_count > 0:
+                        unresolved_guidance = f"User has {unresolved_count} unresolved topics. Be receptive to revisiting previous subjects."
+                        strategic_guidance_parts.append(unresolved_guidance)
+                        logger.debug("🧠 STRATEGIC: Added unresolved topic awareness")
+                
+                # 4. Topic Transition Handling (from context_patterns engine)
+                context_patterns = strategic_intelligence.get('context_patterns')
+                if context_patterns:
+                    switch_frequency = context_patterns.get('switch_frequency', 0)
+                    coherence_score = context_patterns.get('context_coherence_score', 0.5)
+                    
+                    if switch_frequency > 5:  # Frequent topic switching
+                        transition_guidance = f"User tends to switch topics frequently. Be adaptive and follow their conversational flow naturally."
+                        strategic_guidance_parts.append(transition_guidance)
+                        logger.debug("🧠 STRATEGIC: Added topic transition awareness")
+                    
+                    if coherence_score < 0.4:  # Low coherence
+                        coherence_guidance = "User's topic transitions may be abrupt. Help maintain conversation coherence with smooth segues."
+                        strategic_guidance_parts.append(coherence_guidance)
+                        logger.debug("🧠 STRATEGIC: Added coherence support")
+                
+                # 5. Performance-Based Adaptation (from character_performance engine)
+                performance = strategic_intelligence.get('character_performance')
+                if performance:
+                    quality_trend = performance.get('quality_trend', '')
+                    engagement_trend = performance.get('engagement_trend', '')
+                    recommendations = performance.get('recommendations', [])
+                    
+                    if quality_trend == 'declining' or engagement_trend == 'declining':
+                        perf_guidance = "Recent conversation quality signals suggest adjusting approach. Focus on engagement and relevance."
+                        strategic_guidance_parts.append(perf_guidance)
+                        logger.debug("🧠 STRATEGIC: Added performance adaptation")
+                
+                # Assemble strategic intelligence component
+                if strategic_guidance_parts:
+                    strategic_content = "## Strategic Intelligence\n" + "\n".join(f"- {part}" for part in strategic_guidance_parts)
+                    
+                    strategic_component = PromptComponent(
+                        type=PromptComponentType.GUIDANCE,
+                        content=strategic_content,
+                        priority=18.7,
+                        required=False,
+                        metadata={'cdl_type': 'STRATEGIC_INTELLIGENCE', 'engine_count': len([v for v in strategic_intelligence.values() if v])}
+                    )
+                    ai_assembler.add_component(strategic_component)
+                    logger.info("🧠 STRATEGIC INTELLIGENCE: Added guidance component (priority 18.7, %d insights)", len(strategic_guidance_parts))
+                
+            except Exception as e:
+                logger.warning("Strategic intelligence component failed (non-blocking): %s", e)
         
         # ================================
         # COMPONENT 3: AI Intelligence Guidance (Priority 19)
@@ -4141,14 +4581,6 @@ class MessageProcessor:
         if not comprehensive_context:
             return ""
         
-        # Context Switch Detection (Phase 3)
-        context_switches = comprehensive_context.get('context_switches')
-        if context_switches and isinstance(context_switches, dict):
-            switch_type = context_switches.get('switch_type', 'none')
-            confidence = context_switches.get('confidence', 0)
-            if switch_type != 'none' and confidence > 0.6:
-                guidance_parts.append(f"🔄 TOPIC TRANSITION: {switch_type} detected (confidence: {confidence:.2f}) - acknowledge the shift naturally")
-        
         # Proactive Engagement Analysis (Phase 4.3)
         proactive_engagement_analysis = comprehensive_context.get('proactive_engagement_analysis')
         if proactive_engagement_analysis and isinstance(proactive_engagement_analysis, dict):
@@ -4237,22 +4669,15 @@ class MessageProcessor:
             # NOTE: Advanced emotion analysis moved to serial execution after parallel tasks
             # to avoid RoBERTa model race conditions
             
-            # Task 1.8: Memory Aging Intelligence (if enabled)
-            memory_aging_task = self._analyze_memory_aging_intelligence(
-                message_context.user_id,
-                message_context
-            )
-            tasks.append(memory_aging_task)
-            task_names.append("memory_aging_intelligence")
-            
-            # Task 1.9: Character Performance Intelligence
-            character_performance_task = self._analyze_character_performance_intelligence(
-                message_context.user_id,
-                message_context,
-                conversation_context
-            )
-            tasks.append(character_performance_task)
-            task_names.append("character_performance_intelligence")
+            # PHASE 2 OPTIMIZATION: Strategic components removed from hot path
+            # These will be moved to background workers with <5min freshness target:
+            # - Memory Aging Intelligence (Task 1.8)
+            # - Character Performance Intelligence (Task 1.9)
+            # - Dynamic Personality Profiling (Task 3)
+            # - Context Switch Detection (Task 9)
+            # - Human-Like Memory Optimization (Task 7)
+            # - Conversation Pattern Analysis (Task 8)
+            # - Proactive Engagement (Task 7 - conditional, moved to background)
             
             # Task 2: Enhanced context analysis using hybrid detector
             context_task = self._analyze_enhanced_context(
@@ -4262,16 +4687,6 @@ class MessageProcessor:
             )
             tasks.append(context_task)
             task_names.append("context_analysis")
-            
-            # Task 3: Dynamic personality profiling if available
-            if self.bot_core and hasattr(self.bot_core, 'dynamic_personality_profiler'):
-                personality_task = self._analyze_dynamic_personality(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(personality_task)
-                task_names.append("personality_analysis")
             
             # Task 4: Phase 4 human-like intelligence processing
             logger.debug(f"🎯 TASK DEBUG: bot_core exists: {self.bot_core is not None}")
@@ -4302,54 +4717,23 @@ class MessageProcessor:
                 tasks.append(character_intelligence_task)
                 task_names.append("unified_character_intelligence")
                 
-            # Task 6: Thread management analysis (Advanced Thread Management)
-            if self.bot_core and hasattr(self.bot_core, 'conversation_thread_manager'):
-                thread_task = self._process_thread_management(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(thread_task)
-                task_names.append("thread_management")
+            # Task 6: REMOVED - Thread management (dead code - manager never initialized)
+            # The conversation_thread_manager attribute is never set on bot_core,
+            # so this hasattr check always fails and returns None.
+            # Removing to avoid unnecessary parallel task overhead.
             
-            # Task 6: Proactive engagement analysis (Phase 4.3)
-            if self.bot_core and hasattr(self.bot_core, 'engagement_engine'):
-                engagement_task = self._process_proactive_engagement(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(engagement_task)
-                task_names.append("proactive_engagement")
+            # Task 7: REMOVED - Proactive engagement (moved to background)
+            # Heavy analysis (~50-150ms) that rarely contributes guidance.
+            # Will be processed by background worker with cached state in PostgreSQL.
             
-            # Task 7: Human-like memory optimization
-            if self.memory_manager and hasattr(self.memory_manager, 'human_like_optimizer'):
-                memory_task = self._process_human_like_memory(
-                    message_context.user_id,
-                    message_context.content,
-                    message_context
-                )
-                tasks.append(memory_task)
-                task_names.append("human_like_memory")
+            # Task 8: REMOVED - Human-like memory optimization (moved to background)
+            # Strategic memory optimization can be pre-computed and cached.
             
-            # Task 8: Conversation analysis for enhanced guidance
-            conversation_analysis_task = self._analyze_conversation_patterns(
-                message_context.content,
-                conversation_context,
-                message_context.user_id
-            )
-            tasks.append(conversation_analysis_task)
-            task_names.append("conversation_analysis")
+            # Task 9: REMOVED - Conversation pattern analysis (moved to background)
+            # Pattern detection provides guidance but can be pre-computed.
             
-            # Task 9: Context switch detection for conversation flow
-            if self.bot_core and hasattr(self.bot_core, 'context_switch_detector'):
-                context_switch_task = self._detect_context_switches(
-                    message_context.content,
-                    conversation_context,
-                    message_context.user_id
-                )
-                tasks.append(context_switch_task)
-                task_names.append("context_switches")
+            # Task 10: REMOVED - Context switch detection (moved to background)
+            # Context switches can be detected by background worker analyzing conversation flow.
             
             logger.info(f"🧠 SOPHISTICATED AI PROCESSING: Executing {len(tasks)} components in parallel")
             
@@ -4990,76 +5374,10 @@ class MessageProcessor:
             logger.debug(f"Thread management analysis failed: {e}")
             return None
 
-    async def _process_proactive_engagement(self, user_id: str, content: str, 
-                                          message_context: MessageContext) -> Optional[Dict[str, Any]]:
-        """Process Proactive Conversation Engagement for natural topic suggestions."""
-        logger.debug("🎯 STARTING PROACTIVE ENGAGEMENT ANALYSIS for user %s", user_id)
-        try:
-            if not self.bot_core or not hasattr(self.bot_core, 'engagement_engine'):
-                logger.debug("🎯 Engagement engine not available")
-                return None
-            
-            engagement_engine = self.bot_core.engagement_engine
-            
-            # Get recent conversation history for analysis
-            from datetime import datetime
-            conversation_context = []
-            if self.memory_manager:
-                recent_memories = await self.memory_manager.get_conversation_history(
-                    user_id=user_id,
-                    limit=10
-                )
-                if recent_memories:
-                    for memory in recent_memories:
-                        if isinstance(memory, dict):
-                            conversation_context.append({
-                                'content': memory.get('content', ''),
-                                'role': memory.get('role', 'user'),
-                                'timestamp': memory.get('timestamp', datetime.now())
-                            })
-            
-            # Add current message to context
-            conversation_context.append({
-                'content': content,
-                'role': 'user',
-                'timestamp': datetime.now()
-            })
-            
-            # Get thread info if available
-            current_thread_info = None
-            if hasattr(self.bot_core, 'conversation_thread_manager'):
-                # Get thread info from thread manager if needed
-                pass  # Thread manager integration optional
-            
-            # Analyze conversation engagement
-            engagement_analysis = await engagement_engine.analyze_conversation_engagement(
-                user_id=user_id,
-                context_id=f"discord_{user_id}",
-                recent_messages=conversation_context,
-                current_thread_info=current_thread_info
-            )
-            
-            # Extract key data for prompt integration
-            result = {
-                'intervention_needed': engagement_analysis.get('intervention_needed', False),
-                'recommended_strategy': engagement_analysis.get('suggested_strategy'),  # Fixed: engagement engine returns 'suggested_strategy'
-                'flow_state': engagement_analysis.get('flow_state'),  # Direct field, not nested
-                'stagnation_risk': engagement_analysis.get('stagnation_risk'),  # Direct field, not nested
-                'recommendations': engagement_analysis.get('recommendations', [])
-            }
-            
-            if result['intervention_needed']:
-                logger.info("🎯 PROACTIVE ENGAGEMENT: Intervention recommended - Strategy: %s, Risk: %s",
-                          result['recommended_strategy'], result['stagnation_risk'])
-            else:
-                logger.debug("🎯 PROACTIVE ENGAGEMENT: No intervention needed - Flow state: %s",
-                           result['flow_state'])
-            
-            return result
-            
-        except Exception as e:
-            logger.error("🎯 Proactive engagement analysis failed: %s", e)
-            return None
+    # REMOVED: _process_proactive_engagement() method
+    # This method was never called after Phase 1-2 optimization (commit 9c17d66).
+    # The enrichment worker version (src/enrichment/proactive_engagement_engine.py)
+    # is the active production system that stores results in PostgreSQL cache.
 
     async def _process_human_like_memory(self, user_id: str, content: str, 
                                        message_context: MessageContext) -> Optional[Dict[str, Any]]:
@@ -5080,65 +5398,6 @@ class MessageProcessor:
             
         except Exception as e:
             logger.debug(f"Human-like memory optimization failed: {e}")
-            return None
-
-    async def _analyze_conversation_patterns(self, content: str, conversation_context: List[Dict[str, str]], 
-                                           user_id: str) -> Dict[str, Any]:
-        """Analyze conversation patterns for enhanced response guidance."""
-        try:
-            # Analyze conversation patterns and provide guidance
-            analysis = {
-                'mode': 'standard',
-                'interaction_type': 'general',
-                'personality_type': 'default',
-                'relationship_level': 'acquaintance',
-                'response_guidance': 'Respond naturally and authentically'
-            }
-            
-            # Detect conversation patterns
-            content_lower = content.lower()
-            
-            if any(word in content_lower for word in ['how are you', 'how have you been', 'whats up']):
-                analysis['interaction_type'] = 'greeting'
-                analysis['response_guidance'] = 'Respond warmly to greeting'
-            elif any(word in content_lower for word in ['help', 'assist', 'support']):
-                analysis['interaction_type'] = 'assistance_request'
-                analysis['response_guidance'] = 'Provide helpful guidance'
-            elif any(word in content_lower for word in ['tell me about', 'explain', 'what is']):
-                analysis['interaction_type'] = 'information_seeking'
-                analysis['response_guidance'] = 'Provide informative explanation'
-            
-            logger.debug(f"Conversation pattern analysis successful for user {user_id}")
-            return analysis
-            
-        except Exception as e:
-            logger.debug(f"Conversation pattern analysis failed: {e}")
-            return {
-                'mode': 'standard',
-                'interaction_type': 'general',
-                'personality_type': 'default',
-                'relationship_level': 'acquaintance',
-                'response_guidance': 'Respond naturally and authentically'
-            }
-
-    async def _detect_context_switches(self, content: str, conversation_context: List[Dict[str, str]], 
-                                     user_id: str) -> Optional[Dict[str, Any]]:
-        """Detect context switches for conversation flow management."""
-        try:
-            if not self.bot_core or not hasattr(self.bot_core, 'context_switch_detector'):
-                return None
-            
-            # Detect context switches
-            context_switches = await self.bot_core.context_switch_detector.detect_context_switches(
-                user_id=user_id,
-                new_message=content
-            )
-            
-            logger.debug(f"Context switch detection successful for user {user_id}")
-            return context_switches
-            
-        except Exception as e:
-            logger.debug(f"Context switch detection failed: {e}")
             return None
 
     async def _process_attachments(self, message_context: MessageContext, 
