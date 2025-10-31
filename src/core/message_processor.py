@@ -1043,8 +1043,10 @@ class MessageProcessor:
                             f"(avg_age={memory_health_cache.get('avg_memory_age_hours', 0) / 24:.1f}d, "
                             f"trend={memory_health_cache.get('retrieval_frequency_trend', 'unknown')})"
                         )
+                    else:
+                        logger.debug(f"Strategic cache miss for {self.character_name}/{message_context.user_id[:8]}")
                 except Exception as e:
-                    logger.debug(f"Strategic cache retrieval failed (non-blocking): {e}")
+                    logger.warning(f"Strategic cache retrieval failed (non-blocking): {e}", exc_info=True)
             
             # Phase 3: Memory retrieval with emotional context-aware filtering
             relevant_memories = await self._retrieve_relevant_memories(
