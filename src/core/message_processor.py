@@ -1027,8 +1027,31 @@ class MessageProcessor:
                     logger.debug(f"Early emotion analysis failed, using neutral context: {e}")
                     early_emotion_context = "neutral"
             
+            # Phase 2.8: Strategic intelligence cache retrieval (background-computed insights)
+            # Retrieves pre-computed memory health, forgetting risks, and other strategic insights
+            # from PostgreSQL cache populated by enrichment worker
+            memory_health_cache = None
+            if self.bot_core.postgres_pool:
+                try:
+                    memory_health_cache = await self._get_cached_memory_health(
+                        message_context.user_id,
+                        self.character_name
+                    )
+                    if memory_health_cache:
+                        logger.info(
+                            f"📊 STRATEGIC INTELLIGENCE: Retrieved memory health cache "
+                            f"(avg_age={memory_health_cache.get('avg_memory_age_hours', 0) / 24:.1f}d, "
+                            f"trend={memory_health_cache.get('retrieval_frequency_trend', 'unknown')})"
+                        )
+                except Exception as e:
+                    logger.debug(f"Strategic cache retrieval failed (non-blocking): {e}")
+            
             # Phase 3: Memory retrieval with emotional context-aware filtering
-            relevant_memories = await self._retrieve_relevant_memories(message_context, early_emotion_context)
+            relevant_memories = await self._retrieve_relevant_memories(
+                message_context, 
+                early_emotion_context,
+                memory_health_cache
+            )
             
             # Phase 4: Conversation history and context building
             # 🚀 Structured Prompt Assembly (default - no feature flag!)
@@ -2293,7 +2316,8 @@ class MessageProcessor:
     async def _retrieve_relevant_memories(
         self, 
         message_context: MessageContext,
-        emotional_context: Optional[str] = None
+        emotional_context: Optional[str] = None,
+        memory_health_cache: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieve relevant memories with multi-vector intelligence and MemoryBoost optimization.
@@ -2309,6 +2333,32 @@ class MessageProcessor:
         try:
             # Start timing memory retrieval
             memory_start_time = datetime.now()
+            
+            # 📊 STRATEGIC INTELLIGENCE: Use memory health cache to adapt retrieval
+            # Adjust retrieval parameters based on background-computed insights
+            retrieval_limit = 20  # Default
+            boost_stale_memories = False
+            
+            if memory_health_cache:
+                avg_age_hours = memory_health_cache.get('avg_memory_age_hours', 0)
+                avg_age_days = avg_age_hours / 24
+                trend = memory_health_cache.get('retrieval_frequency_trend', 'stable')
+                forgetting_risks = memory_health_cache.get('forgetting_risk_memories', [])
+                
+                # Adaptation logic: Increase retrieval for aging memories
+                if avg_age_days > 7 or trend == 'declining':
+                    retrieval_limit = 30  # Pull more memories to combat forgetting
+                    boost_stale_memories = True
+                    logger.info(
+                        f"📊 STRATEGIC ADAPTATION: Increased retrieval to {retrieval_limit} "
+                        f"(avg_age={avg_age_days:.1f}d, trend={trend})"
+                    )
+                
+                # Prioritize at-risk memories if available
+                if forgetting_risks and len(forgetting_risks) > 0:
+                    logger.info(
+                        f"📊 STRATEGIC PRIORITY: {len(forgetting_risks)} memories at forgetting risk"
+                    )
             
             # Create platform-agnostic message context classification
             classified_context = self._classify_message_context(message_context)
@@ -2335,10 +2385,11 @@ class MessageProcessor:
                     conversation_context = self._build_conversation_context_for_memoryboost(message_context)
                     
                     # Use MemoryBoost enhanced retrieval with channel privacy filtering
+                    # Apply strategic intelligence adaptations (retrieval_limit adjusted based on memory health)
                     memoryboost_result = await self.memory_manager.retrieve_relevant_memories_with_memoryboost(
                         user_id=message_context.user_id,
                         query=message_context.content,
-                        limit=20,
+                        limit=retrieval_limit,  # 📊 STRATEGIC: Adjusted based on memory health
                         conversation_context=conversation_context,
                         apply_quality_scoring=True,
                         apply_optimizations=True,
