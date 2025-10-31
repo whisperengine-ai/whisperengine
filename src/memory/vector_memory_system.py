@@ -5165,7 +5165,17 @@ class VectorMemoryManager:
             
             else:
                 # Fallback if QueryClassifier not initialized
-                logger.warning("QueryClassifier not available - falling back to legacy routing")
+                # If UnifiedQueryClassifier is intentionally disabled via env, log at INFO to avoid noisy warnings
+                try:
+                    import os
+                    tool_calling_enabled = os.getenv('ENABLE_LLM_TOOL_CALLING', 'false').lower() == 'true'
+                except Exception:
+                    tool_calling_enabled = True  # default to warning if we cannot read env
+
+                if tool_calling_enabled:
+                    logger.warning("QueryClassifier not available - falling back to legacy routing")
+                else:
+                    logger.info("UNIFIED disabled (ENABLE_LLM_TOOL_CALLING=false) - using legacy routing")
                 return await self._legacy_retrieve_relevant_memories(
                     user_id=user_id,
                     query=query,

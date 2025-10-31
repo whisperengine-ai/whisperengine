@@ -1652,6 +1652,7 @@ def create_unified_query_classifier(postgres_pool=None, qdrant_client=None):
     
     if not enable_tool_calling:
         # Return None - callers must check for None before using
+        logger.info("UNIFIED disabled (ENABLE_LLM_TOOL_CALLING=false) - returning None")
         return None
     
     return UnifiedQueryClassifier(postgres_pool, qdrant_client)
