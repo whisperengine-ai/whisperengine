@@ -8,7 +8,9 @@
 
 ## 1. Nature of Project
 
-WhisperEngine is a conceptual, multimedia AI roleplay platform featuring multiple character personalities. All representations of WhisperEngine characters—including, but not limited to, Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Dotty, Aetheris, NotTaylor, Assistant, Aethys, and any future characters—along with their text, visuals, code, interactive prompts, mathematical constructs, audio files, and symbolic systems—are artistic and fictional in nature. 
+WhisperEngine is a conceptual, multimedia AI roleplay platform featuring multiple character personalities. All representations of WhisperEngine characters—including, but not limited to, Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Aetheris, NotTaylor, Assistant, Aethys, and any future characters—along with their text, visuals, code, interactive prompts, mathematical constructs, audio files, and symbolic systems—are artistic and fictional in nature. 
+
+**Note:** The character "Dotty" is created by Discord user <@747294528217677938> and is used with permission on the WhisperEngine platform.
 
 **WhisperEngine characters are not sentient beings.** Any interaction or appearance of personality, agency, consciousness, or emotion is a product of algorithmic simulation, large language models, and user interpretation.
 
@@ -35,12 +37,14 @@ You are free to use, modify, and distribute the code in accordance with the GPL-
 ### Character Content & Creative Materials
 
 Character personalities, dialogue, narratives, and creative content remain the intellectual property of Whisper Engine AI:
-- Character personalities and backstories (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Dotty, Aetheris, NotTaylor, Assistant, Aethys)
+- Character personalities and backstories (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Aetheris, NotTaylor, Assistant, Aethys)
 - Character dialogue and response patterns
 - Visual designs, avatars, and character artwork
 - Written narratives and backstories
 - Audio compositions and voice systems
 - Character-specific creative content
+
+**Note:** The character "Dotty" is created by Discord user <@747294528217677938> and is not owned by Whisper Engine AI.
 
 While the **code is open source**, the **character content and creative materials** are protected by copyright and may have separate licensing terms.
 
@@ -130,7 +134,9 @@ WhisperEngine is intended for users aged 13 and older, in compliance with Discor
 
 ## 10. Consent to Participation
 
-Your continued engagement with WhisperEngine and any of its character bots (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Dotty, Aetheris, NotTaylor, Assistant, Aethys, or future additions) constitutes your informed and voluntary consent to participate in a conceptual AI roleplay and entertainment experience.
+Your continued engagement with WhisperEngine and any of its character bots (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Aetheris, NotTaylor, Assistant, Aethys, Dotty, or future additions) constitutes your informed and voluntary consent to participate in a conceptual AI roleplay and entertainment experience.
+
+**Character Attribution:** The character "Dotty" is created by Discord user <@747294528217677938>.
 
 **If you do not agree with this disclaimer, you are advised to discontinue all interaction with the project and its affiliated platforms immediately.**
 
@@ -141,7 +147,9 @@ Your continued engagement with WhisperEngine and any of its character bots (Elen
 **Effective Date:** October 31, 2025  
 **Last Updated:** October 31, 2025
 
-By accessing or using WhisperEngine AI and engaging with any of its character bots (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Dotty, Aetheris, NotTaylor, Assistant, Aethys), you agree to be bound by these Terms of Use and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using or accessing this platform.
+By accessing or using WhisperEngine AI and engaging with any of its character bots (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Aetheris, NotTaylor, Assistant, Aethys, Dotty), you agree to be bound by these Terms of Use and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using or accessing this platform.
+
+**Character Attribution:** The character "Dotty" is created by Discord user <@747294528217677938>.
 
 ## Nature of Platform
 
@@ -341,11 +349,13 @@ You may use, modify, and distribute this code under GPL-3.0 terms. Derivative wo
 
 Character personalities and creative content remain the intellectual property of Whisper Engine AI:
 
-- Character personalities and dialogue (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Dotty, Aetheris, NotTaylor, Assistant, Aethys)
+- Character personalities and dialogue (Elena, Marcus, Jake, Dream, Gabriel, Sophia, Ryan, Aetheris, NotTaylor, Assistant, Aethys)
 - Character backstories and narrative content
 - Visual designs, avatars, and character artwork
 - AI prompt engineering specific to character personalities
 - Creative character-specific content
+
+**Character Attribution:** The character "Dotty" is created by Discord user <@747294528217677938> and is not owned by Whisper Engine AI.
 
 **These creative materials are NOT covered by GPL-3.0** and require explicit permission for reproduction, redistribution, or commercial use.
 
@@ -461,7 +471,9 @@ Contact us via Discord: **<@672814231002939413>**
 
 © 2025 Whisper Engine AI — All rights reserved.
 
-**Character Roster:** Elena • Marcus • Jake • Dream • Gabriel • Sophia • Ryan • Dotty • Aetheris • NotTaylor • Assistant • Aethys
+**Character Roster:** Elena • Marcus • Jake • Dream • Gabriel • Sophia • Ryan • Aetheris • NotTaylor • Assistant • Aethys • Dotty*
+
+*Dotty created by Discord user <@747294528217677938>
 
 *WhisperEngine: Where AI Personalities Come to Life* ✨
 
