@@ -5,7 +5,7 @@ Multi-character Discord AI system with vector-native memory, CDL personalities,
 and Universal Identity management.
 """
 
-__version__ = "1.0.36"
+__version__ = "1.0.37"
 __author__ = "WhisperEngine AI"
 __license__ = "GPL-3.0"
 
