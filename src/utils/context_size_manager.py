@@ -27,18 +27,33 @@ MAX_RESPONSE_TOKENS = 4000  # Reserve tokens for response generation (increased 
 SYSTEM_PROMPT_MAX_TOKENS = 16000  # Up from 6K - supports rich personalities, full CDL, deep memories (message_processor.py:2096)
 CONVERSATION_HISTORY_MAX_TOKENS = 8000  # Up from 2K - supports 30-40 messages of context (~15-20 full exchanges)
 
-def estimate_tokens(text: str) -> int:
+def estimate_tokens(text: str | list) -> int:
     """
-    Estimate token count for text.
+    Estimate token count from text using heuristic.
     
     Args:
-        text: Input text to estimate
+        text: Input text to estimate (string or list for multimodal content)
         
     Returns:
         Estimated token count
     """
     if not text:
         return 0
+    
+    # Handle multimodal content (list format for vision messages)
+    if isinstance(text, list):
+        total_tokens = 0
+        for part in text:
+            if isinstance(part, dict):
+                # Extract text from multimodal parts
+                if part.get('type') == 'text':
+                    total_tokens += estimate_tokens(part.get('text', ''))
+                elif part.get('type') == 'image_url':
+                    # Images consume approximately 85 tokens (Claude's vision token cost)
+                    total_tokens += 85
+            elif isinstance(part, str):
+                total_tokens += estimate_tokens(part)
+        return total_tokens
     
     # More accurate estimation considering tokenization patterns
     # Remove extra whitespace and count meaningful characters

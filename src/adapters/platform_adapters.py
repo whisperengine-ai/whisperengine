@@ -76,10 +76,12 @@ class DiscordAttachmentAdapter:
         await process_message_with_images(..., [discord_attachment], ...)
     """
     
-    def __init__(self, url: str, filename: str, content_type: Optional[str] = None):
+    def __init__(self, url: str, filename: str, content_type: Optional[str] = None, size: Optional[int] = None):
         self.url = url
         self.filename = filename
         self.content_type = content_type or self._infer_content_type(filename)
+        # Size defaults to None - image processor will handle via download if not provided
+        self.size = size or 0  # Default to 0 to pass size checks (will be validated during download)
         
     @staticmethod
     def _infer_content_type(filename: str) -> str:
@@ -101,7 +103,7 @@ class DiscordAttachmentAdapter:
         Create adapter from attachment dictionary.
         
         Args:
-            attachment_dict: Dict with 'url', 'filename', optional 'content_type'
+            attachment_dict: Dict with 'url', 'filename', optional 'content_type', optional 'size'
             
         Returns:
             DiscordAttachmentAdapter instance
@@ -109,7 +111,8 @@ class DiscordAttachmentAdapter:
         return cls(
             url=attachment_dict.get('url', ''),
             filename=attachment_dict.get('filename', 'unknown'),
-            content_type=attachment_dict.get('content_type')
+            content_type=attachment_dict.get('content_type'),
+            size=attachment_dict.get('size', 0)
         )
 
 

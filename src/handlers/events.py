@@ -158,7 +158,8 @@ class BotEventHandlers:
             self.message_processor = create_message_processor(
                 bot_core=bot_core,  # Pass the bot_core instance
                 memory_manager=self.memory_manager,
-                llm_client=self.llm_client
+                llm_client=self.llm_client,
+                image_processor=self.image_processor  # Pass image processor for attachment handling
             )
             logger.info("✅ MessageProcessor initialized for unified processing")
         except Exception as e:
@@ -652,6 +653,13 @@ class BotEventHandlers:
                         'discord_timestamp': message.created_at.isoformat()
                     }
                 )
+                
+                # Debug log attachments
+                if message.attachments:
+                    logger.info(f"📎 ATTACHMENTS CAPTURED: {len(message.attachments)} attachment(s) - {[att.filename for att in message.attachments]}")
+                    logger.debug(f"📎 Full attachment details: {message_context.attachments}")
+                else:
+                    logger.debug("📎 No attachments in this message")
                 
                 # Show typing indicator while processing
                 async with reply_channel.typing():

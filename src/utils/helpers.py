@@ -256,11 +256,15 @@ async def process_message_with_images(
         Updated conversation context with image handling
     """
     # Check if there are any image attachments
+    logger.debug(f"📎 process_message_with_images called with {len(attachments) if attachments else 0} attachments")
     if not attachments:
         # No attachments, add text message normally
+        logger.debug("📎 No attachments provided, adding as text-only message")
         conversation_context.append({"role": "user", "content": message_content})
         return conversation_context
 
+    logger.info(f"📎 Processing {len(attachments)} attachment(s)")
+    
     # Process image attachments
     processed_images = await image_processor.process_multiple_attachments(attachments)
 

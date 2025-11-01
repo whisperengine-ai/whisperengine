@@ -1205,9 +1205,12 @@ class MessageProcessor:
             
             # Phase 6: Image processing if attachments present
             if message_context.attachments:
+                logger.info(f"📎 PHASE 6: Processing {len(message_context.attachments)} attachment(s) for user {message_context.user_id}")
                 conversation_context = await self._process_attachments(
                     message_context, conversation_context
                 )
+            else:
+                logger.debug("📎 PHASE 6: No attachments to process")
             
             # Phase 6.5: REMOVED - Bot Emotional Self-Awareness (redundant)
             # Bot trajectory is already handled by emotional_intelligence_component when needed.
@@ -5403,18 +5406,25 @@ class MessageProcessor:
     async def _process_attachments(self, message_context: MessageContext, 
                                  conversation_context: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """Process message attachments (images, etc.)."""
-        if not self.image_processor or not message_context.attachments:
+        if not self.image_processor:
+            logger.warning("📎 No image_processor available - skipping attachments")
+            return conversation_context
+            
+        if not message_context.attachments:
+            logger.debug("📎 No attachments in message_context")
             return conversation_context
         
         try:
             # Process images and add to context using existing image processing logic
-            logger.debug("Processing %d attachments", len(message_context.attachments))
+            logger.info(f"📎 _process_attachments: Processing {len(message_context.attachments)} attachment(s)")
+            logger.debug(f"📎 Attachment details: {message_context.attachments}")
             
             # Use existing image processing from utils.helpers
             from src.utils.helpers import process_message_with_images
             
             # Convert MessageContext attachments to Discord format using adapter
             discord_attachments = create_discord_attachment_adapters(message_context.attachments)
+            logger.info(f"📎 Created {len(discord_attachments)} Discord attachment adapters")
             
             # Process images with existing logic
             enhanced_context = await process_message_with_images(
@@ -5425,10 +5435,11 @@ class MessageProcessor:
                 self.image_processor
             )
             
+            logger.info(f"📎 Enhanced context returned with {len(enhanced_context)} messages")
             return enhanced_context
             
         except (AttributeError, ValueError, TypeError) as e:
-            logger.error("Attachment processing failed: %s", str(e))
+            logger.error(f"📎 Attachment processing failed with {type(e).__name__}: {str(e)}", exc_info=True)
         
         return conversation_context
 
@@ -6361,7 +6372,7 @@ class MessageProcessor:
             return response
             
         except (ImportError, AttributeError, ValueError, TypeError) as e:
-            logger.error("Response generation failed: %s", str(e))
+            logger.error("Response generation failed: %s", str(e), exc_info=True)
             return "I apologize, but I'm having trouble generating a response right now. Please try again."
 
     async def _add_mixed_emotion_context(self, conversation_context: List[Dict[str, str]], 
