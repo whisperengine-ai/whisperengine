@@ -14,10 +14,10 @@ echo "  - Model: anthropic/claude-sonnet-4.5 (both participants)"
 echo "  - Temperature: 0.8 (both participants)"
 echo "  - Turns: 20 per conversation"
 echo "  - Themes: 5 (consciousness, creativity, emotion, philosophy, absurdism)"
-echo "  - Replications: 3 per theme"
-echo "  - Total conversations: 15"
-echo "  - Estimated duration: 6-8 hours"
-echo "  - Estimated cost: \$9-12"
+echo "  - Replications: 1 per theme (reduced from 3 to save costs)"
+echo "  - Total conversations: 5"
+echo "  - Estimated duration: ~25 minutes"
+echo "  - Estimated cost: ~\$2.50 (Claude Sonnet 4.5 with context retention)"
 echo ""
 
 # Check API key (allow as argument or environment variable)
@@ -54,10 +54,10 @@ THEME_absurdism="Let's explore the nature of absurdist humor. Focus on the exper
 MODEL="anthropic/claude-sonnet-4.5"
 TEMP="0.8"
 TURNS="20"
-REPS=3
+REPS=1  # Reduced from 3 to 1 due to high cost with context retention (~$0.50/conversation)
 
 # Track progress
-TOTAL_TESTS=15
+TOTAL_TESTS=5  # 5 themes × 1 replication each
 COMPLETED=0
 FAILED=0
 SKIPPED=0
@@ -70,7 +70,11 @@ echo ""
 for theme in consciousness creativity emotion philosophy absurdism; do
     existing_count=$(find "$OUTPUT_BASE/$theme" -name "*.json" -type f 2>/dev/null | wc -l)
     existing_count=$(echo "$existing_count" | tr -d ' ')  # Trim whitespace
-    echo "  ${theme}: ${existing_count}/3 conversations found"
+    if [ "$existing_count" -ge 1 ]; then
+        echo "  ✅ ${theme}: ${existing_count} conversation(s) found (need 1)"
+    else
+        echo "  ⏳ ${theme}: ${existing_count} conversation(s) found (need 1)"
+    fi
 done
 echo ""
 
@@ -94,36 +98,36 @@ for theme in consciousness creativity emotion philosophy absurdism; do
     existing_count=$(find "$OUTPUT_BASE/$theme" -name "*.json" -type f 2>/dev/null | wc -l)
     existing_count=$(echo "$existing_count" | tr -d ' ')  # Trim whitespace
     
-    if [ "$existing_count" -ge 3 ]; then
+    if [ "$existing_count" -ge 1 ]; then
         echo ""
-        echo "✅ ${theme} theme COMPLETE (${existing_count}/3 conversations found)"
-        echo "   Skipping all replications for this theme"
+        echo "✅ ${theme} theme COMPLETE (${existing_count} conversation found, need 1)"
+        echo "   Skipping this theme"
         echo ""
-        SKIPPED=$((SKIPPED + 3))
+        SKIPPED=$((SKIPPED + 1))
         continue
     fi
     
     echo ""
-    echo "Found ${existing_count}/3 existing conversations - will run $((3 - existing_count)) more"
+    echo "Running ${theme} conversation (need 1, have ${existing_count})"
     echo ""
     
     for rep in $(seq 1 $REPS); do
         COMPLETED=$((COMPLETED + 1))
         
-        # Check if we already have enough conversations for this theme
+        # Check if we already have a conversation for this theme
         current_count=$(find "$OUTPUT_BASE/$theme" -name "*.json" -type f 2>/dev/null | wc -l)
         current_count=$(echo "$current_count" | tr -d ' ')  # Trim whitespace
         
-        if [ "$current_count" -ge 3 ]; then
+        if [ "$current_count" -ge 1 ]; then
             echo ""
-            echo "✅ ${theme} now has ${current_count}/3 conversations - skipping remaining reps"
+            echo "✅ ${theme} already has conversation - skipping"
             echo ""
             SKIPPED=$((SKIPPED + 1))
             continue
         fi
         
         echo ""
-        echo "[${COMPLETED}/${TOTAL_TESTS}] Running ${theme} replication ${rep}/3..."
+        echo "[${COMPLETED}/${TOTAL_TESTS}] Running ${theme} conversation..."
         echo "Opening prompt: ${theme_prompt:0:80}..."
         echo ""
         
@@ -137,7 +141,7 @@ for theme in consciousness creativity emotion philosophy absurdism; do
             --opening "$theme_prompt" \
             --output-dir "$OUTPUT_BASE/$theme"; then
             
-            echo "✅ ${theme} rep ${rep} completed successfully"
+            echo "✅ ${theme} conversation completed successfully"
             
             # Brief pause between tests to avoid rate limiting
             if [ $COMPLETED -lt $TOTAL_TESTS ]; then
@@ -145,13 +149,13 @@ for theme in consciousness creativity emotion philosophy absurdism; do
                 sleep 10
             fi
         else
-            echo "❌ ${theme} rep ${rep} FAILED"
+            echo "❌ ${theme} conversation FAILED"
             FAILED=$((FAILED + 1))
         fi
     done
     
     echo ""
-    echo "✅ Completed all replications for ${theme} theme"
+    echo "✅ Completed ${theme} theme"
     echo ""
 done
 
@@ -175,10 +179,10 @@ echo "Final theme completion status:"
 for theme in consciousness creativity emotion philosophy absurdism; do
     final_count=$(find "$OUTPUT_BASE/$theme" -name "*.json" -type f 2>/dev/null | wc -l)
     final_count=$(echo "$final_count" | tr -d ' ')
-    if [ "$final_count" -ge 3 ]; then
-        echo "  ✅ ${theme}: ${final_count}/3 (COMPLETE)"
+    if [ "$final_count" -ge 1 ]; then
+        echo "  ✅ ${theme}: ${final_count} conversation (COMPLETE)"
     else
-        echo "  ⏳ ${theme}: ${final_count}/3 (need $((3 - final_count)) more)"
+        echo "  ⏳ ${theme}: ${final_count} conversation (need 1 more)"
     fi
 done
 echo ""
