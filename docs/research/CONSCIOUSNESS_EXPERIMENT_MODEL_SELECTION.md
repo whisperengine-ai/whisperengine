@@ -227,7 +227,7 @@ anthropic/claude-3.5-sonnet + mistralai/mistral-large-2411
 
 **Command to execute:**
 ```bash
-export OPENROUTER_API_KEY='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'
+export OPENROUTER_API_KEY='your-api-key-here'
 source .venv/bin/activate
 
 # Run Phase 1A automatically (script to be created)
