@@ -35,18 +35,24 @@ async def add_template_system_prompt_if_available(
     assembler: Any,  # PromptAssembler instance
     bot_name: str,
     message_context: Any,  # MessageContext instance
+    relevant_memories: list = None,  # Optional: relevant memories from vector DB
 ) -> bool:
     """
     Add template-based system prompt to assembler if configured.
     
     This function checks if CHARACTER_SYSTEM_PROMPT_PATH environment variable
     is set and points to a valid template file. If so, it loads and renders
-    the template, then adds it as a high-priority component to the assembler.
+    the template with dynamic data (user facts, memories, emotional state),
+    then adds it as a high-priority component to the assembler.
+    
+    NOTE: Dynamic data population is PHASE 2 of template system.
+    Currently uses placeholder text - memory/user_facts components added separately.
     
     Args:
         assembler: PromptAssembler instance to add component to
         bot_name: Character name (e.g., "elena", "marcus")
         message_context: MessageContext with user_id, content, metadata
+        relevant_memories: Optional list of relevant memories from vector DB
         
     Returns:
         True if template was successfully loaded and added, False otherwise
@@ -55,7 +61,8 @@ async def add_template_system_prompt_if_available(
         template_loaded = await add_template_system_prompt_if_available(
             assembler=assembler,
             bot_name="elena",
-            message_context=message_context
+            message_context=message_context,
+            relevant_memories=relevant_memories  # Optional
         )
         
         if not template_loaded:
@@ -64,7 +71,7 @@ async def add_template_system_prompt_if_available(
     """
     # Check if template system is enabled
     if not is_template_system_enabled():
-        logger.debug(f"Template system not enabled for {bot_name} - will use database CDL")
+        logger.debug(f"🗄️ DATABASE SYSTEM: Using database-driven CDL for {bot_name}")
         return False
     
     logger.info(f"📄 TEMPLATE SYSTEM: Using template-based system prompt for {bot_name}")
@@ -72,12 +79,31 @@ async def add_template_system_prompt_if_available(
     try:
         template_loader = create_template_loader()
         
-        # TODO Phase 2: Extract dynamic data from ai_components/message_context
-        # For now, use placeholder text that will be replaced in future iteration
-        user_facts_text = "User context not yet configured in template system."
-        recent_memories_text = "Conversation history not yet configured in template system."
-        relationship_text = ""  # Optional
-        emotional_text = ""  # Optional
+        # ================================
+        # PHASE 2 TODO: Dynamic Data Population
+        # ================================
+        # The template has placeholders for:
+        # - {{ user_facts }} - User preferences, facts from PostgreSQL
+        # - {{ recent_memories }} - Recent conversation history from Qdrant
+        # - {{ relationship_context }} - User-character relationship dynamics
+        # - {{ emotional_state }} - Current emotional context (user + bot)
+        # - {{ current_datetime }} - Current date/time with timezone
+        #
+        # CURRENT STATE: Placeholders use fallback text
+        # NEXT PHASE: Extract data from message_processor's existing components
+        # - User facts from PostgreSQL universal_users table
+        # - Recent memories from relevant_memories parameter
+        # - Emotional state from ai_components (needs refactor to pass through)
+        # - Relationship context from PostgreSQL relationship tracking
+        #
+        # This keeps template system simple for Phase 1 while maintaining
+        # same functionality via separate component additions below.
+        # ================================
+        
+        user_facts_text = "(User facts will be added via separate component below)"
+        recent_memories_text = "(Conversation history will be added via separate component below)"
+        relationship_text = "(Relationship context will be added via separate component below)"
+        emotional_text = "(Emotional intelligence will be added via separate component below)"
         
         # Get timezone from message context metadata if available
         timezone = "America/Los_Angeles"  # Default
@@ -98,12 +124,19 @@ async def add_template_system_prompt_if_available(
             return False
         
         # Create component and add to assembler
+        # Priority 1 ensures this loads first (character foundation)
+        # Other dynamic components (memories, user facts) added separately at their priorities
         template_component = PromptComponent(
             type=PromptComponentType.CHARACTER_IDENTITY,
             content=system_prompt,
-            priority=1,  # Highest priority - replaces all CDL database components
+            priority=1,  # Highest priority - replaces CDL database components 1-10
             required=True,  # Critical for character personality
-            metadata={"source": "template_file", "bot_name": bot_name}
+            metadata={
+                "source": "template_file", 
+                "bot_name": bot_name,
+                "phase": "1_static_personality",
+                "note": "Dynamic data (memories/facts/emotions) added via separate components"
+            }
         )
         
         assembler.add_component(template_component)
@@ -111,7 +144,9 @@ async def add_template_system_prompt_if_available(
         word_count = len(system_prompt.split())
         char_count = len(system_prompt)
         logger.info(f"✅ TEMPLATE SYSTEM: Loaded system prompt ({char_count} chars, ~{word_count} words)")
-        logger.info(f"   Template replaces database CDL components - zero per-message DB overhead!")
+        logger.info(f"   📋 Template provides: Character identity, personality, values, background, modes")
+        logger.info(f"   🔄 Separate components provide: User facts, memories, emotional state, relationships")
+        logger.info(f"   ⚡ Zero per-message DB overhead for character personality!")
         
         return True
         

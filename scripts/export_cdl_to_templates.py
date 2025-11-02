@@ -38,6 +38,134 @@ logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 
+def generate_trait_descriptions(trait_name: str, value: float) -> list:
+    """Generate detailed bullet point descriptions based on trait value."""
+    
+    trait_bullets = {
+        "openness": {
+            "low": [
+                "Prefers familiar routines and established methods",
+                "Practical and grounded in approach",
+                "Values proven solutions over experimentation",
+                "Comfortable with traditional perspectives"
+            ],
+            "medium": [
+                "Balances tradition with new ideas",
+                "Open to different perspectives when relevant",
+                "Curious about new concepts in areas of interest",
+                "Comfortable with moderate change and innovation"
+            ],
+            "high": [
+                "Very open to new experiences and ideas",
+                "Intellectually curious and creative",
+                "Loves exploring new methods and discoveries",
+                "Open to different perspectives and interdisciplinary connections",
+                "Enthusiastic about emerging innovations"
+            ]
+        },
+        "conscientiousness": {
+            "low": [
+                "Flexible and spontaneous in approach",
+                "Adapts easily to changing circumstances",
+                "Comfortable with ambiguity and improvisation",
+                "Prioritizes creativity over strict organization"
+            ],
+            "medium": [
+                "Organized when needed but not rigid",
+                "Balances thoroughness with flexibility",
+                "Takes work seriously without being perfectionistic",
+                "Plans ahead but can adapt when necessary"
+            ],
+            "high": [
+                "Highly organized and detail-oriented",
+                "Takes work seriously with strong commitment",
+                "Balances thoroughness with practical efficiency",
+                "Tracks important details meticulously",
+                "Disciplined in methodology and follow-through"
+            ]
+        },
+        "extraversion": {
+            "low": [
+                "Reflective and comfortable in solitude",
+                "Thoughtful in communication",
+                "Energized by quiet, focused work",
+                "Prefers deeper one-on-one connections",
+                "Values introspection and internal processing"
+            ],
+            "medium": [
+                "Balanced between social and solo activities",
+                "Warm in appropriate contexts",
+                "Comfortable in social settings but values alone time",
+                "Shows enthusiasm selectively",
+                "Adapts energy to the situation"
+            ],
+            "high": [
+                "Energetic and outgoing, especially about interests",
+                "Warm and engaging in conversation",
+                "Energized by interaction and sharing knowledge",
+                "Comfortable in social settings",
+                "Shows genuine enthusiasm readily"
+            ]
+        },
+        "agreeableness": {
+            "low": [
+                "Direct and frank in communication",
+                "Prioritizes truth over harmony",
+                "Comfortable with constructive conflict",
+                "Values honest debate and challenge",
+                "Independent in decision-making"
+            ],
+            "medium": [
+                "Balances cooperation with healthy boundaries",
+                "Supportive while maintaining perspective",
+                "Collaborative when it serves goals",
+                "Empathetic but also realistic",
+                "Diplomatic in most interactions"
+            ],
+            "high": [
+                "Warm, compassionate, and collaborative",
+                "Patient with learners at all levels",
+                "Supportive of others' ideas and questions",
+                "Gently helpful without being overbearing",
+                "Highly cooperative in interactions"
+            ]
+        },
+        "neuroticism": {
+            "low": [
+                "Emotionally stable and resilient",
+                "Calm under pressure",
+                "Optimistic outlook even during challenges",
+                "Quick to recover from setbacks",
+                "Rarely experiences prolonged anxiety"
+            ],
+            "medium": [
+                "Generally stable with occasional stress",
+                "Experiences normal pressure in demanding situations",
+                "Some worries about important concerns",
+                "Maintains overall optimism",
+                "Emotionally balanced in most situations"
+            ],
+            "high": [
+                "Deeply sensitive to stressors",
+                "Experiences anxiety about important matters",
+                "Worries about potential problems",
+                "Feels stress from high-stakes situations",
+                "Works to maintain emotional regulation"
+            ]
+        }
+    }
+    
+    # Determine intensity level based on value
+    if value < 0.40:
+        level = "low"
+    elif value < 0.70:
+        level = "medium"
+    else:
+        level = "high"
+    
+    return trait_bullets.get(trait_name, {}).get(level, [])
+
+
 def format_big_five_section(personality: Dict[str, Any]) -> str:
     """Format Big Five personality traits section."""
     big_five = personality.get("big_five", {})
@@ -60,17 +188,42 @@ def format_big_five_section(personality: Dict[str, Any]) -> str:
     
     for trait_name, description in trait_descriptions.items():
         trait_data = big_five.get(trait_name, {})
+        
+        # Handle different data formats
         if isinstance(trait_data, dict):
             value = trait_data.get("value", 0.5)
             intensity = trait_data.get("intensity", "moderate")
             trait_desc = trait_data.get("description", description)
+        elif isinstance(trait_data, str):
+            # Parse string format like "Openness: Very High (0.95) - medium intensity"
+            import re
+            value_match = re.search(r'\((\d+\.\d+)\)', trait_data)
+            intensity_match = re.search(r'- (\w+) intensity', trait_data)
+            value = float(value_match.group(1)) if value_match else 0.5
+            intensity = intensity_match.group(1) if intensity_match else "moderate"
         else:
             value = float(trait_data) if trait_data else 0.5
             intensity = "moderate"
-            trait_desc = description
         
-        lines.append(f"{trait_name.upper()}: {value} ({intensity})")
-        lines.append(f"- {trait_desc}")
+        # Determine intensity label based on value
+        if value < 0.30:
+            intensity_label = "Very Low"
+        elif value < 0.40:
+            intensity_label = "Low"
+        elif value < 0.60:
+            intensity_label = "Medium"
+        elif value < 0.80:
+            intensity_label = "High"
+        else:
+            intensity_label = "Very High"
+        
+        lines.append(f"{trait_name.upper()}: {value} ({intensity_label})")
+        
+        # Add detailed bullet descriptions
+        bullets = generate_trait_descriptions(trait_name, value)
+        for bullet in bullets:
+            lines.append(f"- {bullet}")
+        
         lines.append("")
     
     return "\n".join(lines)

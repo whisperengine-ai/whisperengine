@@ -2989,178 +2989,199 @@ class MessageProcessor:
         assembler = create_prompt_assembler(max_tokens=20000)
         
         # ================================
-        # CDL COMPONENTS 1-2: Character Identity & Mode (Priorities 1-2)
+        # NEW: Template-Based System Prompt (Gradual Migration)
         # ================================
-        # 🎭 CDL CHARACTER: Load character identity and mode from database
+        # 🎭 TEMPLATE SYSTEM: Check if CHARACTER_SYSTEM_PROMPT_PATH env var is set
+        # If template file exists, load it (FAST - zero per-message DB queries)
+        # If not, fall back to existing CDL database components below
         from src.memory.vector_memory_system import get_normalized_bot_name_from_env
-        from src.prompts.cdl_component_factories import (
-            create_character_identity_component,
-            create_character_mode_component,
-            create_ai_identity_guidance_component,
-            create_character_personality_component,
-            create_character_voice_component,
-            create_character_defined_relationships_component,
-            create_final_response_guidance_component,
+        from src.prompts.template_integration import add_template_system_prompt_if_available
+
+        bot_name = get_normalized_bot_name_from_env()
+        template_loaded = await add_template_system_prompt_if_available(
+            assembler=assembler,
+            bot_name=bot_name,
+            message_context=message_context
         )
-        from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
-        from src.database.postgres_pool_manager import get_postgres_pool
-        from src.prompts.cdl_component_factories import create_final_response_guidance_component
+
+        if template_loaded:
+            logger.info(f"✅ Template system active for {bot_name} - skipping database CDL loading")
         
-        try:
-            bot_name = get_normalized_bot_name_from_env()
-            pool = await get_postgres_pool()
-            if pool:
-                enhanced_manager = create_enhanced_cdl_manager(pool)
-                
-                # Component 1: Character Identity (Priority 1)
-                identity_component = await create_character_identity_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if identity_component:
-                    assembler.add_component(identity_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character identity for {bot_name}")
-                else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character identity found for {bot_name}")
-                
-                # Component 2: Character Mode (Priority 2) - AI identity handling
-                mode_component = await create_character_mode_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if mode_component:
-                    assembler.add_component(mode_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character mode for {bot_name}")
-                else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character mode found for {bot_name}")
-                
-                # TODO: Component 3: Character Backstory (Priority 3) - NOT IMPLEMENTED
-                # Reason: Lower priority - backstory provides depth but not critical for basic responses
-                # Requires: Professional history, formative experiences, personal background from CDL
-                # Factory exists: create_character_backstory_component() in cdl_component_factories.py
-                # Estimated tokens: 300-700
-                
-                # TODO: Component 4: Character Principles (Priority 4) - NOT IMPLEMENTED
-                # Reason: Lower priority - core values/beliefs add depth but not essential for personality
-                # Requires: Core values, beliefs, motivations from CDL database
-                # Factory exists: create_character_principles_component() in cdl_component_factories.py
-                # Estimated tokens: 200-600
-                
-                # Component 5: AI Identity Guidance (Priority 5) - Context-aware AI disclosure
-                ai_guidance_component = await create_ai_identity_guidance_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name,
-                    message_content=message_context.content
-                )
-                if ai_guidance_component:
-                    assembler.add_component(ai_guidance_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added AI identity guidance for {bot_name}")
-                # Note: No warning if None - this is context-dependent (only when user asks about AI)
-                
-                # Component 8: Character Personality (Priority 8) - Big Five personality traits
-                personality_component = await create_character_personality_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if personality_component:
-                    assembler.add_component(personality_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character personality for {bot_name}")
-                else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character personality found for {bot_name}")
-                
-                # Component 10: Character Voice (Priority 10) - Speaking style and linguistic patterns
-                voice_component = await create_character_voice_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if voice_component:
-                    assembler.add_component(voice_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character voice for {bot_name}")
-                else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character voice found for {bot_name}")
-                
-                # ================================
-                # COMPONENT 9: Emotional Intelligence Context (Priority 9)
-                # ================================
-                # 🎭 EMOTIONAL INTELLIGENCE: Unified user + bot emotional state with InfluxDB trajectory
-                # This replaces the hackish Qdrant keyword search trajectory with proper time-series analysis
-                try:
-                    from src.prompts.emotional_intelligence_component import create_emotional_intelligence_component
+        # Only load from database if template NOT available
+        if not template_loaded:
+            # ================================
+            # CDL COMPONENTS 1-2: Character Identity & Mode (Priorities 1-2)
+            # ================================
+            # 🎭 CDL CHARACTER: Load character identity and mode from database
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            from src.prompts.cdl_component_factories import (
+                create_character_identity_component,
+                create_character_mode_component,
+                create_ai_identity_guidance_component,
+                create_character_personality_component,
+                create_character_voice_component,
+                create_character_defined_relationships_component,
+                create_final_response_guidance_component,
+            )
+            from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+            from src.database.postgres_pool_manager import get_postgres_pool
+            from src.prompts.cdl_component_factories import create_final_response_guidance_component
+            
+            try:
+                bot_name = get_normalized_bot_name_from_env()
+                pool = await get_postgres_pool()
+                if pool:
+                    enhanced_manager = create_enhanced_cdl_manager(pool)
                     
-                    # Get ai_components to access emotion data (passed via closure or retrieve from context)
-                    # Note: ai_components is generated in parallel processing phase AFTER this function
-                    # For now, we'll need to add this component AFTER ai_components are available
-                    # TODO: Move emotional intelligence component to _build_conversation_context_with_ai_intelligence
-                    logger.debug("ℹ️ STRUCTURED CONTEXT: Emotional intelligence component requires ai_components (added later)")
-                except ImportError as import_err:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: Could not import emotional intelligence component: {import_err}")
-                
-                # Component 9: Character Defined Relationships (Priority 9) - Important people in character's life
-                # This component surfaces relationships defined in the CDL database (character_relationships table)
-                # Examples: Gabriel's Cynthia, NotTaylor's Silas, etc.
-                relationships_component = await create_character_defined_relationships_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if relationships_component:
-                    assembler.add_component(relationships_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character defined relationships for {bot_name}")
-                else:
-                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No defined relationships found for {bot_name}")
-                
-                # TODO: Component 11: User-Character Relationship Dynamics (Priority 11) - NOT IMPLEMENTED
-                # Note: This is DIFFERENT from character_defined_relationships above
-                # Reason: Requires relationship tracking system for user-character dynamics
-                # Complexity: High - needs relationship state management, key moments, interaction patterns
-                # Requires: Relationship data from PostgreSQL (relationship_type, connection_strength, key_moments)
-                # Factory exists: create_character_relationships_component() in cdl_component_factories.py
-                # Estimated tokens: 400
-                # Blocked by: Relationship management system not yet implemented
-                # Note: This would enable characters to reference shared history and relationship depth
-                
-                # ================================
-                # COMPONENT 16: Response Guidelines (Priority 16)
-                # ================================
-                # Character-specific response formatting rules and personality-first principles
-                # from character_response_guidelines table (e.g., NotTaylor's chaotic formatting rules)
-                from src.prompts.cdl_component_factories import create_response_guidelines_component
-                
-                response_guidelines_component = await create_response_guidelines_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name,
-                    priority=16  # After personality/voice, before final guidance
-                )
-                if response_guidelines_component:
-                    assembler.add_component(response_guidelines_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added response guidelines for {bot_name}")
-                else:
-                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No response guidelines found for {bot_name}")
-                
-                # ================================
-                # FINAL CDL COMPONENT: Response Guidance (Priority 20)
-                # ================================
-                # Add final "Respond as [character] to [user]:" instruction at highest priority
-                # This ensures it appears at the end of the system prompt
-                
-                # Get user display name: prefer stored name, fallback to Discord display name
-                user_display_name = await self._get_user_display_name(message_context)
-                
-                final_guidance_component = await create_final_response_guidance_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name,
-                    user_display_name=user_display_name,
-                    priority=20  # Highest priority to ensure it appears last
-                )
-                if final_guidance_component:
-                    assembler.add_component(final_guidance_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added final response guidance for {bot_name} addressing '{user_display_name}'")
-                else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No final guidance component for {bot_name}")
+                    # Component 1: Character Identity (Priority 1)
+                    identity_component = await create_character_identity_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if identity_component:
+                        assembler.add_component(identity_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character identity for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character identity found for {bot_name}")
                     
-            else:
-                logger.warning("⚠️ STRUCTURED CONTEXT: No database pool - skipping CDL components")
-        except Exception as e:
-            logger.warning(f"⚠️ STRUCTURED CONTEXT: Failed to load CDL components: {e}")
+                    # Component 2: Character Mode (Priority 2) - AI identity handling
+                    mode_component = await create_character_mode_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if mode_component:
+                        assembler.add_component(mode_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character mode for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character mode found for {bot_name}")
+                    
+                    # TODO: Component 3: Character Backstory (Priority 3) - NOT IMPLEMENTED
+                    # Reason: Lower priority - backstory provides depth but not critical for basic responses
+                    # Requires: Professional history, formative experiences, personal background from CDL
+                    # Factory exists: create_character_backstory_component() in cdl_component_factories.py
+                    # Estimated tokens: 300-700
+                    
+                    # TODO: Component 4: Character Principles (Priority 4) - NOT IMPLEMENTED
+                    # Reason: Lower priority - core values/beliefs add depth but not essential for personality
+                    # Requires: Core values, beliefs, motivations from CDL database
+                    # Factory exists: create_character_principles_component() in cdl_component_factories.py
+                    # Estimated tokens: 200-600
+                    
+                    # Component 5: AI Identity Guidance (Priority 5) - Context-aware AI disclosure
+                    ai_guidance_component = await create_ai_identity_guidance_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name,
+                        message_content=message_context.content
+                    )
+                    if ai_guidance_component:
+                        assembler.add_component(ai_guidance_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added AI identity guidance for {bot_name}")
+                    # Note: No warning if None - this is context-dependent (only when user asks about AI)
+                    
+                    # Component 8: Character Personality (Priority 8) - Big Five personality traits
+                    personality_component = await create_character_personality_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if personality_component:
+                        assembler.add_component(personality_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character personality for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character personality found for {bot_name}")
+                    
+                    # Component 10: Character Voice (Priority 10) - Speaking style and linguistic patterns
+                    voice_component = await create_character_voice_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if voice_component:
+                        assembler.add_component(voice_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character voice for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character voice found for {bot_name}")
+                    
+                    # ================================
+                    # COMPONENT 9: Emotional Intelligence Context (Priority 9)
+                    # ================================
+                    # 🎭 EMOTIONAL INTELLIGENCE: Unified user + bot emotional state with InfluxDB trajectory
+                    # This replaces the hackish Qdrant keyword search trajectory with proper time-series analysis
+                    try:
+                        from src.prompts.emotional_intelligence_component import create_emotional_intelligence_component
+                        
+                        # Get ai_components to access emotion data (passed via closure or retrieve from context)
+                        # Note: ai_components is generated in parallel processing phase AFTER this function
+                        # For now, we'll need to add this component AFTER ai_components are available
+                        # TODO: Move emotional intelligence component to _build_conversation_context_with_ai_intelligence
+                        logger.debug("ℹ️ STRUCTURED CONTEXT: Emotional intelligence component requires ai_components (added later)")
+                    except ImportError as import_err:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: Could not import emotional intelligence component: {import_err}")
+                    
+                    # Component 9: Character Defined Relationships (Priority 9) - Important people in character's life
+                    # This component surfaces relationships defined in the CDL database (character_relationships table)
+                    # Examples: Gabriel's Cynthia, NotTaylor's Silas, etc.
+                    relationships_component = await create_character_defined_relationships_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if relationships_component:
+                        assembler.add_component(relationships_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character defined relationships for {bot_name}")
+                    else:
+                        logger.debug(f"ℹ️ STRUCTURED CONTEXT: No defined relationships found for {bot_name}")
+                    
+                    # TODO: Component 11: User-Character Relationship Dynamics (Priority 11) - NOT IMPLEMENTED
+                    # Note: This is DIFFERENT from character_defined_relationships above
+                    # Reason: Requires relationship tracking system for user-character dynamics
+                    # Complexity: High - needs relationship state management, key moments, interaction patterns
+                    # Requires: Relationship data from PostgreSQL (relationship_type, connection_strength, key_moments)
+                    # Factory exists: create_character_relationships_component() in cdl_component_factories.py
+                    # Estimated tokens: 400
+                    # Blocked by: Relationship management system not yet implemented
+                    # Note: This would enable characters to reference shared history and relationship depth
+                    
+                    # ================================
+                    # COMPONENT 16: Response Guidelines (Priority 16)
+                    # ================================
+                    # Character-specific response formatting rules and personality-first principles
+                    # from character_response_guidelines table (e.g., NotTaylor's chaotic formatting rules)
+                    from src.prompts.cdl_component_factories import create_response_guidelines_component
+                    
+                    response_guidelines_component = await create_response_guidelines_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name,
+                        priority=16  # After personality/voice, before final guidance
+                    )
+                    if response_guidelines_component:
+                        assembler.add_component(response_guidelines_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added response guidelines for {bot_name}")
+                    else:
+                        logger.debug(f"ℹ️ STRUCTURED CONTEXT: No response guidelines found for {bot_name}")
+                    
+                    # ================================
+                    # FINAL CDL COMPONENT: Response Guidance (Priority 20)
+                    # ================================
+                    # Add final "Respond as [character] to [user]:" instruction at highest priority
+                    # This ensures it appears at the end of the system prompt
+                    
+                    # Get user display name: prefer stored name, fallback to Discord display name
+                    user_display_name = await self._get_user_display_name(message_context)
+                    
+                    final_guidance_component = await create_final_response_guidance_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name,
+                        user_display_name=user_display_name,
+                        priority=20  # Highest priority to ensure it appears last
+                    )
+                    if final_guidance_component:
+                        assembler.add_component(final_guidance_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added final response guidance for {bot_name} addressing '{user_display_name}'")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No final guidance component for {bot_name}")
+                        
+                else:
+                    logger.warning("⚠️ STRUCTURED CONTEXT: No database pool - skipping CDL components")
+            except Exception as e:
+                logger.warning(f"⚠️ STRUCTURED CONTEXT: Failed to load CDL components: {e}")
         
         # ================================
         # CDL COMPONENT 6: Temporal Awareness (Priority 6)
