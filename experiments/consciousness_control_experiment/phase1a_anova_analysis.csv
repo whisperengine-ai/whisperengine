@@ -1,0 +1,6 @@
+metric,f_statistic,p_value,significant,interpretation
+response_length_slope,1.9288449765945208,0.3693403349727022,False,Themes similar
+consciousness_density_slope,0.99148581230422,0.5580890580556516,False,Themes similar
+formatting_density_slope,0.3368965174340801,0.8379498184377219,False,Themes similar
+semantic_drift_slope,9.272035768542793,0.09971482068832865,False,Themes similar
+composite_escalation,0.8416070138602998,0.6064788739970606,False,Themes similar

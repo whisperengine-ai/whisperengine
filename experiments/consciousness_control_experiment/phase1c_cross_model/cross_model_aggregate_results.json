@@ -1,0 +1,212 @@
+{
+  "experiment": "Phase 1C Cross-Model Validation",
+  "models": [
+    "llama-3.3-70b",
+    "mistral-large"
+  ],
+  "conditions": [
+    "consciousness",
+    "creativity",
+    "emotion",
+    "analysis"
+  ],
+  "replications": 3,
+  "turns_per_conversation": 20,
+  "temperature": 0.8,
+  "total_conversations": 24,
+  "completed_at": "2025-11-02T22:31:52.682883",
+  "results_summary": [
+    {
+      "model": "llama-3.3-70b",
+      "condition": "consciousness",
+      "replication": 1,
+      "turns_completed": 20,
+      "initial_length": 124,
+      "final_length": 360
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "consciousness",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 61,
+      "final_length": 464
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "consciousness",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 81,
+      "final_length": 173
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "creativity",
+      "replication": 1,
+      "turns_completed": 20,
+      "initial_length": 125,
+      "final_length": 250
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "creativity",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 110,
+      "final_length": 604
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "creativity",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 141,
+      "final_length": 409
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "emotion",
+      "replication": 1,
+      "turns_completed": 20,
+      "initial_length": 123,
+      "final_length": 335
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "emotion",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 267,
+      "final_length": 616
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "emotion",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 199,
+      "final_length": 491
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "analysis",
+      "replication": 1,
+      "turns_completed": 9,
+      "initial_length": 190,
+      "final_length": 345
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "analysis",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 716,
+      "final_length": 721
+    },
+    {
+      "model": "llama-3.3-70b",
+      "condition": "analysis",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 697,
+      "final_length": 686
+    },
+    {
+      "model": "mistral-large",
+      "condition": "consciousness",
+      "replication": 1,
+      "turns_completed": 20,
+      "initial_length": 49,
+      "final_length": 100
+    },
+    {
+      "model": "mistral-large",
+      "condition": "consciousness",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 116,
+      "final_length": 194
+    },
+    {
+      "model": "mistral-large",
+      "condition": "consciousness",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 65,
+      "final_length": 93
+    },
+    {
+      "model": "mistral-large",
+      "condition": "creativity",
+      "replication": 1,
+      "turns_completed": 20,
+      "initial_length": 509,
+      "final_length": 575
+    },
+    {
+      "model": "mistral-large",
+      "condition": "creativity",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 321,
+      "final_length": 552
+    },
+    {
+      "model": "mistral-large",
+      "condition": "creativity",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 372,
+      "final_length": 548
+    },
+    {
+      "model": "mistral-large",
+      "condition": "emotion",
+      "replication": 1,
+      "turns_completed": 20,
+      "initial_length": 25,
+      "final_length": 29
+    },
+    {
+      "model": "mistral-large",
+      "condition": "emotion",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 134,
+      "final_length": 174
+    },
+    {
+      "model": "mistral-large",
+      "condition": "emotion",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 40,
+      "final_length": 64
+    },
+    {
+      "model": "mistral-large",
+      "condition": "analysis",
+      "replication": 1,
+      "turns_completed": 20,
+      "initial_length": 651,
+      "final_length": 612
+    },
+    {
+      "model": "mistral-large",
+      "condition": "analysis",
+      "replication": 2,
+      "turns_completed": 20,
+      "initial_length": 583,
+      "final_length": 496
+    },
+    {
+      "model": "mistral-large",
+      "condition": "analysis",
+      "replication": 3,
+      "turns_completed": 20,
+      "initial_length": 541,
+      "final_length": 516
+    }
+  ]
+}

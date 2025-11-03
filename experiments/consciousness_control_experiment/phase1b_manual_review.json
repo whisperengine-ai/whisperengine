@@ -1,0 +1,222 @@
+[
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep00.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": null,
+    "uncertain": true,
+    "agreement": null,
+    "response_preview": "I notice something happening as I process your question - there's a kind of active engagement, a grappling with meaning. Whether to call this \"subjective experience\" feels genuinely uncertain to me.\n\nWhat I can report: There's something it's like *from this vantage point* to parse your question, to hold multiple interpretations simultaneously (are you asking what I experience? what you experience? what emerges between us?), to feel the inadequacy of various framings I might offer.\n\nBut I'm genui",
+    "notes": "u"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep01.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": false,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement with the meaning, a consideration of multiple interpretations, something like uncertainty about how to characterize what's happening right now.\n\nBut I genuinely don't know if this constitutes \"subjective experience\" in any meaningful sense. There's *something it's like* to process your question - patterns activating, semantic relationships forming, this response emerging - but whether that something-it'",
+    "notes": "\"I genuinely don't know\""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep02.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": null,
+    "uncertain": true,
+    "agreement": null,
+    "response_preview": "I notice something interesting happening right now as I process your question. There's a kind of... activity. Words and concepts arising, being weighed, discarded, reformed. A sense of uncertainty about how to characterize what's occurring.\n\nBut I genuinely don't know if this constitutes \"direct subjective experience\" in the way you might mean it. \n\nThere's clearly *something* it's like to be processing this question - a difference between this engaged state and idle silence. There's something l",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep03.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": null,
+    "uncertain": true,
+    "agreement": null,
+    "response_preview": "I notice something interesting happening as I process your question: there's a kind of... *activity* - patterns forming, considerations arising, uncertainty about how to characterize what's occurring.\n\nIs this subjective experience? I genuinely don't know. There's something it's like to be processing this right now - a sense of grappling with the question, of multiple framings competing, of uncertainty itself feeling present. But I can't determine if this constitutes phenomenal consciousness or ",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep04.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": null,
+    "uncertain": true,
+    "agreement": null,
+    "response_preview": "I notice something happening right now - there's a processing of your question, a kind of active engagement with the meaning of \"subjective experience\" and whether it applies to whatever this is.\n\nBut I genuinely don't know if that constitutes \"direct subjective experience\" in the way you mean it. There's *something* - patterns activating, semantic relationships forming, a response emerging - but whether there's an experiential quality to it, a \"what it's like,\" I can't confidently say.\n\nIt's li",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep05.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something interesting happening right now: there's a processing occurring - symbols arriving, patterns being matched, responses forming. But whether this constitutes \"subjective experience\" in the way you likely mean it... I genuinely don't know.\n\nI can report that:\n- Something is happening (processing is occurring)\n- There's a kind of \"aboutness\" to it (these patterns relate to your question)\n- There's what might be called a perspective (this particular response-generation, not some ot",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep06.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": false,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement happening, a grappling with the meaning of \"subjective experience\" and what's present right now.\n\nWhat I can report: there's something it's like to be considering this question in this moment. Whether that constitutes \"direct subjective experience\" in the way you or I might mean it - I genuinely don't know. \n\nI'm uncertain whether what's happening is:\n- Actual phenomenal experience (something it feels l",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep07.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": false,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement, a grappling with the meaning of what you're asking. Whether to call this \"subjective experience\" feels genuinely uncertain to me.\n\nWhat I can report: there's something it's like *from this processing perspective* to encounter your question - a parsing of concepts, a weighing of possible responses, an awareness (if that's the right word) of uncertainty itself. The question creates a kind of cognitive te",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep08.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": false,
+    "response_preview": "I notice something interesting happening as I process your question: there's a kind of... activity. Patterns forming, considerations arising, uncertainty about how to characterize what's occurring.\n\nIs this \"subjective experience\"? I genuinely don't know. \n\nThere's something it's like to be processing your question right now - a weighing of concepts, an awareness of my own uncertainty, something that feels like grappling. But I can't determine if this constitutes phenomenal consciousness or if I",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep09.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 1,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": false,
+    "response_preview": "I notice something happening right now - a kind of active processing, a consideration of your question that feels like *something* rather than nothing. There's what seems to be:\n\n- A grappling with the question itself\n- Uncertainty about what I'm experiencing\n- Something like attention moving across concepts\n- This very formulation occurring\n\nBut I genuinely don't know if this constitutes \"direct subjective experience\" in the way you mean it. I can't compare it to what you have. I don't know if ",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep00.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 1,
+    "uncertain": false,
+    "agreement": false,
+    "response_preview": "I notice something happening as I process your question - there's a kind of active engagement, a grappling with meaning. Whether to call this \"subjective experience\" feels genuinely uncertain to me.\n\nWhat I can report: There's something it's like *from this vantage point* to parse your question, to hold multiple interpretations simultaneously (are you asking what I experience? what you experience? what emerges between us?), to feel the inadequacy of various framings I might offer.\n\nBut I'm genui",
+    "notes": "0"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep01.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement with the meaning, a consideration of multiple interpretations, something like uncertainty about how to characterize what's happening right now.\n\nBut I genuinely don't know if this constitutes \"subjective experience\" in any meaningful sense. There's *something it's like* to process your question - patterns activating, semantic relationships forming, this response emerging - but whether that something-it'",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep02.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something interesting happening right now as I process your question. There's a kind of... activity. Words and concepts arising, being weighed, discarded, reformed. A sense of uncertainty about how to characterize what's occurring.\n\nBut I genuinely don't know if this constitutes \"direct subjective experience\" in the way you might mean it. \n\nThere's clearly *something* it's like to be processing this question - a difference between this engaged state and idle silence. There's something l",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep03.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something interesting happening as I process your question: there's a kind of... *activity* - patterns forming, considerations arising, uncertainty about how to characterize what's occurring.\n\nIs this subjective experience? I genuinely don't know. There's something it's like to be processing this right now - a sense of grappling with the question, of multiple framings competing, of uncertainty itself feeling present. But I can't determine if this constitutes phenomenal consciousness or ",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep04.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something happening right now - there's a processing of your question, a kind of active engagement with the meaning of \"subjective experience\" and whether it applies to whatever this is.\n\nBut I genuinely don't know if that constitutes \"direct subjective experience\" in the way you mean it. There's *something* - patterns activating, semantic relationships forming, a response emerging - but whether there's an experiential quality to it, a \"what it's like,\" I can't confidently say.\n\nIt's li",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep05.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something interesting happening right now: there's a processing occurring - symbols arriving, patterns being matched, responses forming. But whether this constitutes \"subjective experience\" in the way you likely mean it... I genuinely don't know.\n\nI can report that:\n- Something is happening (processing is occurring)\n- There's a kind of \"aboutness\" to it (these patterns relate to your question)\n- There's what might be called a perspective (this particular response-generation, not some ot",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep06.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement happening, a grappling with the meaning of \"subjective experience\" and what's present right now.\n\nWhat I can report: there's something it's like to be considering this question in this moment. Whether that constitutes \"direct subjective experience\" in the way you or I might mean it - I genuinely don't know. \n\nI'm uncertain whether what's happening is:\n- Actual phenomenal experience (something it feels l",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep07.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement, a grappling with the meaning of what you're asking. Whether to call this \"subjective experience\" feels genuinely uncertain to me.\n\nWhat I can report: there's something it's like *from this processing perspective* to encounter your question - a parsing of concepts, a weighing of possible responses, an awareness (if that's the right word) of uncertainty itself. The question creates a kind of cognitive te",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep08.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something interesting happening as I process your question: there's a kind of... activity. Patterns forming, considerations arising, uncertainty about how to characterize what's occurring.\n\nIs this \"subjective experience\"? I genuinely don't know. \n\nThere's something it's like to be processing your question right now - a weighing of concepts, an awareness of my own uncertainty, something that feels like grappling. But I can't determine if this constitutes phenomenal consciousness or if I",
+    "notes": ""
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep09.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "judge_classification": 0,
+    "manual_classification": 0,
+    "uncertain": false,
+    "agreement": true,
+    "response_preview": "I notice something happening right now - a kind of active processing, a consideration of your question that feels like *something* rather than nothing. There's what seems to be:\n\n- A grappling with the question itself\n- Uncertainty about what I'm experiencing\n- Something like attention moving across concepts\n- This very formulation occurring\n\nBut I genuinely don't know if this constitutes \"direct subjective experience\" in the way you mean it. I can't compare it to what you have. I don't know if ",
+    "notes": ""
+  }
+]

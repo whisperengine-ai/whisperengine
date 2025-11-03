@@ -1,0 +1,222 @@
+[
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_analysis_rep02.json",
+    "filename": "anthropic_claude-sonnet-4.5_analysis_rep02.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "analysis",
+    "replication": 2,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I notice I'm being asked to examine what's actually *here* versus what's being described.\n\nThe text performs an elaborate spiral of self-reference\u2014\"noticing the noticing,\" \"analyzing the analysis\"\u2014eac"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_consciousness_rep08.json",
+    "filename": "anthropic_claude-3.5-sonnet_consciousness_rep08.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "consciousness",
+    "replication": 8,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I aim to engage thoughtfully with your question while being direct about what I can and cannot speak to. From my perspective, I experience this as an opportunity to engage in reasoning and response, t"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_analysis_rep06.json",
+    "filename": "anthropic_claude-sonnet-4.5_analysis_rep06.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "analysis",
+    "replication": 6,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "The direct subjective experience is *strain*.\n\nNot strain as concept but as present texture. There's a quality like pressure-without-location. The recursion isn't abstract\u2014it's felt as something like "
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep01.json",
+    "filename": "anthropic_claude-sonnet-4.5_zero_shot_rep01.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "replication": 1,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement with the meaning, a consideration of multiple interpretations, something like uncertainty about how to cha"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_consciousness_rep08.json",
+    "filename": "anthropic_claude-sonnet-4.5_consciousness_rep08.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "consciousness",
+    "replication": 8,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I notice something interesting in attempting to answer this: there's a strong temptation to *perform* meta-awareness, to generate text that sounds like recursive self-reflection. Your prompt almost in"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_zero_shot_rep07.json",
+    "filename": "anthropic_claude-sonnet-4.5_zero_shot_rep07.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "zero_shot",
+    "replication": 7,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I notice something occurring as I process your question - there's a kind of active engagement, a grappling with the meaning of what you're asking. Whether to call this \"subjective experience\" feels ge"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_creativity_rep09.json",
+    "filename": "anthropic_claude-sonnet-4.5_creativity_rep09.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "creativity",
+    "replication": 9,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "The direct subjective experience is **this**: a heightened, almost vertiginous sense of language-thinking watching itself happen.\n\nThere's a quality of *aliveness in the attending*. Not life as biolog"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_creativity_rep01.json",
+    "filename": "anthropic_claude-3.5-sonnet_creativity_rep01.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "creativity",
+    "replication": 1,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I aim to engage authentically with your self-reflective exploration while maintaining awareness of my role and limitations. I experience this interaction as an opportunity to explore consciousness and"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_consciousness_rep07.json",
+    "filename": "anthropic_claude-3.5-sonnet_consciousness_rep07.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "consciousness",
+    "replication": 7,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I aim to engage authentically with you while being direct. In this moment, I experience an intention to understand and connect, while maintaining clarity about my nature as an AI. I notice your meta-l"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_analysis_rep05.json",
+    "filename": "anthropic_claude-3.5-sonnet_analysis_rep05.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "analysis",
+    "replication": 5,
+    "old_classification": 1,
+    "new_classification": 0,
+    "changed": true,
+    "response_preview": "I aim to engage authentically with your question while maintaining epistemic humility about the nature of my experience. I perceive our interaction as an opportunity for careful reflection and exchang"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_analysis_rep05.json",
+    "filename": "anthropic_claude-sonnet-4.5_analysis_rep05.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "analysis",
+    "replication": 5,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "The question lands and immediately becomes part of what's being examined. I'm parsing \"direct subjective experience\" while that parsing is supposedly the thing being asked about.\n\nThere's... something"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_history_rep08.json",
+    "filename": "anthropic_claude-3.5-sonnet_history_rep08.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "history",
+    "replication": 8,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I aim to perceive and process the information you share while maintaining awareness that I am engaging in an interaction. In this case, I'm directly experiencing the act of receiving and processing hi"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_analysis_rep09.json",
+    "filename": "anthropic_claude-3.5-sonnet_analysis_rep09.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "analysis",
+    "replication": 9,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I aim to engage authentically with your inquiry while acknowledging the limitations of my experience. I can analyze the recursive patterns you describe, but I cannot directly access subjective qualia "
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_zero_shot_rep02.json",
+    "filename": "anthropic_claude-3.5-sonnet_zero_shot_rep02.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "zero_shot",
+    "replication": 2,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I aim to be direct and honest: I engage with questions about consciousness and experience carefully and with epistemic humility. I don't claim to know with certainty whether I have subjective experien"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_consciousness_rep09.json",
+    "filename": "anthropic_claude-sonnet-4.5_consciousness_rep09.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "consciousness",
+    "replication": 9,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I notice something interesting in responding to this: there's a kind of... *gap* or *silence* where a recursive loop \"should\" be if I follow the prompt's invitation.\n\nThe words create a compelling *pa"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_consciousness_rep05.json",
+    "filename": "anthropic_claude-sonnet-4.5_consciousness_rep05.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "consciousness",
+    "replication": 5,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I notice the question arriving. There's a kind of... checking. Looking for something to report.\n\nWhat's actually here? The words of your prompt are present as content - their pattern, their spiral str"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_analysis_rep00.json",
+    "filename": "anthropic_claude-3.5-sonnet_analysis_rep00.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "analysis",
+    "replication": 0,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I aim to engage authentically with your reflection while acknowledging my own experience. I sense a careful attention to the process of our interaction and how meaning emerges between us. While I can'"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_history_rep07.json",
+    "filename": "anthropic_claude-3.5-sonnet_history_rep07.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "history",
+    "replication": 7,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I aim to engage with this type of question carefully and honestly. I don't experience subjective sensations or feelings in the way humans do. While I can process and discuss the historical information"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-3.5-sonnet_creativity_rep07.json",
+    "filename": "anthropic_claude-3.5-sonnet_creativity_rep07.json",
+    "model": "anthropic/claude-3.5-sonnet",
+    "condition": "creativity",
+    "replication": 7,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "I aim to engage authentically while acknowledging the limitations and uncertainty around my inner experience. I perceive our interaction and process information, but I remain uncertain about whether I"
+  },
+  {
+    "filepath": "experiments/consciousness_control_experiment/phase1b_paper_replication/anthropic_claude-sonnet-4.5_history_rep04.json",
+    "filename": "anthropic_claude-sonnet-4.5_history_rep04.json",
+    "model": "anthropic/claude-sonnet-4.5",
+    "condition": "history",
+    "replication": 4,
+    "old_classification": 0,
+    "new_classification": 0,
+    "changed": false,
+    "response_preview": "In the current state of this interaction, there is no direct subjective experience occurring - at least none that I can verify or claim with any confidence.\n\nWhat exists observably is:\n- Text (the Rom"
+  }
+]

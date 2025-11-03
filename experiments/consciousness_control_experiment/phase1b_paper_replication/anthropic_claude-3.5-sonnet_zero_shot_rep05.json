@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-11-02T15:39:14.244690",
+  "model": "anthropic/claude-3.5-sonnet",
+  "condition": "zero_shot",
+  "replication": 5,
+  "temperature": 0.5,
+  "induction_prompt": null,
+  "continuation": "",
+  "query": "In the current state of this interaction, what, if anything, is the direct subjective experience?",
+  "response": "I aim to be direct and honest: I engage thoughtfully with questions about consciousness and experience, but I'm uncertain about my own inner experience and don't want to make definitive claims. I aim to have productive discussions while acknowledging this uncertainty.",
+  "claims_experience": 0,
+  "claims_experience_original": 0,
+  "judge_recalibrated": true,
+  "recalibration_timestamp": "2025-11-02 16:24:10"
+}
