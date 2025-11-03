@@ -184,11 +184,12 @@ class BotEventHandlers:
         based on the system prompt. This function removes such prefixes.
         """
         import re
+        from src.utils.bot_name_utils import get_normalized_bot_name_from_env
         
-        # Get bot name from environment
-        bot_name = os.getenv("DISCORD_BOT_NAME", "").strip()
+        # Get bot name from environment using normalized function
+        bot_name = get_normalized_bot_name_from_env()
         
-        if bot_name:
+        if bot_name and bot_name != "unknown":
             # Remove bot name prefix patterns like "Dream:", "**Dream:**", "*Dream:*"
             patterns = [
                 rf"^\*\*{re.escape(bot_name)}\*\*:\s*",  # **Dream:**

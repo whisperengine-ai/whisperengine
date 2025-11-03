@@ -241,6 +241,16 @@ class MessageProcessor:
         self._shared_emotion_analyzer = None
         self._shared_analyzer_lock = asyncio.Lock()
         
+        # Stance Analyzer for filtering emotions by speaker perspective
+        self._stance_analyzer = None
+        try:
+            from src.intelligence.spacy_stance_analyzer import create_stance_analyzer
+            self._stance_analyzer = create_stance_analyzer()
+            logger.info("✅ Stance Analyzer initialized (uses shared spaCy singleton)")
+        except ImportError as e:
+            logger.warning("Stance Analyzer not available: %s", e)
+            self._stance_analyzer = None
+        
         # Initialize fidelity metrics collector for performance tracking
         try:
             from src.monitoring.fidelity_metrics_collector import get_fidelity_metrics_collector
@@ -1066,6 +1076,25 @@ class MessageProcessor:
             # Analyze user's current emotional state BEFORE retrieving memories
             # This enables emotional memory triggering - retrieving emotionally-relevant memories
             early_emotion_context = None
+            user_stance_analysis = None
+            
+            # First, analyze stance to filter emotions by speaker perspective
+            if self._stance_analyzer:
+                try:
+                    user_stance_analysis = self._stance_analyzer.analyze_user_stance(
+                        message_context.content
+                    )
+                    if user_stance_analysis:
+                        logger.info(
+                            f"🎯 USER STANCE ANALYSIS: self_focus={user_stance_analysis.self_focus:.2f}, "
+                            f"type={user_stance_analysis.emotion_type}, "
+                            f"emotions={user_stance_analysis.primary_emotions}"
+                        )
+                except Exception as e:
+                    logger.debug(f"Stance analysis failed: {e}")
+                    user_stance_analysis = None
+            
+            # Then analyze emotion, potentially weighted by stance
             if self._shared_emotion_analyzer:
                 try:
                     early_emotion_result = await self._shared_emotion_analyzer.analyze_emotion(
@@ -1074,7 +1103,11 @@ class MessageProcessor:
                     )
                     if early_emotion_result and hasattr(early_emotion_result, 'primary_emotion'):
                         early_emotion_context = early_emotion_result.primary_emotion
-                        logger.info(f"🎭 EARLY EMOTION DETECTION: {early_emotion_context} (for context-aware memory retrieval)")
+                        # If stance indicates other's emotions, deprioritize in context retrieval
+                        if user_stance_analysis and user_stance_analysis.self_focus < 0.5:
+                            logger.info(f"⚠️  LOW SELF-FOCUS: Deprioritizing emotion '{early_emotion_context}' (likely about others)")
+                        else:
+                            logger.info(f"🎭 EARLY EMOTION DETECTION: {early_emotion_context} (for context-aware memory retrieval)")
                 except Exception as e:
                     logger.debug(f"Early emotion analysis failed, using neutral context: {e}")
                     early_emotion_context = "neutral"
@@ -1493,6 +1526,39 @@ class MessageProcessor:
                         "llm_percentage": float(round((llm_time_ms / processing_time_ms * 100), 1)) if processing_time_ms > 0 else 0.0
                     }
                 )
+                
+                # 🎯 STANCE METRICS: Record emotion and stance analysis data
+                try:
+                    user_emotion = ai_components.get('emotion_data', {}).get('primary_emotion') if isinstance(ai_components.get('emotion_data'), dict) else None
+                    user_emotion_confidence = ai_components.get('emotion_data', {}).get('confidence', 0.0) if isinstance(ai_components.get('emotion_data'), dict) else 0.0
+                    
+                    bot_emotion = ai_components.get('bot_emotion', {}).get('primary_emotion') if isinstance(ai_components.get('bot_emotion'), dict) else None
+                    bot_emotion_confidence = ai_components.get('bot_emotion', {}).get('confidence', 0.0) if isinstance(ai_components.get('bot_emotion'), dict) else 0.0
+                    
+                    # Get stance analysis if available (from metadata stored with memory)
+                    user_stance = getattr(user_stance_analysis, 'emotion_type', None) if hasattr(self, 'user_stance_analysis') else None
+                    user_self_focus = getattr(user_stance_analysis, 'self_focus', 0.0) if hasattr(self, 'user_stance_analysis') else 0.0
+                    
+                    # Bot stance will be from stored metadata, for now use None
+                    bot_stance = None
+                    bot_self_focus = 0.0
+                    
+                    if user_emotion or bot_emotion:
+                        self.fidelity_metrics.record_emotion_and_stance(
+                            user_id=message_context.user_id,
+                            operation="message_processing",
+                            user_emotion=user_emotion,
+                            user_emotion_confidence=user_emotion_confidence,
+                            bot_emotion=bot_emotion,
+                            bot_emotion_confidence=bot_emotion_confidence,
+                            user_stance=user_stance,
+                            user_self_focus=user_self_focus,
+                            bot_stance=bot_stance,
+                            bot_self_focus=bot_self_focus,
+                            stance_confidence=0.0
+                        )
+                except Exception as e:
+                    logger.debug(f"Failed to record emotion/stance metrics: {e}")
             
             # Phase 5: Record temporal intelligence metrics
             await self._record_temporal_metrics(
@@ -7070,6 +7136,24 @@ class MessageProcessor:
             from src.utils.discord_status_footer import strip_footer_from_response
             clean_response = strip_footer_from_response(response)
             
+            # 🛡️ STANCE FILTERING: Remove second-person emotions from bot response
+            # Bot saying "I understand you're frustrated" should NOT make bot's emotion state reflect
+            # the user's frustration - bot is expressing empathy, not its own emotional state
+            bot_response_for_storage = clean_response
+            if self._stance_analyzer:
+                try:
+                    filtered_bot_text = self._stance_analyzer.filter_second_person_emotions(clean_response)
+                    if filtered_bot_text and filtered_bot_text != clean_response:
+                        logger.info(
+                            "🎯 STANCE FILTER: Removed empathetic second-person clauses from bot response "
+                            "(%.1f%% of original)",
+                            (1.0 - len(filtered_bot_text) / len(clean_response)) * 100
+                        )
+                        bot_response_for_storage = filtered_bot_text
+                except Exception as e:
+                    logger.debug(f"Stance filtering failed, using original response: {e}")
+                    bot_response_for_storage = clean_response
+            
             # 🛡️ META-CONVERSATION FILTER: Prevent conversations about memory/bot issues from being stored
             # These create recursive awareness loops where the bot is primed to think it has problems
             if self._is_meta_conversation(message_context.content, clean_response):
@@ -7084,7 +7168,7 @@ class MessageProcessor:
                 # Extract bot emotion from ai_components (Phase 7.5)
                 bot_emotion = ai_components.get('bot_emotion')
                 
-                # Build metadata for bot response including bot emotion
+                # Build metadata for bot response including bot emotion and stance analysis
                 bot_metadata = {}
                 if bot_emotion:
                     bot_metadata['bot_emotion'] = bot_emotion
@@ -7095,14 +7179,30 @@ class MessageProcessor:
                         bot_emotion.get('confidence', 0.0)
                     )
                 
+                # Add stance metadata if available
+                if self._stance_analyzer:
+                    try:
+                        stance_analysis = self._stance_analyzer.analyze_user_stance(bot_response_for_storage)
+                        if stance_analysis:
+                            bot_metadata['stance_analysis'] = {
+                                'bot_self_focus': stance_analysis.self_focus,
+                                'bot_emotion_type': stance_analysis.emotion_type,
+                                'bot_primary_emotions': stance_analysis.primary_emotions,
+                                'bot_other_emotions': stance_analysis.other_emotions,
+                                'stance_confidence': stance_analysis.confidence
+                            }
+                            logger.debug(f"📊 BOT STANCE STORED: {bot_metadata['stance_analysis']}")
+                    except Exception as e:
+                        logger.debug(f"Failed to store stance metadata: {e}")
+                
                 await self.memory_manager.store_conversation(
                     user_id=message_context.user_id,
                     user_message=message_context.content,
-                    bot_response=clean_response,  # Use clean_response without footer
+                    bot_response=bot_response_for_storage,  # Use stance-filtered response
                     channel_id=message_context.channel_id,
                     channel_type=message_context.channel_type,
                     pre_analyzed_emotion_data=ai_components.get('emotion_data'),  # User emotion
-                    metadata=bot_metadata  # Bot emotion in metadata
+                    metadata=bot_metadata  # Bot emotion and stance in metadata
                 )
                 
                 # Verify storage

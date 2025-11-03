@@ -99,8 +99,9 @@ class ModularBotManager:
             logger.info("✅ Health check server initialized")
 
             # Get bot name for personalized startup message
-            bot_name = os.getenv("DISCORD_BOT_NAME", "")
-            if bot_name:
+            from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            if bot_name and bot_name != "unknown":
                 logger.info("🤖 %s bot initialization complete - all systems ready!", bot_name)
             else:
                 logger.info("🤖 WhisperEngine bot initialization complete - all systems ready!")
@@ -182,12 +183,16 @@ class ModularBotManager:
         # Import bot command decorators and helpers
         from src.core.bot_launcher import bot_name_filter
         from src.utils.helpers import is_admin
+        from src.utils.bot_name_utils import get_normalized_bot_name_from_env
 
         try:
+            # Get normalized bot name for handler initialization
+            normalized_bot_name = get_normalized_bot_name_from_env()
+            
             # Status commands
             self.command_handlers["status"] = StatusCommandHandlers(
                 bot=self.bot,
-                bot_name=os.getenv("DISCORD_BOT_NAME", ""),
+                bot_name=normalized_bot_name,
                 llm_client=components["llm_client"],
                 memory_manager=components.get("memory_manager"),
                 voice_manager=components.get("voice_manager"),
@@ -203,7 +208,7 @@ class ModularBotManager:
             # Help commands
             self.command_handlers["help"] = HelpCommandHandlers(
                 bot=self.bot,
-                bot_name=os.getenv("DISCORD_BOT_NAME", ""),
+                bot_name=normalized_bot_name,
                 voice_manager=components.get("voice_manager"),
                 voice_support_enabled=getattr(self.bot_core, "voice_support_enabled", False),
                 personality_profiler=None,  # Legacy personality profiler removed
@@ -320,8 +325,9 @@ class ModularBotManager:
                 await self.bot_core.shutdown_manager.graceful_shutdown()
 
             # Get bot name for personalized shutdown message
-            bot_name = os.getenv("DISCORD_BOT_NAME", "")
-            if bot_name:
+            from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            if bot_name and bot_name != "unknown":
                 logger.info(f"🌙 {bot_name} bot shutting down gracefully...")
             else:
                 logger.info("🌙 WhisperEngine bot shutting down gracefully...")

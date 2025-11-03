@@ -35,13 +35,22 @@ import psutil
 try:
     from src.memory.vector_memory_system import get_normalized_bot_name_from_env
 except ImportError:
-    # Fallback implementation
-    import os
-    def get_normalized_bot_name_from_env() -> str:
-        bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
-        if not bot_name or not isinstance(bot_name, str):
-            return "unknown"
-        return bot_name.strip().lower().replace(' ', '_')
+    # Fallback implementation - use proper bot name normalization
+    try:
+        from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+    except ImportError:
+        # Last resort fallback
+        import os
+        import re
+        def get_normalized_bot_name_from_env() -> str:
+            raw_bot_name = os.getenv('DISCORD_BOT_NAME') or os.getenv('BOT_NAME') or 'unknown'
+            if not raw_bot_name or not isinstance(raw_bot_name, str):
+                return "unknown"
+            normalized = raw_bot_name.strip().lower()
+            normalized = re.sub(r'\s+', '_', normalized)
+            normalized = re.sub(r'[^a-z0-9_-]', '', normalized)
+            normalized = re.sub(r'[_-]+', '_', normalized).strip('_-')
+            return normalized if normalized else "unknown"
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +255,104 @@ class FidelityMetricsCollector:
     
     # REMOVED: record_user_engagement method - redundant with temporal intelligence
     
+    def record_emotion_and_stance(self, user_id: str, operation: str,
+                                 user_emotion: Optional[str] = None,
+                                 user_emotion_confidence: float = 0.0,
+                                 bot_emotion: Optional[str] = None,
+                                 bot_emotion_confidence: float = 0.0,
+                                 user_stance: Optional[str] = None,
+                                 user_self_focus: float = 0.0,
+                                 bot_stance: Optional[str] = None,
+                                 bot_self_focus: float = 0.0,
+                                 stance_confidence: float = 0.0):
+        """
+        Record emotion and stance analysis metrics for both user and bot.
+        
+        Enables tracking of:
+        - User's actual emotional state (with self-focus ratio)
+        - Bot's genuine emotional response (not empathetic echoing)
+        - Emotional attribution accuracy (direct vs attributed emotions)
+        - Conversation emotion flow and dynamics
+        
+        Args:
+            user_id: Platform user ID (Discord ID, etc.)
+            operation: Operation name (e.g., "message_processing")
+            user_emotion: Primary emotion detected in user message
+            user_emotion_confidence: Confidence of user emotion (0.0-1.0)
+            bot_emotion: Primary emotion in bot response
+            bot_emotion_confidence: Confidence of bot emotion (0.0-1.0)
+            user_stance: Emotional stance type ("direct", "attributed", "mixed", "none")
+            user_self_focus: Ratio of self-focused emotions in user message (0.0-1.0)
+            bot_stance: Bot's emotional stance type
+            bot_self_focus: Ratio of self-focused emotions in bot response (0.0-1.0)
+            stance_confidence: Overall stance detection confidence (0.0-1.0)
+        """
+        try:
+            # User emotion and stance metrics
+            if user_emotion:
+                self.record_metric(FidelityMetric(
+                    metric_type=MetricType.FIDELITY_SCORE,  # Reuse for emotional fidelity
+                    value=user_emotion_confidence,
+                    bot_name=self.bot_name,
+                    user_id=user_id,
+                    operation=f"{operation}_user_emotion",
+                    tags={
+                        "emotion_source": "user",
+                        "emotion_type": user_emotion,
+                        "stance_type": user_stance or "unknown"
+                    },
+                    fields={
+                        "user_self_focus": user_self_focus,
+                        "confidence": user_emotion_confidence
+                    }
+                ))
+            
+            # Bot emotion and stance metrics
+            if bot_emotion:
+                self.record_metric(FidelityMetric(
+                    metric_type=MetricType.FIDELITY_SCORE,  # Reuse for emotional fidelity
+                    value=bot_emotion_confidence,
+                    bot_name=self.bot_name,
+                    user_id=user_id,
+                    operation=f"{operation}_bot_emotion",
+                    tags={
+                        "emotion_source": "bot",
+                        "emotion_type": bot_emotion,
+                        "stance_type": bot_stance or "unknown"
+                    },
+                    fields={
+                        "bot_self_focus": bot_self_focus,
+                        "confidence": bot_emotion_confidence
+                    }
+                ))
+            
+            # Stance analysis summary (meta-metric for emotional attribution accuracy)
+            self.record_metric(FidelityMetric(
+                metric_type=MetricType.CHARACTER_CONSISTENCY,  # Reuse for stance consistency
+                value=stance_confidence,
+                bot_name=self.bot_name,
+                user_id=user_id,
+                operation=f"{operation}_stance_analysis",
+                tags={
+                    "user_stance": user_stance or "none",
+                    "bot_stance": bot_stance or "none"
+                },
+                fields={
+                    "user_self_focus": user_self_focus,
+                    "bot_self_focus": bot_self_focus,
+                    "stance_confidence": stance_confidence
+                }
+            ))
+            
+            logger.debug(
+                f"📊 EMOTION/STANCE METRICS: user_emotion={user_emotion} (stance={user_stance}, "
+                f"self_focus={user_self_focus:.2f}), bot_emotion={bot_emotion} (stance={bot_stance}, "
+                f"self_focus={bot_self_focus:.2f})"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error recording emotion and stance metrics: {e}")
+    
     def record_metric(self, metric: FidelityMetric):
         """Record a generic metric to InfluxDB or buffer"""
         try:
@@ -401,3 +508,35 @@ def record_performance_metric(operation: str, duration_ms: float,
     """Convenience function to record performance metrics"""
     collector = get_fidelity_metrics_collector()
     collector.record_performance_metric(operation, duration_ms, success, user_id, metadata)
+
+
+def record_emotion_and_stance(user_id: str, operation: str,
+                             user_emotion: Optional[str] = None,
+                             user_emotion_confidence: float = 0.0,
+                             bot_emotion: Optional[str] = None,
+                             bot_emotion_confidence: float = 0.0,
+                             user_stance: Optional[str] = None,
+                             user_self_focus: float = 0.0,
+                             bot_stance: Optional[str] = None,
+                             bot_self_focus: float = 0.0,
+                             stance_confidence: float = 0.0):
+    """
+    Convenience function to record emotion and stance analysis metrics.
+    
+    This integrates stance analysis data into WhisperEngine's metrics collection,
+    enabling tracking of emotional attribution accuracy and character consistency.
+    """
+    collector = get_fidelity_metrics_collector()
+    collector.record_emotion_and_stance(
+        user_id=user_id,
+        operation=operation,
+        user_emotion=user_emotion,
+        user_emotion_confidence=user_emotion_confidence,
+        bot_emotion=bot_emotion,
+        bot_emotion_confidence=bot_emotion_confidence,
+        user_stance=user_stance,
+        user_self_focus=user_self_focus,
+        bot_stance=bot_stance,
+        bot_self_focus=bot_self_focus,
+        stance_confidence=stance_confidence
+    )

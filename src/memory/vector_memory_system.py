@@ -825,6 +825,22 @@ class VectorMemoryStore:
             else:
                 logger.info(f"🧠 EMOTION AUDIT: No emotion_data found in memory metadata")
             
+            # 🎯 STANCE ANALYSIS: Store speaker perspective and emotional attribution
+            if memory.metadata and 'stance_analysis' in memory.metadata:
+                stance_data = memory.metadata['stance_analysis']
+                logger.info(f"🎯 STANCE AUDIT: Found stance_analysis in metadata: {list(stance_data.keys())}")
+                if stance_data:
+                    qdrant_payload.update({
+                        'stance_self_focus': stance_data.get('bot_self_focus', stance_data.get('self_focus')),
+                        'stance_emotion_type': stance_data.get('bot_emotion_type', stance_data.get('emotion_type')),
+                        'stance_primary_emotions': str(stance_data.get('bot_primary_emotions', stance_data.get('primary_emotions'))),
+                        'stance_other_emotions': str(stance_data.get('bot_other_emotions', stance_data.get('other_emotions'))),
+                        'stance_confidence': stance_data.get('stance_confidence', 0.0)
+                    })
+                    logger.info(f"🎯 STANCE AUDIT: Added stance fields to payload - self_focus={qdrant_payload.get('stance_self_focus', 'N/A')}, type={qdrant_payload.get('stance_emotion_type', 'N/A')}")
+            else:
+                logger.debug(f"🎯 STANCE AUDIT: No stance_analysis found in memory metadata")
+            
             logger.info(f"🎭 DEBUG: Payload emotional_context set to: '{qdrant_payload['emotional_context']}' for memory {memory.id}")
             logger.info(f"🎭 DEBUG: Full payload keys: {list(qdrant_payload.keys())}")            # 🚀 QDRANT FEATURE: Named vectors for intelligent multi-dimensional search
             vectors = {}

@@ -26,7 +26,8 @@ def should_bot_respond_voice(ctx: commands.Context) -> bool:
 
     For guild channels, bot name must be explicitly mentioned to prevent conflicts.
     """
-    bot_name = os.getenv("DISCORD_BOT_NAME", "whisperengine").lower()
+    from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+    bot_name = get_normalized_bot_name_from_env()
     fallback_name = "whisperengine"
 
     if not ctx.guild:  # Always respond to DMs
@@ -91,7 +92,8 @@ class VoiceCommandHandlers:
             logger.debug(f"Join voice command triggered by {ctx.author.name}")
 
             # Filter out bot name from channel_name if present
-            bot_name = os.getenv("DISCORD_BOT_NAME", "whisperengine").lower()
+            from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
             fallback_name = "whisperengine"
 
             if channel_name and (
@@ -118,7 +120,8 @@ class VoiceCommandHandlers:
             Usage: !speak <text> or !speak whisperengine <text>
             """
             # Filter out bot name from beginning of text if present
-            bot_name = os.getenv("DISCORD_BOT_NAME", "whisperengine").lower()
+            from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
             fallback_name = "whisperengine"
 
             # Check if text starts with bot name or fallback name and remove it
@@ -611,6 +614,7 @@ class VoiceCommandHandlers:
 
     async def _voice_help_handler(self, ctx):
         """Handle voice help command"""
+        from src.utils.bot_name_utils import get_normalized_bot_name_from_env
         embed = discord.Embed(
             title="🎵 Voice Commands Help",
             description="Available voice commands and features",
@@ -618,8 +622,8 @@ class VoiceCommandHandlers:
         )
 
         # Bot name requirement info
-        bot_name = os.getenv("DISCORD_BOT_NAME", "")
-        if bot_name:
+        bot_name = get_normalized_bot_name_from_env()
+        if bot_name and bot_name != "unknown":
             name_suffix = f" {bot_name}"
             embed.add_field(
                 name="🤖 Bot Name Requirement",

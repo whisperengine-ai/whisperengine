@@ -10,11 +10,10 @@ Database Tables:
 - character_learning_timeline: Learning evolution history
 """
 
-import asyncio
 import logging
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
+from datetime import datetime
+from dataclasses import dataclass
 import asyncpg
 
 logger = logging.getLogger(__name__)
@@ -103,6 +102,13 @@ class CharacterInsightStorage:
         Raises:
             asyncpg.UniqueViolationError: If insight_content already exists for character
         """
+        # First, check if this insight already exists (to avoid duplicate insertion)
+        check_query = """
+            SELECT id FROM character_insights
+            WHERE character_id = $1 AND insight_content = $2
+            LIMIT 1;
+        """
+        
         query = """
             INSERT INTO character_insights (
                 character_id, insight_type, insight_content, confidence_score,
@@ -114,6 +120,23 @@ class CharacterInsightStorage:
         
         async with self.db_pool.acquire() as conn:
             try:
+                # Check if insight already exists
+                existing_id = await conn.fetchval(
+                    check_query,
+                    insight.character_id,
+                    insight.insight_content
+                )
+                
+                if existing_id:
+                    self.logger.debug(
+                        "ℹ️ Insight already exists for character %s "
+                        "(ID: %s), skipping duplicate: '%s...'",
+                        insight.character_id,
+                        existing_id,
+                        insight.insight_content[:50]
+                    )
+                    return existing_id
+                
                 insight_id = await conn.fetchval(
                     query,
                     insight.character_id,
@@ -128,15 +151,39 @@ class CharacterInsightStorage:
                 )
                 
                 self.logger.info(
-                    f"✅ Stored insight ID {insight_id} for character {insight.character_id} "
-                    f"(type: {insight.insight_type}, confidence: {insight.confidence_score:.2f})"
+                    "✅ Stored insight ID %s for character %s "
+                    "(type: %s, confidence: %.2f)",
+                    insight_id,
+                    insight.character_id,
+                    insight.insight_type,
+                    insight.confidence_score
                 )
                 return insight_id
                 
             except asyncpg.UniqueViolationError:
-                self.logger.warning(
-                    f"⚠️ Duplicate insight content for character {insight.character_id}: "
-                    f"'{insight.insight_content[:50]}...'"
+                # This should rarely happen now due to pre-check, but handle it gracefully
+                # Query again to get the actual ID
+                existing_id = await conn.fetchval(
+                    check_query,
+                    insight.character_id,
+                    insight.insight_content
+                )
+                
+                if existing_id:
+                    self.logger.debug(
+                        "ℹ️ Duplicate insight detected and retrieved from DB "
+                        "(ID: %s) for character %s",
+                        existing_id,
+                        insight.character_id
+                    )
+                    return existing_id
+                
+                # If we can't find it, something is wrong - log and re-raise
+                self.logger.error(
+                    "❌ Unexpected state: UniqueViolationError but insight not found "
+                    "for character %s: '%s...'",
+                    insight.character_id,
+                    insight.insight_content[:50]
                 )
                 raise
     
@@ -234,8 +281,10 @@ class CharacterInsightStorage:
             ]
             
             self.logger.info(
-                f"📋 Retrieved {len(insights)} insights for character {character_id} "
-                f"matching triggers: {triggers}"
+                "📋 Retrieved %d insights for character %s matching triggers: %s",
+                len(insights),
+                character_id,
+                triggers
             )
             return insights
     
@@ -288,8 +337,10 @@ class CharacterInsightStorage:
             ]
             
             self.logger.info(
-                f"📋 Retrieved {len(insights)} recent insights (last {days_back} days) "
-                f"for character {character_id}"
+                "📋 Retrieved %d recent insights (last %d days) for character %s",
+                len(insights),
+                days_back,
+                character_id
             )
             return insights
     
@@ -325,7 +376,9 @@ class CharacterInsightStorage:
             
             if updated:
                 self.logger.info(
-                    f"✅ Updated insight {insight_id} confidence to {new_confidence:.2f}"
+                    "✅ Updated insight %d confidence to %.2f",
+                    insight_id,
+                    new_confidence
                 )
             return updated
     
@@ -364,9 +417,11 @@ class CharacterInsightStorage:
             )
             
             self.logger.info(
-                f"✅ Created relationship {relationship_id}: "
-                f"{relationship.from_insight_id} --[{relationship.relationship_type}]--> "
-                f"{relationship.to_insight_id}"
+                "✅ Created relationship %d: %d --[%s]--> %d",
+                relationship_id,
+                relationship.from_insight_id,
+                relationship.relationship_type,
+                relationship.to_insight_id
             )
             return relationship_id
     
@@ -433,7 +488,9 @@ class CharacterInsightStorage:
             ]
             
             self.logger.info(
-                f"📋 Found {len(insights)} related insights for insight {insight_id}"
+                "📋 Found %d related insights for insight %d",
+                len(insights),
+                insight_id
             )
             return insights
     
@@ -473,8 +530,10 @@ class CharacterInsightStorage:
             )
             
             self.logger.info(
-                f"✅ Recorded learning event {event_id} for character {event.character_id} "
-                f"(type: {event.learning_type})"
+                "✅ Recorded learning event %d for character %d (type: %s)",
+                event_id,
+                event.character_id,
+                event.learning_type
             )
             return event_id
     
@@ -524,8 +583,10 @@ class CharacterInsightStorage:
             ]
             
             self.logger.info(
-                f"📋 Retrieved {len(events)} learning events (last {days_back} days) "
-                f"for character {character_id}"
+                "📋 Retrieved %d learning events (last %d days) for character %d",
+                len(events),
+                days_back,
+                character_id
             )
             return events
     
@@ -564,8 +625,10 @@ class CharacterInsightStorage:
             }
             
             self.logger.info(
-                f"📊 Character {character_id} stats: {stats['total_insights']} insights, "
-                f"avg confidence {stats['avg_confidence']:.2f}"
+                "📊 Character %d stats: %d insights, avg confidence %.2f",
+                character_id,
+                stats['total_insights'],
+                stats['avg_confidence']
             )
             return stats
 
@@ -602,5 +665,5 @@ async def create_character_insight_storage(
         max_size=10
     )
     
-    logger.info(f"✅ Created database connection pool for {postgres_host}:{postgres_port}/{postgres_db}")
+    logger.info("✅ Created database connection pool for %s:%d/%s", postgres_host, postgres_port, postgres_db)
     return CharacterInsightStorage(db_pool)
