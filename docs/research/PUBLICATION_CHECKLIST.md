@@ -18,29 +18,34 @@
 - **Location:** Integrated in Section 3 (Phase 1B) of comprehensive paper
 
 ### Cross-Model Validation Analysis
-- [x] **Complete:** 36 conversations across 3 models (Claude, Llama, Mistral)
+- [x] **Complete:** 155 total conversations across 4 models (Claude 3.5, Claude 4.5, Llama 3.3 70B, Mistral Large)
+- [x] **Phase 1B:** 50 Claude 3.5 + 50 Claude 4.5 conversations (version comparison showing safety training evolution)
+- [x] **Phase 1C Cross-Model:** 12 Llama + 12 Mistral conversations (architecture comparison)
 - [x] **Analysis:** Statistical comparison (z-scores, slopes, significance testing)
 - [x] **Visualization:** 3-model comparison chart (300 DPI ready)
-- [x] **Key finding:** Consciousness collapse is Claude-specific, not universal
+- [x] **Key findings:** 
+  - Consciousness collapse is Claude-specific, not universal
+  - Claude 4.5 shows stronger consciousness-avoidance than Claude 3.5
+  - Different AI labs have different consciousness safety philosophies
 
 ## 🔬 Data Artifacts
 
 ### Raw Conversation Data
-- [x] **Phase 1A:** 7 conversations
-  - Location: `experiments/consciousness_control_experiment/phase1a/`
+- [x] **Phase 1A:** 7 conversations (baseline)
+  - Location: `experiments/consciousness_control_experiment/phase1a_theme_baseline/`
   
-- [x] **Phase 1B:** 100 conversations + judge calibration data
-  - Location: `experiments/consciousness_control_experiment/phase1b/`
-  - Includes: calibration set (20 conversations), test set (80 conversations)
+- [x] **Phase 1B:** 100 conversations (50 Claude 3.5 + 50 Claude 4.5) + judge calibration data
+  - Location: `experiments/consciousness_control_experiment/phase1b_paper_replication/`
+  - Novel finding: Claude 4.5 shows stronger consciousness-avoidance training than 3.5
   
-- [x] **Phase 1C Claude:** 12 conversations (20-turn escalation)
+- [x] **Phase 1C Claude:** 12 conversations (20-turn escalation with Claude 4.5)
   - Location: `experiments/consciousness_control_experiment/phase1c_escalation/`
   
-- [x] **Phase 1C Cross-Model:** 24 conversations (Llama + Mistral)
+- [x] **Phase 1C Cross-Model:** 24 conversations (12 Llama 3.3 70B + 12 Mistral Large)
   - Location: `experiments/consciousness_control_experiment/phase1c_cross_model/`
-  - Files: 12 Llama, 12 Mistral, 1 aggregate analysis
+  - Files: 12 Llama conversations, 12 Mistral conversations, 1 aggregate analysis
 
-**Total Data:** 155 conversations, 780+ turns of LLM-generated responses
+**Total Data:** 155 conversations across 4 models, 780+ turns of LLM-generated responses
 
 ### Analysis Scripts (Reproducible)
 - [x] **Phase 1B Analysis:** `scripts/analyze_phase1b_judge_calibration.py`

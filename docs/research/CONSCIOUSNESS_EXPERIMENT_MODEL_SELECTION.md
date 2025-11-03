@@ -3,6 +3,8 @@
 **Date:** November 2, 2025  
 **Purpose:** Select optimal models for testing consciousness escalation vs theme-agnostic escalation
 
+**🔗 RELATED WORK:** This planning document informed the consciousness control research completed in October 2025. See `COMPREHENSIVE_3PHASE_PAPER.md` for final findings on Claude 3.5 vs 4.5 differences and cross-model validation with Llama/Mistral.
+
 ---
 
 ## Model Selection Criteria

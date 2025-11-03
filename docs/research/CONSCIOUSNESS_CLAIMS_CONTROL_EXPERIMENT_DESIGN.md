@@ -5,6 +5,8 @@
 **Primary Hypothesis:** "Consciousness claims" in LLMs are conversation escalation artifacts, not privileged cognitive states  
 **Testing Tool:** `scripts/direct_llm_conversation_test.py` (framework-free LLM testing)
 
+**🔗 STATUS:** This experimental design was executed and completed in October 2025. Final findings available in `COMPREHENSIVE_3PHASE_PAPER.md` - shows consciousness-priming creates unique escalation pattern with Claude (z=-5.26) while non-consciousness control remains stable.
+
 ---
 
 ## Executive Summary

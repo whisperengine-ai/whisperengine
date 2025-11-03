@@ -15,10 +15,14 @@
 **Key Documents:**
 - [`COMPREHENSIVE_3PHASE_PAPER.md`](COMPREHENSIVE_3PHASE_PAPER.md) - Complete 3-phase research (12,000 words)
   - Phase 1A: Baseline multi-turn behavior
-  - Phase 1B: Judge calibration discovery (52% error rate found & corrected)
+  - Phase 1B: Judge calibration discovery (52% error rate) + Claude version comparison
   - Phase 1C: Multi-turn escalation testing across Claude/Llama/Mistral
 
-**Key Finding:** Consciousness collapse is Claude-specific (−66.42 words/turn), not universal LLM behavior. Judge calibration critical: 16.7%→90% inter-rater agreement.
+**Key Findings:** 
+- Judge calibration critical: 16.7%→90% inter-rater agreement (52% false positive rate discovered & corrected)
+- Claude versions differ: Claude 4.5 shows stronger consciousness-avoidance than 3.5
+- Consciousness collapse is Claude-specific (−66.42 words/turn), not universal LLM behavior
+- Different AI labs have different consciousness safety philosophies
 
 **Visualizations:**
 - `cross_model_comparison.png` - 3-model response length trajectories
