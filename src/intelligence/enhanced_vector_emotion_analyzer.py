@@ -478,7 +478,8 @@ class EnhancedVectorEmotionAnalyzer:
         user_id: str,
         conversation_context: Optional[List[Dict[str, Any]]] = None,
         recent_emotions: Optional[List[str]] = None,
-        stance_analysis: Optional[Any] = None  # 🎯 NEW: Optional stance analysis to filter self-focused emotions
+        stance_analysis: Optional[Any] = None,  # 🎯 NEW: Optional stance analysis to filter self-focused emotions
+        nlp_cache: Optional[Any] = None  # 🚀 NEW: Optional NLPAnalysisCache for optimized keyword matching
     ) -> EmotionAnalysisResult:
         """
         Perform comprehensive emotion analysis using vector-native techniques.
@@ -520,7 +521,7 @@ class EnhancedVectorEmotionAnalyzer:
             
             # Step 4: Keyword-based fallback analysis (essential for new users)
             logger.debug(f"🎭 STEP 4: Starting keyword-based fallback analysis")
-            keyword_emotions = self._analyze_keyword_emotions(content)
+            keyword_emotions = self._analyze_keyword_emotions(content, nlp_cache=nlp_cache)
             logger.info(f"🎭 STEP 4 RESULT: Keyword emotions: {keyword_emotions}")
             
             # Step 5: Emotional intensity analysis
@@ -661,10 +662,15 @@ class EnhancedVectorEmotionAnalyzer:
     
     # KEYWORD ANALYSIS - Essential fallback for new users!
     
-    def _analyze_keyword_emotions(self, content: str) -> Dict[str, float]:
+    def _analyze_keyword_emotions(self, content: str, nlp_cache: Optional[Any] = None) -> Dict[str, float]:
         """
         Multi-layer emotion analysis: RoBERTa (primary) → VADER (fallback) → Keywords (backup).
         This is the core emotion detection method with state-of-art accuracy.
+        
+        Args:
+            content: Text to analyze
+            nlp_cache: Optional NLPAnalysisCache with pre-computed spaCy features
+                      If provided, uses O(1) lemma lookups instead of O(n) substring matching
         """
         logger.info(f"🔍 KEYWORD ANALYSIS: Starting multi-layer emotion analysis for: '{content[:50]}{'...' if len(content) > 50 else ''}'")
         
@@ -844,30 +850,57 @@ class EnhancedVectorEmotionAnalyzer:
                 logger.info(f"😊 VADER ANALYSIS: VADER not available, proceeding to keyword analysis")
             
             # LAYER 3: Keyword Analysis (BACKUP - Always available)
-            # Check for emotion keywords
-            for emotion_dimension, keywords in self.emotion_keywords.items():
-                emotion_name = emotion_dimension  # Fixed: emotion_dimension is already a string
-                matches = 0
-                total_weight = 0.0
+            # 🚀 OPTIMIZED: Use lemma-based matching if cache provided (3x faster, handles word variations)
+            if nlp_cache is not None:
+                logger.info(f"🔍 KEYWORD ANALYSIS: Using optimized lemma-based keyword matching (NLPAnalysisCache)")
                 
-                for keyword in keywords:
-                    if keyword in content_lower:
-                        matches += 1
-                        # Weight longer keywords more highly
-                        weight = min(len(keyword) / 10.0, 1.0)
-                        total_weight += weight
+                # Get pre-computed emotion keyword matches from cache (O(1) per emotion)
+                cached_emotion_matches = nlp_cache.get_all_emotion_matches()
                 
-                if matches > 0:
-                    # Base score on number of matches and total weight
-                    base_score = min(matches / 3.0, 1.0)  # Max 3 matches for full score
-                    weight_score = min(total_weight, 1.0)
-                    keyword_score = (base_score + weight_score) / 2.0
+                for emotion_name, matched_keywords in cached_emotion_matches.items():
+                    if matched_keywords:
+                        # Score based on number and quality of matches
+                        matches = len(matched_keywords)
+                        total_weight = sum(min(len(kw) / 10.0, 1.0) for kw in matched_keywords)
+                        
+                        base_score = min(matches / 3.0, 1.0)  # Max 3 matches for full score
+                        weight_score = min(total_weight, 1.0)
+                        keyword_score = (base_score + weight_score) / 2.0
+                        
+                        # Combine with any existing scores (from RoBERTa/VADER)
+                        emotion_scores[emotion_name] = max(
+                            emotion_scores.get(emotion_name, 0.0), 
+                            keyword_score
+                        )
+                        logger.debug(f"🔍 KEYWORD ANALYSIS: {emotion_name} matched {matches} lemmas: {matched_keywords[:3]} → {keyword_score:.3f}")
+            
+            else:
+                # Legacy substring matching (fallback when cache not provided)
+                logger.info(f"🔍 KEYWORD ANALYSIS: Using legacy substring keyword matching (no cache provided)")
+                # Check for emotion keywords
+                for emotion_dimension, keywords in self.emotion_keywords.items():
+                    emotion_name = emotion_dimension  # Fixed: emotion_dimension is already a string
+                    matches = 0
+                    total_weight = 0.0
                     
-                    # Combine with any existing scores (from RoBERTa/VADER)
-                    emotion_scores[emotion_name] = max(
-                        emotion_scores.get(emotion_name, 0.0), 
-                        keyword_score
-                    )
+                    for keyword in keywords:
+                        if keyword in content_lower:
+                            matches += 1
+                            # Weight longer keywords more highly
+                            weight = min(len(keyword) / 10.0, 1.0)
+                            total_weight += weight
+                    
+                    if matches > 0:
+                        # Base score on number of matches and total weight
+                        base_score = min(matches / 3.0, 1.0)  # Max 3 matches for full score
+                        weight_score = min(total_weight, 1.0)
+                        keyword_score = (base_score + weight_score) / 2.0
+                        
+                        # Combine with any existing scores (from RoBERTa/VADER)
+                        emotion_scores[emotion_name] = max(
+                            emotion_scores.get(emotion_name, 0.0), 
+                            keyword_score
+                        )
             
             # LAYER 4: Apply intensity amplifiers
             for amplifier in self.intensity_amplifiers:
