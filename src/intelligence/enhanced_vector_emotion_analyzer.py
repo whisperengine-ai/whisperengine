@@ -477,7 +477,8 @@ class EnhancedVectorEmotionAnalyzer:
         content: str, 
         user_id: str,
         conversation_context: Optional[List[Dict[str, Any]]] = None,
-        recent_emotions: Optional[List[str]] = None
+        recent_emotions: Optional[List[str]] = None,
+        stance_analysis: Optional[Any] = None  # 🎯 NEW: Optional stance analysis to filter self-focused emotions
     ) -> EmotionAnalysisResult:
         """
         Perform comprehensive emotion analysis using vector-native techniques.
@@ -549,6 +550,33 @@ class EnhancedVectorEmotionAnalyzer:
                 )
             
             logger.info(f"🎭 STEP 7 RESULT: Final combined emotions: {final_emotions}")
+            
+            # 🎯 STANCE-BASED FILTERING: Use stance to confirm neutrality only in clear cases
+            # Only override emotions IF:
+            # 1. Stance says no emotions (emotion_type='none') AND
+            # 2. RoBERTa doesn't have strong confidence (< 0.6) AND  
+            # 3. The emotion isn't clearly supported by content
+            if stance_analysis and hasattr(stance_analysis, 'emotion_type'):
+                max_emotion_score = max(final_emotions.values()) if final_emotions else 0.0
+                
+                if stance_analysis.emotion_type == 'none' and max_emotion_score < 0.6:
+                    # Stance says no emotions AND RoBERTa is not confident
+                    # This is a factual/neutral statement being misinterpreted as emotional
+                    logger.info(f"🎯 STANCE OVERRIDE: No emotions detected by stance + weak RoBERTa signal ({max_emotion_score:.3f}) → neutralizing")
+                    final_emotions = {"neutral": 0.8}
+                elif stance_analysis.self_focus < 0.2 and max_emotion_score < 0.5:
+                    # Emotions detected but mostly about others, not user
+                    logger.info(f"🎯 STANCE OVERRIDE: Low self-focus ({stance_analysis.self_focus:.2f}) + weak signal → neutralizing")
+                    final_emotions = {"neutral": 0.7}
+                elif stance_analysis.primary_emotions and max_emotion_score < 0.4:
+                    # Stance found clear emotions but RoBERTa is weak
+                    # Use stance analysis
+                    logger.info(f"🎯 STANCE GUIDANCE: Using stance emotions instead of weak RoBERTa: {stance_analysis.primary_emotions}")
+                    # Map stance emotions to our emotion scores
+                    for emotion in stance_analysis.primary_emotions:
+                        final_emotions[emotion] = max(final_emotions.get(emotion, 0.0), 0.6)
+                else:
+                    logger.debug(f"🎯 STANCE ANALYSIS: emotion_type={stance_analysis.emotion_type}, self_focus={stance_analysis.self_focus:.2f}, max_score={max_emotion_score:.3f} - no override needed")
             
             # Step 7: Determine primary emotion and confidence (pass content for question detection)
             primary_emotion, confidence = self._determine_primary_emotion(final_emotions, content=content)
@@ -1192,18 +1220,27 @@ class EnhancedVectorEmotionAnalyzer:
                     f"Secondary={secondary_emotion}({secondary_confidence:.3f}), "
                     f"Margin={margin:.3f}")
         
-        # === SPECIAL HANDLING: Questions with anticipation ===
-        # Questions naturally contain "anticipation" (expecting answer), but if confidence is low/moderate,
-        # treat them as neutral for better UX alignment
+        # === SPECIAL HANDLING: Low-intensity anticipation (questions/requests/factual) ===
+        # Questions/requests naturally contain "anticipation" (expecting answer/action), but if confidence is low/moderate,
+        # treat them as neutral for better UX alignment. Also handle factual statements and simple queries.
         if primary_emotion == 'anticipation' and content:
-            # Check if this is a question
-            is_question = content.strip().endswith('?') or any(
-                content.lower().startswith(q) for q in ['how', 'what', 'when', 'where', 'why', 'who', 'can', 'do', 'is', 'are']
+            content_lower = content.lower().strip()
+            
+            # Check if this is a question, request, or neutral statement
+            is_question_or_request = (
+                content_lower.endswith('?') or  # Direct question
+                any(content_lower.startswith(q) for q in ['how', 'what', 'when', 'where', 'why', 'who', 'can', 'do', 'is', 'are', 'would', 'could', 'should', 'tell', 'please', 'could you', 'would you', 'can you']) or  # Question starters
+                any(phrase in content_lower for phrase in ['tell me', 'show me', 'explain', 'describe', 'let me know', 'more about', 'what do you'])  # Request phrases
             )
             
-            # If it's a question with low-moderate anticipation, treat as neutral
-            if is_question and primary_confidence < 0.70:
-                logger.info(f"❓ QUESTION PATTERN: Low anticipation ({primary_confidence:.3f}) in question context → treating as neutral")
+            # Check if this is a factual/neutral statement (e.g., "The meeting is at 3pm")
+            is_factual_statement = (
+                any(phrase in content_lower for phrase in [' is at ', ' is on ', ' are at ', ' are on ', 'the meeting', 'the time', 'the schedule', 'the plan'])
+            )
+            
+            # If it's a question/request/factual statement with low-moderate anticipation, treat as neutral
+            if (is_question_or_request or is_factual_statement) and primary_confidence < 0.70:
+                logger.info(f"❓ NEUTRAL PATTERN: Low anticipation ({primary_confidence:.3f}) in question/request/factual context → treating as neutral")
                 return "neutral", 0.5
         
         # === ADAPTIVE THRESHOLDING LOGIC ===

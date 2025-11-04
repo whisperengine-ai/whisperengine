@@ -32,7 +32,7 @@ class TestAdaptiveEmotionThreshold:
         results = []
         for message, expected_emotions in test_cases:
             emotions = analyzer._analyze_keyword_emotions(message)
-            primary, confidence = analyzer._determine_primary_emotion(emotions)
+            primary, confidence = analyzer._determine_primary_emotion(emotions, content=message)
             
             # Should NOT be neutral, should be one of the expected emotions
             is_correct = primary in expected_emotions
@@ -67,7 +67,7 @@ class TestAdaptiveEmotionThreshold:
         results = []
         for message in test_cases:
             emotions = analyzer._analyze_keyword_emotions(message)
-            primary, confidence = analyzer._determine_primary_emotion(emotions)
+            primary, confidence = analyzer._determine_primary_emotion(emotions, content=message)
             
             is_correct = primary == "neutral"
             results.append({
@@ -100,7 +100,7 @@ class TestAdaptiveEmotionThreshold:
         results = []
         for message, expected_emotions in test_cases:
             emotions = analyzer._analyze_keyword_emotions(message)
-            primary, confidence = analyzer._determine_primary_emotion(emotions)
+            primary, confidence = analyzer._determine_primary_emotion(emotions, content=message)
             
             is_correct = primary in expected_emotions
             results.append({
@@ -150,27 +150,27 @@ class TestAdaptiveEmotionThreshold:
         
         # Scenario 1: High confidence neutral (should remain neutral)
         emotions_high_neutral = {"neutral": 0.75, "joy": 0.15, "sadness": 0.10}
-        primary, confidence = analyzer._determine_primary_emotion(emotions_high_neutral)
+        primary, confidence = analyzer._determine_primary_emotion(emotions_high_neutral, content="")
         assert primary == "neutral", f"High confidence neutral should stay neutral, got {primary}"
         
         # Scenario 2: Large margin neutral (should remain neutral)
         emotions_large_margin_neutral = {"neutral": 0.65, "joy": 0.25, "sadness": 0.10}
-        primary, confidence = analyzer._determine_primary_emotion(emotions_large_margin_neutral)
+        primary, confidence = analyzer._determine_primary_emotion(emotions_large_margin_neutral, content="")
         assert primary == "neutral", f"Large margin neutral should stay neutral, got {primary}"
         
         # Scenario 3: Weak neutral with strong alternative (should switch to emotion)
         emotions_weak_neutral = {"neutral": 0.45, "sadness": 0.40, "joy": 0.15}
-        primary, confidence = analyzer._determine_primary_emotion(emotions_weak_neutral)
+        primary, confidence = analyzer._determine_primary_emotion(emotions_weak_neutral, content="")
         assert primary == "sadness", f"Weak neutral with strong alternative should switch, got {primary}"
         
         # Scenario 4: Clear winner emotion (should be accepted)
         emotions_clear_winner = {"anger": 0.60, "neutral": 0.25, "sadness": 0.15}
-        primary, confidence = analyzer._determine_primary_emotion(emotions_clear_winner)
+        primary, confidence = analyzer._determine_primary_emotion(emotions_clear_winner, content="")
         assert primary == "anger", f"Clear winner should be accepted, got {primary}"
         
         # Scenario 5: Large margin emotion (should be accepted even at moderate confidence)
         emotions_large_margin_emotion = {"fear": 0.50, "neutral": 0.20, "sadness": 0.15}
-        primary, confidence = analyzer._determine_primary_emotion(emotions_large_margin_emotion)
+        primary, confidence = analyzer._determine_primary_emotion(emotions_large_margin_emotion, content="")
         assert primary == "fear", f"Large margin emotion should be accepted, got {primary}"
         
         print("\n✅ Adaptive threshold scenario tests passed")
@@ -214,14 +214,14 @@ class TestRegressionPrevention:
     
     def test_empty_emotions_fallback(self, analyzer):
         """Test empty emotions dict returns neutral"""
-        primary, confidence = analyzer._determine_primary_emotion({})
+        primary, confidence = analyzer._determine_primary_emotion({}, content="")
         assert primary == "neutral", f"Empty emotions should return neutral, got {primary}"
         assert confidence > 0, f"Confidence should be positive, got {confidence}"
     
     def test_single_emotion(self, analyzer):
         """Test single emotion is correctly identified"""
         emotions = {"joy": 0.8}
-        primary, confidence = analyzer._determine_primary_emotion(emotions)
+        primary, confidence = analyzer._determine_primary_emotion(emotions, content="")
         assert primary == "joy", f"Single emotion should be identified, got {primary}"
     
     def test_confidence_bounds(self, analyzer):
@@ -233,7 +233,7 @@ class TestRegressionPrevention:
         ]
         
         for emotions in test_cases:
-            primary, confidence = analyzer._determine_primary_emotion(emotions)
+            primary, confidence = analyzer._determine_primary_emotion(emotions, content="")
             assert 0.0 <= confidence <= 1.0, \
                 f"Confidence out of bounds: {confidence} for {emotions}"
     
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     
     for msg in false_neutral_cases:
         emotions = analyzer._analyze_keyword_emotions(msg)
-        primary, confidence = analyzer._determine_primary_emotion(emotions)
+        primary, confidence = analyzer._determine_primary_emotion(emotions, content=msg)
         status = "✅" if primary != "neutral" else "❌"
         print(f"{status} {msg[:45]:45} → {primary:12} ({confidence:.3f})")
     
@@ -285,7 +285,7 @@ if __name__ == "__main__":
     
     for msg in true_neutral_cases:
         emotions = analyzer._analyze_keyword_emotions(msg)
-        primary, confidence = analyzer._determine_primary_emotion(emotions)
+        primary, confidence = analyzer._determine_primary_emotion(emotions, content=msg)
         status = "✅" if primary == "neutral" else "❌"
         print(f"{status} {msg[:45]:45} → {primary:12} ({confidence:.3f})")
     
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     
     for msg in clear_emotion_cases:
         emotions = analyzer._analyze_keyword_emotions(msg)
-        primary, confidence = analyzer._determine_primary_emotion(emotions)
+        primary, confidence = analyzer._determine_primary_emotion(emotions, content=msg)
         status = "✅" if primary != "neutral" else "⚠️"
         print(f"{status} {msg[:45]:45} → {primary:12} ({confidence:.3f})")
     
