@@ -550,8 +550,8 @@ class EnhancedVectorEmotionAnalyzer:
             
             logger.info(f"🎭 STEP 7 RESULT: Final combined emotions: {final_emotions}")
             
-            # Step 7: Determine primary emotion and confidence
-            primary_emotion, confidence = self._determine_primary_emotion(final_emotions)
+            # Step 7: Determine primary emotion and confidence (pass content for question detection)
+            primary_emotion, confidence = self._determine_primary_emotion(final_emotions, content=content)
             
             # SURGICAL FIX: Standardize primary emotion to universal taxonomy
             from src.intelligence.emotion_taxonomy import standardize_emotion
@@ -1150,37 +1150,125 @@ class EnhancedVectorEmotionAnalyzer:
         
         return combined_emotions
     
-    def _determine_primary_emotion(self, emotions: Dict[str, float]) -> Tuple[str, float]:
-        """Determine the primary emotion and confidence from combined analysis"""
+    def _calculate_emotion_margin(self, emotions: Dict[str, float]) -> Tuple[float, str, str]:
+        """
+        Calculate margin between top two emotions.
+        
+        Returns:
+            Tuple of (margin, primary_emotion, secondary_emotion)
+        """
+        sorted_emotions = sorted(emotions.items(), key=lambda x: x[1], reverse=True)
+        if len(sorted_emotions) < 2:
+            return 0.0, sorted_emotions[0][0] if sorted_emotions else "neutral", "none"
+        
+        primary_emotion, primary_score = sorted_emotions[0]
+        secondary_emotion, secondary_score = sorted_emotions[1]
+        margin = primary_score - secondary_score
+        
+        return margin, primary_emotion, secondary_emotion
+
+    def _determine_primary_emotion(self, emotions: Dict[str, float], content: str = "") -> Tuple[str, float]:
+        """
+        Determine primary emotion using adaptive confidence thresholding.
+        
+        Adaptive Strategy:
+        - Neutral requires HIGH confidence (≥0.70) OR large margin (≥0.30)
+        - Emotions accepted at MODERATE confidence (≥0.35) with clear winner (≥0.15 margin)
+        - OR emotions accepted with very large margin (≥0.25) even at low confidence
+        - Smart fallback: When neutral wins weakly, check for strong alternatives
+        - Special handling: Low-intensity anticipation from questions treated as neutral
+        
+        This eliminates neutral bias while preserving accuracy for genuinely neutral content.
+        """
         if not emotions:
             return "neutral", 0.3
         
-        # 🔥 FIX: Don't let neutral win if there's a strong competing emotion
-        # This prevents "neutral: 1.0" from beating "anger: 0.867" when RoBERTa detects both
-        non_neutral_emotions = {k: v for k, v in emotions.items() if k != 'neutral'}
-        max_non_neutral = max(non_neutral_emotions.values()) if non_neutral_emotions else 0.0
-        neutral_score = emotions.get('neutral', 0.0)
+        # Calculate margin between top two emotions
+        margin, primary_emotion, secondary_emotion = self._calculate_emotion_margin(emotions)
+        primary_confidence = emotions.get(primary_emotion, 0.0)
+        secondary_confidence = emotions.get(secondary_emotion, 0.0)
         
-        # Use non-neutral emotion if it's significant (>0.3) and competitive with neutral
-        if max_non_neutral > 0.3 and max_non_neutral > neutral_score * 0.5:
-            # Find the strongest non-neutral emotion
-            primary_emotion = max(non_neutral_emotions.items(), key=lambda x: x[1])
-            emotion_name, confidence = primary_emotion
-            logger.info(f"🎭 PRIMARY EMOTION: Chose {emotion_name} ({confidence:.3f}) over neutral ({neutral_score:.3f})")
+        logger.info(f"🎯 ADAPTIVE THRESHOLD: Primary={primary_emotion}({primary_confidence:.3f}), "
+                    f"Secondary={secondary_emotion}({secondary_confidence:.3f}), "
+                    f"Margin={margin:.3f}")
+        
+        # === SPECIAL HANDLING: Questions with anticipation ===
+        # Questions naturally contain "anticipation" (expecting answer), but if confidence is low/moderate,
+        # treat them as neutral for better UX alignment
+        if primary_emotion == 'anticipation' and content:
+            # Check if this is a question
+            is_question = content.strip().endswith('?') or any(
+                content.lower().startswith(q) for q in ['how', 'what', 'when', 'where', 'why', 'who', 'can', 'do', 'is', 'are']
+            )
+            
+            # If it's a question with low-moderate anticipation, treat as neutral
+            if is_question and primary_confidence < 0.70:
+                logger.info(f"❓ QUESTION PATTERN: Low anticipation ({primary_confidence:.3f}) in question context → treating as neutral")
+                return "neutral", 0.5
+        
+        # === ADAPTIVE THRESHOLDING LOGIC ===
+        
+        if primary_emotion == 'neutral':
+            # NEUTRAL DETECTION: Require strong evidence
+            
+            # Strong neutral signal: high confidence OR large margin
+            if primary_confidence >= 0.70 or margin >= 0.30:
+                logger.info(f"✅ NEUTRAL ACCEPTED: Strong signal (conf={primary_confidence:.3f}, margin={margin:.3f})")
+                return "neutral", primary_confidence
+            
+            # Medium-strong neutral: moderate confidence with separation
+            elif primary_confidence >= 0.50 and margin >= 0.08:
+                logger.info(f"✅ NEUTRAL ACCEPTED: Medium-strong (conf={primary_confidence:.3f}, margin={margin:.3f})")
+                return "neutral", primary_confidence
+            
+            else:
+                # Neutral won but not convincingly - look for alternatives
+                logger.info(f"⚠️ NEUTRAL WEAK: Looking for non-neutral alternative (conf={primary_confidence:.3f}, margin={margin:.3f})")
+                
+                # Find best non-neutral emotion
+                non_neutral_emotions = {k: v for k, v in emotions.items() if k != 'neutral'}
+                if non_neutral_emotions:
+                    best_emotion, best_score = max(non_neutral_emotions.items(), key=lambda x: x[1])
+                    gap_to_neutral = primary_confidence - best_score
+                    
+                    # Accept non-neutral if it's strong OR very close to neutral
+                    if best_score >= 0.40 or gap_to_neutral < 0.05:
+                        logger.info(f"✅ NON-NEUTRAL PREFERRED: {best_emotion}({best_score:.3f}) over weak neutral (gap={gap_to_neutral:.3f})")
+                        return best_emotion, best_score
+                
+                # All emotions too weak - fall back to neutral
+                logger.info(f"⚠️ FALLBACK TO NEUTRAL: No strong alternatives found")
+                return "neutral", primary_confidence
+        
         else:
-            # No strong non-neutral emotion, use whatever is highest (including neutral)
-            primary_emotion = max(emotions.items(), key=lambda x: x[1])
-            emotion_name, confidence = primary_emotion
-            logger.info(f"🎭 PRIMARY EMOTION: No strong alternative, chose {emotion_name} ({confidence:.3f})")
-        
-        # Apply confidence adjustments
-        confidence = min(confidence * 1.2, 1.0)  # Slight confidence boost
-        
-        # Minimum confidence threshold
-        if confidence < 0.2:
-            return "neutral", 0.4
-        
-        return emotion_name, confidence
+            # NON-NEUTRAL EMOTION DETECTION
+            
+            # High confidence emotion
+            if primary_confidence >= 0.50:
+                logger.info(f"✅ EMOTION ACCEPTED: High confidence (conf={primary_confidence:.3f})")
+                return primary_emotion, primary_confidence
+            
+            # Clear winner: moderate confidence with good margin
+            elif primary_confidence >= 0.35 and margin >= 0.15:
+                logger.info(f"✅ EMOTION ACCEPTED: Clear winner (conf={primary_confidence:.3f}, margin={margin:.3f})")
+                return primary_emotion, primary_confidence
+            
+            # Very large margin: accept even at low confidence
+            elif margin >= 0.25:
+                logger.info(f"✅ EMOTION ACCEPTED: Very large margin (margin={margin:.3f})")
+                return primary_emotion, primary_confidence
+            
+            else:
+                # Emotion is weak - check if should fall back to neutral
+                neutral_score = emotions.get('neutral', 0.0)
+                
+                if neutral_score >= 0.30:
+                    logger.info(f"⚠️ FALLBACK TO NEUTRAL: Weak emotion (conf={primary_confidence:.3f}, margin={margin:.3f}), neutral available ({neutral_score:.3f})")
+                    return "neutral", neutral_score
+                else:
+                    # Even neutral is weak - keep the emotion
+                    logger.info(f"✅ EMOTION KEPT: All signals weak, keeping {primary_emotion} (conf={primary_confidence:.3f})")
+                    return primary_emotion, primary_confidence
 
     # =================================================================
     # COMPREHENSIVE EMOTIONAL INTELLIGENCE METHODS
