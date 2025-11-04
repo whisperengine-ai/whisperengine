@@ -16,7 +16,7 @@ A comprehensive suite of 5 documents explaining how `pattern_type` works in Whis
 
 ### 1. **CDL_PATTERN_TYPE_HANDLING.md** - Comprehensive Reference
 **Size**: 24 KB | **Read Time**: 20-30 minutes  
-**Location**: `/docs/cdl-system/CDL_PATTERN_TYPE_HANDLING.md`
+**Location**: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md)
 
 **Contents**:
 - What is `pattern_type`? (definition & characteristics)
@@ -41,7 +41,7 @@ A comprehensive suite of 5 documents explaining how `pattern_type` works in Whis
 
 ### 2. **CDL_PATTERN_TYPE_QUICK_REFERENCE.md** - Quick Lookup
 **Size**: 6.1 KB | **Read Time**: 5 minutes  
-**Location**: `/docs/cdl-system/CDL_PATTERN_TYPE_QUICK_REFERENCE.md`
+**Location**: [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md)
 
 **Contents**:
 - Quick definition of pattern_type
@@ -66,7 +66,7 @@ A comprehensive suite of 5 documents explaining how `pattern_type` works in Whis
 
 ### 3. **CDL_PATTERN_TYPE_VISUAL_GUIDE.md** - Visual Reference
 **Size**: 19 KB | **Read Time**: 15 minutes  
-**Location**: `/docs/cdl-system/CDL_PATTERN_TYPE_VISUAL_GUIDE.md`
+**Location**: [CDL_PATTERN_TYPE_VISUAL_GUIDE.md](./CDL_PATTERN_TYPE_VISUAL_GUIDE.md)
 
 **Contents**:
 - ASCII diagrams of entire pipeline
@@ -91,7 +91,7 @@ A comprehensive suite of 5 documents explaining how `pattern_type` works in Whis
 
 ### 4. **ARIA_HOLOGRAPHIC_PATTERNS.md** - Character Implementation
 **Size**: 13 KB | **Read Time**: 15 minutes  
-**Location**: `/docs/cdl-system/ARIA_HOLOGRAPHIC_PATTERNS.md`
+**Location**: [ARIA_HOLOGRAPHIC_PATTERNS.md](./ARIA_HOLOGRAPHIC_PATTERNS.md)
 
 **Contents**:
 - ARIA's character background
@@ -117,7 +117,7 @@ A comprehensive suite of 5 documents explaining how `pattern_type` works in Whis
 
 ### 5. **CDL_PATTERN_TYPE_DOCUMENTATION_SUMMARY.md** - Navigation Guide
 **Size**: 9.1 KB | **Read Time**: 10 minutes  
-**Location**: `/docs/cdl-system/CDL_PATTERN_TYPE_DOCUMENTATION_SUMMARY.md`
+**Location**: [CDL_PATTERN_TYPE_DOCUMENTATION_SUMMARY.md](./CDL_PATTERN_TYPE_DOCUMENTATION_SUMMARY.md)
 
 **Contents**:
 - Overview of all 5 documentation files
@@ -224,24 +224,24 @@ A comprehensive suite of 5 documents explaining how `pattern_type` works in Whis
 These documents complement existing WhisperEngine documentation:
 
 **Existing CDL Docs**:
-- ✅ `docs/cdl-system/CDL_DATABASE_GUIDE.md` - Overall CDL system
-- ✅ `docs/architecture/CHARACTER_ARCHETYPES.md` - Character types
-- ✅ `docs/cdl-system/CDL_INTEGRATION_COMPLETE_ROADMAP.md` - Implementation roadmap
-- ✅ `docs/architecture/CDL_COMPONENT_MAPPING.md` - Component relationships
+- ✅ [CDL_DATABASE_GUIDE.md](../cdl-system/CDL_DATABASE_GUIDE.md) - Overall CDL system
+- ✅ [CHARACTER_ARCHETYPES.md](../architecture/CHARACTER_ARCHETYPES.md) - Character types
+- ✅ [CDL_INTEGRATION_COMPLETE_ROADMAP.md](../cdl-system/CDL_INTEGRATION_COMPLETE_ROADMAP.md) - Implementation roadmap
+- ✅ [CDL_COMPONENT_MAPPING.md](../architecture/CDL_COMPONENT_MAPPING.md) - Component relationships
 
 **New Pattern Type Docs** (This Suite):
-- ✅ `CDL_PATTERN_TYPE_HANDLING.md` - Deep pattern_type documentation
-- ✅ `CDL_PATTERN_TYPE_QUICK_REFERENCE.md` - Quick lookup
-- ✅ `CDL_PATTERN_TYPE_VISUAL_GUIDE.md` - Visual explanations
-- ✅ `ARIA_HOLOGRAPHIC_PATTERNS.md` - Character example
+- ✅ [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md) - Deep pattern_type documentation
+- ✅ [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md) - Quick lookup
+- ✅ [CDL_PATTERN_TYPE_VISUAL_GUIDE.md](./CDL_PATTERN_TYPE_VISUAL_GUIDE.md) - Visual explanations
+- ✅ [ARIA_HOLOGRAPHIC_PATTERNS.md](./ARIA_HOLOGRAPHIC_PATTERNS.md) - Character example
 - ✅ This index document
 
 **Recommended Reading Order**:
-1. Start: `CDL_DATABASE_GUIDE.md` (understand CDL overall)
-2. Then: `CDL_PATTERN_TYPE_QUICK_REFERENCE.md` (quick patterns overview)
-3. Deep: `CDL_PATTERN_TYPE_HANDLING.md` (pattern_type system)
-4. Visual: `CDL_PATTERN_TYPE_VISUAL_GUIDE.md` (understand flows)
-5. Practical: `ARIA_HOLOGRAPHIC_PATTERNS.md` (real implementation)
+1. Start: [CDL_DATABASE_GUIDE.md](../cdl-system/CDL_DATABASE_GUIDE.md) (understand CDL overall)
+2. Then: [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md) (quick patterns overview)
+3. Deep: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md) (pattern_type system)
+4. Visual: [CDL_PATTERN_TYPE_VISUAL_GUIDE.md](./CDL_PATTERN_TYPE_VISUAL_GUIDE.md) (understand flows)
+5. Practical: [ARIA_HOLOGRAPHIC_PATTERNS.md](./ARIA_HOLOGRAPHIC_PATTERNS.md) (real implementation)
 
 ---
 
@@ -255,7 +255,7 @@ These documents complement existing WhisperEngine documentation:
 - Fully extensible and customizable
 - Examples: humor, explanation, emoji, communication_style
 
-**Read**: `CDL_PATTERN_TYPE_HANDLING.md` § "What is Pattern Type?"
+**Read**: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md) § "What is Pattern Type?"
 
 ---
 
@@ -268,7 +268,7 @@ These documents complement existing WhisperEngine documentation:
 - Send to LLM
 - LLM generates response
 
-**Read**: `CDL_PATTERN_TYPE_VISUAL_GUIDE.md` § "Data Flow Diagram"
+**Read**: [CDL_PATTERN_TYPE_VISUAL_GUIDE.md](./CDL_PATTERN_TYPE_VISUAL_GUIDE.md) § "Data Flow Diagram"
 
 ---
 
@@ -280,7 +280,7 @@ These documents complement existing WhisperEngine documentation:
 - Specify context and frequency
 - Test via HTTP Chat API
 
-**Read**: `CDL_PATTERN_TYPE_QUICK_REFERENCE.md` § "Quick SQL Examples"
+**Read**: [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md) § "Quick SQL Examples"
 
 ---
 
@@ -292,7 +292,7 @@ These documents complement existing WhisperEngine documentation:
 - sometimes: 30-50% of responses
 - rarely: <20% of responses
 
-**Read**: `CDL_PATTERN_TYPE_HANDLING.md` § "Frequency Values"
+**Read**: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md) § "Frequency Values"
 
 ---
 
@@ -304,27 +304,27 @@ These documents complement existing WhisperEngine documentation:
 - Complements other communication patterns
 - Creates unique AI personality
 
-**Read**: `ARIA_HOLOGRAPHIC_PATTERNS.md` § "How ARIA's Patterns Work"
+**Read**: [ARIA_HOLOGRAPHIC_PATTERNS.md](./ARIA_HOLOGRAPHIC_PATTERNS.md) § "How ARIA's Patterns Work"
 
 ---
 
 ## 🚀 Using This Documentation
 
 ### For Development Work
-**Keep open**: `CDL_PATTERN_TYPE_QUICK_REFERENCE.md`  
+**Keep open**: [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md)  
 **Reference**: SQL examples while working
 
 ### For Learning
-**Start with**: `CDL_PATTERN_TYPE_DOCUMENTATION_SUMMARY.md`  
-**Then read**: `CDL_PATTERN_TYPE_VISUAL_GUIDE.md`  
-**Deep dive**: `CDL_PATTERN_TYPE_HANDLING.md`
+**Start with**: [CDL_PATTERN_TYPE_DOCUMENTATION_SUMMARY.md](./CDL_PATTERN_TYPE_DOCUMENTATION_SUMMARY.md)  
+**Then read**: [CDL_PATTERN_TYPE_VISUAL_GUIDE.md](./CDL_PATTERN_TYPE_VISUAL_GUIDE.md)  
+**Deep dive**: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md)
 
 ### For Problem Solving
-**Check**: `CDL_PATTERN_TYPE_QUICK_REFERENCE.md` § "Common Issues"  
-**Then**: `CDL_PATTERN_TYPE_HANDLING.md` § "Troubleshooting"
+**Check**: [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md) § "Common Issues"  
+**Then**: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md) § "Troubleshooting"
 
 ### For Implementation
-**Follow**: `ARIA_HOLOGRAPHIC_PATTERNS.md` as template  
+**Follow**: [ARIA_HOLOGRAPHIC_PATTERNS.md](./ARIA_HOLOGRAPHIC_PATTERNS.md) as template  
 **Use**: SQL examples from any document
 
 ---
@@ -332,22 +332,22 @@ These documents complement existing WhisperEngine documentation:
 ## 📞 Quick Help
 
 ### "I forgot what frequency values mean"
-→ See `CDL_PATTERN_TYPE_QUICK_REFERENCE.md` - Frequency Values table
+→ See [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md) - Frequency Values table
 
 ### "I need a SQL example to add a pattern"
-→ See `CDL_PATTERN_TYPE_QUICK_REFERENCE.md` - Quick SQL Examples
+→ See [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md) - Quick SQL Examples
 
 ### "I don't understand how patterns work"
-→ See `CDL_PATTERN_TYPE_VISUAL_GUIDE.md` - Data Flow Diagram
+→ See [CDL_PATTERN_TYPE_VISUAL_GUIDE.md](./CDL_PATTERN_TYPE_VISUAL_GUIDE.md) - Data Flow Diagram
 
 ### "I need to implement ARIA's patterns"
-→ See `ARIA_HOLOGRAPHIC_PATTERNS.md` - Recommended Pattern Set
+→ See [ARIA_HOLOGRAPHIC_PATTERNS.md](./ARIA_HOLOGRAPHIC_PATTERNS.md) - Recommended Pattern Set
 
 ### "Something's not working"
 → See any document's Troubleshooting section
 
 ### "I want to understand everything"
-→ Read `CDL_PATTERN_TYPE_HANDLING.md` in order
+→ Read [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md) in order
 
 ---
 

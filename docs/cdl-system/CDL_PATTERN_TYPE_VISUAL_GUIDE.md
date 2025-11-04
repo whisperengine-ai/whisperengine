@@ -426,6 +426,6 @@ rarely                    │  Pattern at VERY END       │  🟠 <20% of
 ---
 
 **See Also**: 
-- Full documentation: `CDL_PATTERN_TYPE_HANDLING.md`
-- Quick reference: `CDL_PATTERN_TYPE_QUICK_REFERENCE.md`
-- ARIA implementation: `ARIA_HOLOGRAPHIC_PATTERNS.md`
+- Full documentation: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md)
+- Quick reference: [CDL_PATTERN_TYPE_QUICK_REFERENCE.md](./CDL_PATTERN_TYPE_QUICK_REFERENCE.md)
+- ARIA implementation: [ARIA_HOLOGRAPHIC_PATTERNS.md](./ARIA_HOLOGRAPHIC_PATTERNS.md)

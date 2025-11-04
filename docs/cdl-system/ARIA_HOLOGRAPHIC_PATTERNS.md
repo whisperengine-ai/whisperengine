@@ -374,9 +374,9 @@ AND pattern_name = 'manifestation_emotion';
 
 ## Documentation References
 
-- **Full CDL Guide**: `docs/cdl-system/CDL_DATABASE_GUIDE.md`
-- **Pattern Type Handling**: `docs/cdl-system/CDL_PATTERN_TYPE_HANDLING.md`
-- **Character Archetypes**: `docs/architecture/CHARACTER_ARCHETYPES.md`
+- **Full CDL Guide**: [CDL_DATABASE_GUIDE.md](./CDL_DATABASE_GUIDE.md)
+- **Pattern Type Handling**: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md)
+- **Character Archetypes**: [CHARACTER_ARCHETYPES.md](../architecture/CHARACTER_ARCHETYPES.md)
 - **ARIA Character Details**: See `.env.aria` configuration
 
 ---

@@ -201,6 +201,6 @@ curl -X POST http://localhost:9091/api/chat \
 
 ## References
 
-- Full documentation: `docs/cdl-system/CDL_PATTERN_TYPE_HANDLING.md`
-- CDL Database Guide: `docs/cdl-system/CDL_DATABASE_GUIDE.md`
+- Full documentation: [CDL_PATTERN_TYPE_HANDLING.md](./CDL_PATTERN_TYPE_HANDLING.md)
+- CDL Database Guide: [CDL_DATABASE_GUIDE.md](./CDL_DATABASE_GUIDE.md)
 - Character examples: `characters/examples_legacy_backup/` or CDL Web UI
