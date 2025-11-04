@@ -201,15 +201,35 @@ class NLPAnalysisCache:
     
     def has_lemma(self, lemma: str) -> bool:
         """
-        Check if message contains specific lemma (O(1) lookup).
+        Check if lemma exists in cached lemmas (O(1) lookup).
         
         Args:
-            lemma: Lemmatized word to check (lowercase)
-        
+            lemma: Base form to check (e.g., "worry")
+            
         Returns:
-            True if lemma is present in message
+            True if lemma exists in document
+            
+        Example:
+            >>> cache.has_lemma("worry")  # True if "worried"/"worrying"/"worries" in text
+            True
         """
-        return lemma.lower() in self.lemma_set
+        return lemma in self.lemmas
+    
+    def has_emotion_keyword(self, emotion: str) -> bool:
+        """
+        Check if any keywords for emotion exist in cached keywords (O(1) lookup).
+        
+        Args:
+            emotion: Emotion name (e.g., "joy", "fear", "anger")
+            
+        Returns:
+            True if emotion has keywords detected in document
+            
+        Example:
+            >>> cache.has_emotion_keyword("joy")  # True if "happy"/"excited"/etc in text
+            True
+        """
+        return emotion in self.emotion_keywords and len(self.emotion_keywords[emotion]) > 0
     
     def get_tokens_with_pos(self, pos_tag: str) -> List["Token"]:
         """
