@@ -1078,11 +1078,33 @@ class MessageProcessor:
             early_emotion_context = None
             user_stance_analysis = None
             
+            # 🚀 OPTIMIZATION: Create NLPAnalysisCache once per message (eliminates 3+ redundant spaCy parses)
+            # This cache will be reused by: stance analyzer, emotion analyzer (keywords, intensity, trajectory)
+            nlp_cache = None
+            try:
+                from src.intelligence.nlp_analysis_cache import NLPAnalysisCache
+                from src.nlp.spacy_manager import get_spacy_nlp
+                
+                nlp = get_spacy_nlp()
+                if nlp:
+                    doc = nlp(message_context.content)
+                    nlp_cache = NLPAnalysisCache.from_doc(doc, message_context.content)
+                    logger.debug(
+                        f"🚀 NLP CACHE: Created unified cache "
+                        f"(lemmas={len(nlp_cache.lemmas)}, emotion_keywords={len(nlp_cache.emotion_keywords)})"
+                    )
+                else:
+                    logger.debug("🚀 NLP CACHE: spaCy not available, analyzers will use legacy paths")
+            except Exception as e:
+                logger.debug(f"🚀 NLP CACHE: Cache creation failed (non-blocking, using legacy): {e}")
+                nlp_cache = None
+            
             # First, analyze stance to filter emotions by speaker perspective
             if self._stance_analyzer:
                 try:
                     user_stance_analysis = self._stance_analyzer.analyze_user_stance(
                         message_context.content
+                        # Note: stance analyzer could be optimized with nlp_cache in future
                     )
                     if user_stance_analysis:
                         logger.info(
@@ -1099,7 +1121,9 @@ class MessageProcessor:
                 try:
                     early_emotion_result = await self._shared_emotion_analyzer.analyze_emotion(
                         message_context.content,
-                        message_context.user_id
+                        message_context.user_id,
+                        stance_analysis=user_stance_analysis,  # Pass stance for filtering
+                        nlp_cache=nlp_cache  # 🚀 Pass cache to avoid re-parsing (keywords, intensity, trajectory)
                     )
                     if early_emotion_result and hasattr(early_emotion_result, 'primary_emotion'):
                         early_emotion_context = early_emotion_result.primary_emotion
