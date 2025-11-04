@@ -797,7 +797,7 @@
             "type": "influxdb",
             "uid": "influxdb"
           },
-          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> filter(fn: (r) => r._field == \"emotional_resonance\" or r._field == \"engagement_score\" or r._field == \"natural_flow_score\" or r._field == \"satisfaction_score\" or r._field == \"topic_relevance\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"conversation_quality\")\n  |> filter(fn: (r) => r.bot == \"${bot}\")\n  |> filter(fn: (r) => \"${user_id}\" == \"\" or r.user_id == \"${user_id}\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ],
