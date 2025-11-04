@@ -526,12 +526,12 @@ class EnhancedVectorEmotionAnalyzer:
             
             # Step 5: Emotional intensity analysis
             logger.debug(f"🎭 STEP 5: Analyzing emotional intensity")
-            intensity = self._analyze_emotional_intensity(content)
+            intensity = self._analyze_emotional_intensity(content, nlp_cache=nlp_cache)
             logger.info(f"🎭 STEP 5 RESULT: Emotional intensity: {intensity:.3f}")
             
             # Step 6: Emotional trajectory analysis
             logger.debug(f"🎭 STEP 6: Analyzing emotional trajectory")
-            trajectory = self._analyze_emotional_trajectory(content, recent_emotions)
+            trajectory = self._analyze_emotional_trajectory(content, recent_emotions, nlp_cache=nlp_cache)
             logger.info(f"🎭 STEP 6 RESULT: Emotional trajectory: {trajectory}")
             
             # Step 7: Combine all emotion analyses (including emoji analysis)
@@ -1088,18 +1088,31 @@ class EnhancedVectorEmotionAnalyzer:
         
         return context_emotions
     
-    def _analyze_emotional_intensity(self, content: str) -> float:
-        """Analyze the intensity of emotional expression"""
+    def _analyze_emotional_intensity(self, content: str, nlp_cache: Optional[Any] = None) -> float:
+        """
+        Analyze the intensity of emotional expression.
+        
+        Args:
+            content: Text to analyze
+            nlp_cache: Optional NLPAnalysisCache with pre-computed POS tags
+                      If provided, uses POS-based intensifier detection
+        """
         content_lower = content.lower()
         intensity_score = 0.5  # Base intensity
         
         # Check for intensity amplifiers
-        amplifier_count = sum(
-            1 for amplifier in self.intensity_amplifiers 
-            if amplifier in content_lower
-        )
+        # 🚀 OPTIMIZED: Use POS tags if cache available (more accurate, handles variations)
+        if nlp_cache is not None:
+            # Get adverbs (primary intensifiers) + intensifier lemmas from cache
+            amplifier_count = nlp_cache.get_intensifier_count()
+        else:
+            # Legacy: substring matching
+            amplifier_count = sum(
+                1 for amplifier in self.intensity_amplifiers 
+                if amplifier in content_lower
+            )
         
-        # Check for punctuation intensity
+        # Check for punctuation intensity (this works well, keep it)
         exclamation_count = content.count('!')
         question_count = content.count('?')
         caps_ratio = sum(1 for c in content if c.isupper()) / max(len(content), 1)
@@ -1115,21 +1128,40 @@ class EnhancedVectorEmotionAnalyzer:
     def _analyze_emotional_trajectory(
         self, 
         content: str, 
-        recent_emotions: Optional[List[str]] = None
+        recent_emotions: Optional[List[str]] = None,
+        nlp_cache: Optional[Any] = None
     ) -> str:
-        """Analyze the trajectory of emotional change"""
+        """
+        Analyze the trajectory of emotional change.
+        
+        Args:
+            content: Text to analyze
+            recent_emotions: List of recently detected emotions
+            nlp_cache: Optional NLPAnalysisCache with pre-computed lemmas
+                      If provided, uses lemma-based verb detection (handles tenses)
+        """
         content_lower = content.lower()
         
         # Check for trajectory indicators in content
-        rising_count = sum(
-            1 for indicator in self.rising_indicators 
-            if indicator in content_lower
-        )
-        
-        falling_count = sum(
-            1 for indicator in self.falling_indicators 
-            if indicator in content_lower
-        )
+        # 🚀 OPTIMIZED: Use lemmas if cache available (handles verb tenses automatically)
+        if nlp_cache is not None:
+            # Use lemma-based matching (handles "getting", "got", "gets" via "get" lemma)
+            rising_indicators_lemmas = {'get', 'become', 'grow', 'increase', 'start', 'begin', 'feel', 'turn'}
+            falling_indicators_lemmas = {'calm', 'settle', 'fade', 'diminish', 'use'}  # "used to be" → "use"
+            
+            rising_count = sum(1 for lemma in rising_indicators_lemmas if nlp_cache.has_lemma(lemma))
+            falling_count = sum(1 for lemma in falling_indicators_lemmas if nlp_cache.has_lemma(lemma))
+        else:
+            # Legacy: substring matching
+            rising_count = sum(
+                1 for indicator in self.rising_indicators 
+                if indicator in content_lower
+            )
+            
+            falling_count = sum(
+                1 for indicator in self.falling_indicators 
+                if indicator in content_lower
+            )
         
         # Check historical emotion pattern
         if recent_emotions and len(recent_emotions) >= 2:
