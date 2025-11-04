@@ -19,6 +19,17 @@ from collections import Counter
 
 from src.nlp.spacy_manager import get_spacy_nlp
 
+# Import text normalization utilities
+try:
+    from src.utils.text_normalizer import (
+        get_text_normalizer,
+        TextNormalizationMode
+    )
+    _TEXT_NORMALIZER_AVAILABLE = True
+except ImportError:
+    _TEXT_NORMALIZER_AVAILABLE = False
+    logging.getLogger(__name__).warning("Text normalizer not available for hybrid context detector")
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,6 +78,9 @@ class HybridContextDetector:
         Uses content words only (NOUN, VERB, ADJ, ADV) to filter out articles,
         pronouns, and auxiliary verbs that create pattern matching noise.
         
+        ⭐ PHASE 1: Text Normalization (Nov 2025)
+        Cleans Discord artifacts before spaCy processing for better accuracy.
+        
         Args:
             text: The text to lemmatize
             
@@ -77,22 +91,44 @@ class HybridContextDetector:
             return ""
             
         try:
+            # ⭐ PHASE 1: Normalize text before spaCy processing
+            # Uses pattern matching mode: lowercase + full cleaning
+            if _TEXT_NORMALIZER_AVAILABLE:
+                try:
+                    normalizer = get_text_normalizer()
+                    text = normalizer.normalize(text, TextNormalizationMode.PATTERN_MATCHING)
+                    logger.debug("Text normalized for pattern matching: '%s...'", text[:50])
+                except (AttributeError, ValueError, TypeError) as norm_error:
+                    logger.warning("Text normalization failed in lemmatize: %s", norm_error)
+                    # Fall back to simple lowercase if normalization fails
+                    text = text.lower()
+            else:
+                # Legacy behavior: just lowercase
+                text = text.lower()
+            
             if not self.nlp:
-                return text.lower()
+                return text
                 
             # Use spaCy to lemmatize and extract content words
-            doc = self.nlp(text.lower())
+            doc = self.nlp(text)
             
             # Extract only content words (filters out articles, pronouns, aux verbs)
             content_words = [token.lemma_ for token in doc 
                            if token.pos_ in ['NOUN', 'VERB', 'ADJ', 'ADV']]
+            
+            # Filter out replacement tokens from lemmatization results
+            # These aren't real content words and pollute pattern matching
+            if _TEXT_NORMALIZER_AVAILABLE:
+                normalizer = get_text_normalizer()
+                content_words = [word for word in content_words 
+                               if not normalizer.should_filter_token(word)]
             
             # If no content words found, fall back to all lemmas (safety net)
             if not content_words:
                 content_words = [token.lemma_ for token in doc if not token.is_punct]
             
             return ' '.join(content_words)
-        except Exception as e:
+        except (AttributeError, ValueError, TypeError) as e:
             logger.warning("Lemmatization failed for hybrid context detection: %s", str(e))
             return text.lower() if text else ""
     

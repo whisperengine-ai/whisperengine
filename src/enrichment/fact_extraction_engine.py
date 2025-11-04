@@ -160,7 +160,8 @@ class FactExtractionEngine:
         relationships: List[Dict],
         preference_patterns: Dict[str, int],
         entities: List[Dict],
-        indicators: Dict
+        indicators: Dict,
+        attributes: Optional[List[Dict]] = None  # ⭐ PHASE 2: Attribute guidance
     ) -> str:
         """
         Build spaCy context prefix for LLM guidance.
@@ -168,12 +169,16 @@ class FactExtractionEngine:
         Uses extracted linguistic features to guide LLM fact extraction without
         explicitly telling it what facts to extract. More Socratic than prescriptive.
         
+        ⭐ PHASE 2: Now includes attribute guidance to help LLM preserve compound
+        entities like "green car", "ice cream", "Swedish meatballs".
+        
         Args:
             negation_facts: List of detected negated statements
             relationships: List of SVO relationships with negation info + metadata
             preference_patterns: Dict of pattern types → match counts
             entities: List of extracted named entities
             indicators: Dict with names, locations, question_sentences
+            attributes: List of attribute relationships (amod, compound, nmod)
             
         Returns:
             Context string to prepend to extraction prompt
@@ -183,6 +188,47 @@ class FactExtractionEngine:
         # Add header
         lines.append("LINGUISTIC ANALYSIS (detected patterns to guide fact extraction):")
         lines.append("")
+        
+        # ⭐ PHASE 2: Add attribute guidance FIRST (most important for quality)
+        # This helps LLM understand semantic units and avoid splitting entities
+        if attributes:
+            # Group attributes by entity for clearer guidance
+            entity_attrs = {}
+            for attr in attributes:
+                entity = attr.get('entity', 'unknown')
+                if entity not in entity_attrs:
+                    entity_attrs[entity] = []
+                entity_attrs[entity].append(attr)
+            
+            lines.append("ENTITY ATTRIBUTES (preserve these as semantic units):")
+            count = 0
+            for entity, attrs in entity_attrs.items():
+                if count >= 10:  # Limit to first 10 entities to avoid token overflow
+                    break
+                
+                # Build attribute description
+                attr_list = []
+                for attr in attrs:
+                    attr_text = attr.get('attribute', '')
+                    attr_type = attr.get('attribute_type', '')
+                    
+                    if attr_type == 'descriptor':
+                        attr_list.append(f"{attr_text} (adjective)")
+                    elif attr_type == 'compound':
+                        attr_list.append(f"{attr_text} (compound)")
+                    else:
+                        attr_list.append(attr_text)
+                
+                if attr_list:
+                    lines.append(f"  • '{entity}' with: {', '.join(attr_list)}")
+                    lines.append(f"    → Store as: '{' '.join([a.get('attribute') for a in attrs])} {entity}'")
+                    count += 1
+            
+            if entity_attrs:
+                lines.append("")
+                lines.append("IMPORTANT: These should be stored as SINGLE entities with attributes,")
+                lines.append("not split into separate disconnected entities.")
+                lines.append("")
         
         # Add negation facts if found
         if negation_facts:
@@ -340,9 +386,12 @@ class FactExtractionEngine:
                 # Extract entities and indicators
                 entities = all_features.get("entities", [])
                 preference_indicators = all_features.get("indicators", {})
+                attributes = all_features.get("attributes", [])  # ⭐ PHASE 2: Attribute extraction
                 
                 if entities:
                     logger.info("  • Extracted %d named entities", len(entities))
+                if attributes:
+                    logger.info("  • Extracted %d attribute relationships", len(attributes))
                 if preference_indicators.get('names'):
                     logger.info("  • Preference indicators: names=%d, locations=%d, questions=%d",
                                len(preference_indicators.get('names', [])),
@@ -355,13 +404,14 @@ class FactExtractionEngine:
                     relationships=relationships,
                     preference_patterns=preference_patterns_found,
                     entities=entities,
-                    indicators=preference_indicators
+                    indicators=preference_indicators,
+                    attributes=attributes  # ⭐ PHASE 2: Pass attributes to LLM
                 )
                 
                 if spacy_context:
-                    logger.info("✅ SPACY CONTEXT BUILT: %d chars (negations=%d, rels=%d, patterns=%d)",
+                    logger.info("✅ SPACY CONTEXT BUILT: %d chars (negations=%d, rels=%d, patterns=%d, attrs=%d)",
                                len(spacy_context), len(negation_facts), len(relationships),
-                               sum(preference_patterns_found.values()))
+                               sum(preference_patterns_found.values()), len(attributes))
                 
             except (AttributeError, ValueError, TypeError) as e:
                 # Non-fatal: fallback to pure LLM

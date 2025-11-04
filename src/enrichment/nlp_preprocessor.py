@@ -31,6 +31,17 @@ except ImportError:
     Matcher = None  # type: ignore
     _SPACY_AVAILABLE = False
 
+# Import text normalization utilities
+try:
+    from src.utils.text_normalizer import (
+        get_text_normalizer,
+        TextNormalizationMode
+    )
+    _TEXT_NORMALIZER_AVAILABLE = True
+except ImportError:
+    _TEXT_NORMALIZER_AVAILABLE = False
+    logger.warning("Text normalizer not available - will process raw text")
+
 
 class EnrichmentNLPPreprocessor:
     """Optional spaCy-powered NLP preprocessor for enrichment worker."""
@@ -260,7 +271,21 @@ class EnrichmentNLPPreprocessor:
                 "pos_tags": {}
             }
         
-        # Truncate if necessary
+        # ⭐ PHASE 1: Text Normalization (Nov 2025)
+        # Clean Discord artifacts (mentions, URLs, emojis) before spaCy processing
+        # Uses replacement tokens ([URL], [MENTION]) to preserve text structure
+        if _TEXT_NORMALIZER_AVAILABLE:
+            try:
+                normalizer = get_text_normalizer()
+                original_text = text  # Keep for debugging
+                text = normalizer.normalize(text, TextNormalizationMode.ENTITY_EXTRACTION)
+                logger.debug("Text normalized for entity extraction: '%s...' -> '%s...'", 
+                           original_text[:50], text[:50])
+            except (AttributeError, ValueError, TypeError) as norm_error:
+                logger.warning("Text normalization failed: %s - using original text", norm_error)
+                # Continue with original text if normalization fails
+        
+        # Truncate if necessary (after normalization, since it might shorten text)
         if len(text) > max_length:
             logger.debug("Text length %d exceeds max %d, truncating for batch feature extraction", len(text), max_length)
             text = text[:max_length]
@@ -275,7 +300,8 @@ class EnrichmentNLPPreprocessor:
             "entities": self._extract_entities_from_doc(doc),
             "indicators": self._extract_indicators_from_doc(doc),
             "noun_chunks": self._extract_noun_chunks_from_doc(doc),
-            "pos_tags": self._extract_pos_tags_from_doc(doc)
+            "pos_tags": self._extract_pos_tags_from_doc(doc),
+            "attributes": self._extract_attributes_from_doc(doc)  # ⭐ PHASE 2: Semantic attributes
         }
     
     # =====================================================================
@@ -441,6 +467,93 @@ class EnrichmentNLPPreprocessor:
         for token in doc:
             pos_counts[token.pos_] = pos_counts.get(token.pos_, 0) + 1
         return pos_counts
+    
+    def _extract_attributes_from_doc(self, doc: Any) -> List[Dict[str, Any]]:
+        """
+        ⭐ PHASE 2: Extract entity attributes using dependency parsing.
+        
+        Identifies adjective-noun, compound noun, and noun modifier relationships
+        to preserve semantic units like "green car", "ice cream", "cup of coffee".
+        
+        This fixes the knowledge graph quality issue where "green car" was being
+        stored as two disconnected entities instead of one entity with attributes.
+        
+        Dependency Tags Used:
+        - amod: Adjectival modifier (e.g., "green" modifies "car")
+        - compound: Compound noun (e.g., "ice" modifies "cream")
+        - nmod: Noun modifier (e.g., "coffee" modifies "cup")
+        
+        Returns:
+            List of attribute relationships with structure:
+            {
+                "entity": str,           # Head noun (e.g., "car")
+                "attribute": str,        # Modifier (e.g., "green")
+                "attribute_type": str,   # Type of attribute ("color", "size", "compound", etc.)
+                "dependency": str,       # spaCy dependency tag (amod, compound, nmod)
+                "position": str          # "pre" or "post" (before or after entity)
+            }
+            
+        Examples:
+            "I have a green car" → [
+                {
+                    "entity": "car",
+                    "attribute": "green",
+                    "attribute_type": "descriptor",
+                    "dependency": "amod",
+                    "position": "pre"
+                }
+            ]
+            
+            "I love ice cream" → [
+                {
+                    "entity": "cream",
+                    "attribute": "ice",
+                    "attribute_type": "compound",
+                    "dependency": "compound",
+                    "position": "pre"
+                }
+            ]
+        """
+        attributes = []
+        
+        for token in doc:
+            # CASE 1: Adjectival Modifier (amod)
+            # Example: "green car" - "green" (amod) → "car" (head)
+            if token.dep_ == "amod":
+                attributes.append({
+                    "entity": token.head.text,
+                    "attribute": token.text,
+                    "attribute_type": "descriptor",  # Color, size, quality, etc.
+                    "dependency": "amod",
+                    "position": "pre" if token.i < token.head.i else "post"
+                })
+            
+            # CASE 2: Compound Noun (compound)
+            # Example: "ice cream" - "ice" (compound) → "cream" (head)
+            # Example: "Swedish meatballs" - "Swedish" (compound) → "meatballs" (head)
+            elif token.dep_ == "compound":
+                attributes.append({
+                    "entity": token.head.text,
+                    "attribute": token.text,
+                    "attribute_type": "compound",  # Multi-word entity
+                    "dependency": "compound",
+                    "position": "pre" if token.i < token.head.i else "post"
+                })
+            
+            # CASE 3: Noun Modifier (nmod)
+            # Example: "cup of coffee" - "coffee" (nmod) → "cup" (head)
+            # Note: This often includes prepositions in between
+            elif token.dep_ == "nmod":
+                attributes.append({
+                    "entity": token.head.text,
+                    "attribute": token.text,
+                    "attribute_type": "modifier",  # Relational modifier
+                    "dependency": "nmod",
+                    "position": "pre" if token.i < token.head.i else "post"
+                })
+        
+        logger.debug("Extracted %d attribute relationships from doc", len(attributes))
+        return attributes
 
     # ---------------------------------------------------------------------
     # Entity and Relationship Extraction
