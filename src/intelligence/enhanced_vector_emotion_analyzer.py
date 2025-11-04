@@ -902,13 +902,9 @@ class EnhancedVectorEmotionAnalyzer:
                             keyword_score
                         )
             
-            # LAYER 4: Apply intensity amplifiers
-            for amplifier in self.intensity_amplifiers:
-                if amplifier in content_lower:
-                    # Boost all detected emotions when intensity amplifiers are present
-                    for emotion in emotion_scores:
-                        emotion_scores[emotion] = min(emotion_scores[emotion] * 1.3, 1.0)
-                    break  # Only apply once
+            # Note: Intensity amplifier boost (1.3x multiplier) removed - redundant with adaptive thresholding
+            # RoBERTa analysis dominates emotion detection, making keyword-based boosts unnecessary
+            # Adaptive thresholding (lines 1310-1375) handles emotion vs neutral discrimination effectively
             
             return emotion_scores
             
