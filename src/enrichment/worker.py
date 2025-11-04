@@ -1276,8 +1276,12 @@ class EnrichmentWorker:
                         attributes = {
                             'extraction_method': 'enrichment_worker',
                             'extracted_at': datetime.now(timezone.utc).isoformat(),
-                            'tags': fact.related_facts  # Used for full-text search
+                            'tags': fact.related_facts,  # Used for full-text search
                         }
+                        
+                        # ⭐ PHASE 2: Add semantic attributes (adjectives, compound nouns, etc. from spaCy)
+                        if fact.semantic_attributes:
+                            attributes['semantic_attributes'] = fact.semantic_attributes
                         
                         # Insert or update entity in fact_entities (matches semantic_router.py)
                         # Include category field to match inline extraction schema

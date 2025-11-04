@@ -40,12 +40,15 @@ class ExtractedFact:
     temporal_context: Optional[str] = None  # "recent", "long-term", "past", etc.
     reasoning: Optional[str] = None
     source_messages: Optional[List[str]] = None  # Message IDs that support this fact
+    semantic_attributes: Optional[Dict] = None  # ⭐ PHASE 2: Semantic attributes from spaCy (adjectives, compound nouns, etc.)
     
     def __post_init__(self):
         if self.related_facts is None:
             self.related_facts = []
         if self.source_messages is None:
             self.source_messages = []
+        if self.semantic_attributes is None:
+            self.semantic_attributes = {}
 
 
 @dataclass
@@ -349,6 +352,7 @@ class FactExtractionEngine:
         negation_facts = []
         relationship_suggestions = []
         preference_patterns_found = {}
+        semantic_attributes_extracted = []  # ⭐ PHASE 2: Store for later use
         
         if (
             getattr(self, "preprocessor", None) is not None
@@ -387,6 +391,7 @@ class FactExtractionEngine:
                 entities = all_features.get("entities", [])
                 preference_indicators = all_features.get("indicators", {})
                 attributes = all_features.get("attributes", [])  # ⭐ PHASE 2: Attribute extraction
+                semantic_attributes_extracted = attributes  # ⭐ PHASE 2: Store for passing to parser
                 
                 if entities:
                     logger.info("  • Extracted %d named entities", len(entities))
@@ -486,7 +491,8 @@ Valid relationship_types: is_named, lives_in, from, works_as, studied_at, likes,
             logger.warning("🔍 LLM RESPONSE (first 300 chars): %s", result[:300] if result else "NONE")
             
             # Parse and structure results
-            facts = self._parse_fact_extraction_result(result, messages)
+            # ⭐ PHASE 2: Pass semantic attributes to enrich facts with adjectives, compound nouns, etc.
+            facts = self._parse_fact_extraction_result(result, messages, semantic_attributes_extracted)
             
             logger.info(
                 "Extracted %s facts from %s-message conversation window for user %s",
@@ -763,12 +769,15 @@ Valid relationship_types: is_named, lives_in, from, works_as, studied_at, likes,
     def _parse_fact_extraction_result(
         self,
         llm_response: str,
-        messages: List[Dict]
+        messages: List[Dict],
+        semantic_attributes: Optional[List[Dict]] = None
     ) -> List[ExtractedFact]:
         """
         Parse LLM response into structured facts.
         
         MATCHES inline bot implementation - simpler structure for better LLM compliance.
+        
+        ⭐ PHASE 2: Enriches facts with semantic attributes (adjectives, compound nouns)
         """
         try:
             # Handle markdown code blocks
@@ -788,6 +797,16 @@ Valid relationship_types: is_named, lives_in, from, works_as, studied_at, likes,
                     list(data.keys()), llm_response[:200]
                 )
             
+            # Build semantic attribute map for fast lookup by entity_name
+            attr_map = {}
+            if semantic_attributes:
+                for attr in semantic_attributes:
+                    entity_name = attr.get('entity')
+                    if entity_name:
+                        if entity_name not in attr_map:
+                            attr_map[entity_name] = []
+                        attr_map[entity_name].append(attr)
+            
             for fact_data in facts_list:
                 # Use simpler structure matching inline extraction
                 # Optional fields get sensible defaults
@@ -803,8 +822,12 @@ Valid relationship_types: is_named, lives_in, from, works_as, studied_at, likes,
                         fact_data.get('entity_name', 'unknown'), relationship_type
                     )
                 
+                # ⭐ PHASE 2: Look up semantic attributes for this entity
+                entity_name = fact_data.get('entity_name', '')
+                semantic_attrs = attr_map.get(entity_name, {})
+                
                 fact = ExtractedFact(
-                    entity_name=fact_data.get('entity_name', ''),
+                    entity_name=entity_name,
                     entity_type=fact_data.get('entity_type', 'other'),
                     relationship_type=relationship_type,  # Now guaranteed to be non-empty
                     confidence=float(fact_data.get('confidence', 0.8)),
@@ -812,7 +835,8 @@ Valid relationship_types: is_named, lives_in, from, works_as, studied_at, likes,
                     related_facts=[],  # Can be enriched later if needed
                     temporal_context=None,  # Optional - not in simple prompt
                     reasoning=fact_data.get('reasoning', 'Extracted from conversation window'),
-                    source_messages=[msg.get('id', '') for msg in messages if msg.get('id')]
+                    source_messages=[msg.get('id', '') for msg in messages if msg.get('id')],
+                    semantic_attributes=semantic_attrs  # ⭐ PHASE 2: Attach semantic attributes
                 )
                 facts.append(fact)
             
