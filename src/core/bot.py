@@ -446,52 +446,16 @@ class DiscordBotCore:
             self.thread_manager = None
             self.logger.info("✅ Advanced Thread Manager removed (phantom feature)")
 
-            # Initialize Phase 4.3: Proactive Engagement Engine
-            if not hasattr(self, 'engagement_engine') or self.engagement_engine is None:
-                try:
-                    from src.conversation.engagement_protocol import create_engagement_engine
-                    
-                    # Create with available integrations using factory pattern
-                    # Initialize HYBRID emotion analyzer for engagement engine (FAST TRACK!)
-                    emotion_analyzer = None
-                    try:
-                        from src.intelligence.hybrid_emotion_analyzer import create_hybrid_emotion_analyzer
-                        emotion_analyzer = create_hybrid_emotion_analyzer()
-                        self.logger.info("✅ FAST TRACK: Hybrid Emotion Analyzer (RoBERTa+VADER) initialized")
-                    except Exception as e:
-                        self.logger.warning("Hybrid emotion analyzer not available: %s", str(e))
-                        
-                        # Fallback to enhanced vector emotion analyzer
-                        try:
-                            from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
-                            if hasattr(self, 'memory_manager') and self.memory_manager:
-                                emotion_analyzer = EnhancedVectorEmotionAnalyzer(
-                                    vector_memory_manager=self.memory_manager
-                                )
-                                self.logger.info("✅ Enhanced Vector Emotion Analyzer initialized for engagement engine")
-                        except Exception as fallback_e:
-                            self.logger.warning("Enhanced emotion analyzer not available for engagement: %s", fallback_e)
-                    
-                    self.engagement_engine = await create_engagement_engine(
-                        engagement_engine_type=os.getenv("ENGAGEMENT_ENGINE_TYPE", "full"),
-                        thread_manager=getattr(self, 'thread_manager', None),
-                        memory_moments=None,  # Memory moments removed (phantom feature)
-                        emotional_engine=emotion_analyzer or (getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None),
-                        personality_profiler=getattr(self, 'dynamic_personality_profiler', None)
-                    )
-                    self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialized with factory pattern")
-                except Exception as e:
-                    self.logger.warning("Phase 4.3 engagement engine not available: %s", e)
-                    self.logger.debug("Continuing without proactive engagement features")
-                    self.engagement_engine = None
+            # Proactive Engagement Engine removed (now handled by enrichment worker)
+            # The real engagement engine implementation is in src/enrichment/proactive_engagement_engine.py
+            # which runs as a background worker with cached results in PostgreSQL.
+            self.logger.info("✅ Engagement Engine initialization removed (enrichment worker provides functionality)")
 
             # Log Phase 4 integration status
             if hasattr(self, 'memory_moments') and self.memory_moments:
                 self.logger.info("🎭 Phase 4.1: Memory-Triggered Moments - ACTIVE")
             if hasattr(self, 'thread_manager') and self.thread_manager:
                 self.logger.info("🧵 Phase 4.2: Advanced Thread Manager - ACTIVE")
-            if hasattr(self, 'engagement_engine') and self.engagement_engine:
-                self.logger.info("⚡ Phase 4.3: Proactive Engagement Engine - ACTIVE")
 
         except Exception as e:
             self.logger.error(f"Error during Phase 4 component initialization: {e}")
@@ -528,19 +492,8 @@ class DiscordBotCore:
             # Character Learning system actively detects memory surprises and growth insights
             self.logger.debug("💭 Memory-Triggered Moments removed (phantom feature) - Character Learning system provides working alternative")
             
-            # Phase 4.2: Advanced Thread Manager - REMOVED (phantom feature)
-            # Advanced Thread Manager was documented in roadmaps but never actually implemented.
-            # Like Memory-Triggered Moments, it existed only in planning documents with no working code.
-            # Discord's native threading system provides adequate thread management without custom implementation.
-            # ALTERNATIVE: Use Discord's built-in thread features for conversation organization.
-            self.logger.debug("🧵 Advanced Thread Manager removed (phantom feature) - Discord native threading sufficient")
-            
-            # Phase 4.3: Proactive Engagement Engine
-            if hasattr(self, 'engagement_engine') and self.engagement_engine:
-                self.bot.engagement_engine = self.engagement_engine
-                self.logger.info("✅ Proactive Engagement Engine integrated with Discord bot")
-            else:
-                self.logger.warning("⚠️ Proactive Engagement Engine not available for integration")
+            # Phase 4.3: Proactive Engagement Engine removed (functionality in enrichment worker)
+            self.logger.debug("⚠️ Proactive Engagement Engine removed - enrichment worker provides functionality")
             
             # Additional components for comprehensive integration
             if hasattr(self, 'dynamic_personality_profiler') and self.dynamic_personality_profiler:
@@ -728,15 +681,13 @@ class DiscordBotCore:
         # Initialize Phase 4.3: Proactive Engagement Engine
         self.logger.info("⚡ Initializing Phase 4.3: Proactive Engagement Engine...")
         try:
-            # Initialize proactive engagement engine asynchronously (will be awaited later)
-            self._engagement_engine_task = None
-            self.engagement_engine = None
-            self.logger.info("✅ Phase 4.3: Proactive Engagement Engine scheduled for initialization")
+            # Proactive engagement engine removed (handled by enrichment worker)
+            # Real implementation: src/enrichment/proactive_engagement_engine.py
+            self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialization removed")
             
         except Exception as e:
             self.logger.warning("Phase 4.3 engagement engine not available: %s", e)
             self.logger.debug("⚠️ Continuing without proactive engagement features")
-            self.engagement_engine = None
 
         # Initialize Phase 4 Human-Like Intelligence
         self.logger.info("🤖 Initializing Phase 4: Human-Like Conversation Intelligence...")
