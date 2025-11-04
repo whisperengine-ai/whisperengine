@@ -175,3 +175,4 @@ character_intelligence_validation_results.json
 *_validation_report.json/
 .env.nottaylor
 .env.assistant
+.env.aria

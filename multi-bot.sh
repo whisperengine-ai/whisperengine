@@ -33,6 +33,7 @@ AVAILABLE_BOTS=(
     "nottaylor:9100:Taylor Swift Parody"
     "assistant:9101:AI Assistant"
     "aethys:3007:Omnipotent Entity"
+    "aria:9459:Starship AI"
 )
 
 print_banner() {
