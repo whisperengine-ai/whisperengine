@@ -176,13 +176,7 @@ INSERT INTO characters (
     name, normalized_name, occupation, description, archetype, allow_full_roleplay, is_active, created_at, updated_at, created_date, updated_date, emoji_frequency, emoji_style, emoji_combination, emoji_placement, emoji_age_demographic, emoji_cultural_influence
 ) VALUES (
     '{self._escape_sql_string(self.character_name)}', '{self.normalized_name}', '{self._escape_sql_string(occupation)}', '{desc}', '{archetype}', FALSE, TRUE, NOW(), NOW(), NOW(), NOW(), '{emoji_config['frequency']}', '{emoji_config['style']}', '{emoji_config['combination']}', '{emoji_config['placement']}', 'timeless', 'universal'
-) ON CONFLICT (normalized_name) DO UPDATE SET
-    name = EXCLUDED.name,
-    occupation = EXCLUDED.occupation,
-    description = EXCLUDED.description,
-    archetype = EXCLUDED.archetype,
-    is_active = EXCLUDED.is_active,
-    updated_at = EXCLUDED.updated_at;
+);
 """
         return insert
     
@@ -196,8 +190,8 @@ INSERT INTO character_llm_config (
     character_id, llm_client_type, llm_chat_api_url, llm_chat_model, llm_temperature, llm_max_tokens, llm_top_p, is_active, created_at, updated_at
 ) VALUES (
     (SELECT id FROM characters WHERE normalized_name = '{self.normalized_name}'),
-    'openrouter', 'https://openrouter.ai/api/v1', 'anthropic/claude-3-haiku', '0.70', 4000, '0.90', TRUE, NOW(), NOW()
-) ON CONFLICT DO NOTHING;
+    'openrouter', 'https://openrouter.ai/api/v1', 'anthropic/claude-3-haiku', 0.70, 4000, 0.90, TRUE, NOW(), NOW()
+);
 """
         return insert
     
@@ -215,9 +209,7 @@ INSERT INTO character_identity_details (
 ) VALUES (
     (SELECT id FROM characters WHERE normalized_name = '{self.normalized_name}'),
     '{self._escape_sql_string(full_name)}', 'unknown', '{essence}', 'Through continuous learning and interaction', 'Character definition and values', '{self._escape_sql_string(self.character_name)}: A unique character embodying specific traits and personality', NOW()
-) ON CONFLICT (character_id) DO UPDATE SET
-    full_name = EXCLUDED.full_name,
-    essence_nature = EXCLUDED.essence_nature;
+);
 """
         return insert
     
@@ -237,32 +229,25 @@ INSERT INTO character_identity_details (
     character_id, category, description, importance, display_order, active, created_at
 ) VALUES (
     (SELECT id FROM characters WHERE normalized_name = '{self.normalized_name}'),
-    'personality_trait', '{escaped_trait}', 'high', {i}, TRUE, NOW()
+    'personality_trait', '{escaped_trait}', 10, {i}, TRUE, NOW()
 );
 """
         
-        return inserts
+        return inserts if personality else ""
     
     def _generate_values(self) -> str:
         """Generate CHARACTER VALUES inserts"""
-        creator_notes = self.data.get('creator_notes', '')
-        
         inserts = """
 -- =======================================================
 -- CHARACTER VALUES
 -- =======================================================
-"""
-        
-        # Extract core values from creator notes or description
-        if 'Core Instruction' in creator_notes or 'Special Abilities' in creator_notes:
-            inserts += f"""INSERT INTO character_values (
+INSERT INTO character_values (
     character_id, value_key, value_description, importance_level, category
 ) VALUES (
     (SELECT id FROM characters WHERE normalized_name = '{self.normalized_name}'),
-    'core_value_1', 'Primary character identity and core values', 'critical', 'core_value'
+    'primary_value', 'Core identity and purpose derived from character definition', 10, 'core_value'
 );
 """
-        
         return inserts
     
     def _generate_speech_patterns(self) -> str:
