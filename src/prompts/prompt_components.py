@@ -270,6 +270,15 @@ def create_guidance_component(
 ) -> PromptComponent:
     """Create a communication guidance component.
     
+    ⚠️ DEPRECATED: This function uses hardcoded generic text for all characters.
+    Use create_response_style_component() from cdl_component_factories.py instead,
+    which pulls character-specific guidance from the CDL database.
+    
+    This function violates WhisperEngine's NO HARDCODED CHARACTER LOGIC constraint
+    by applying the same generic guidance to Elena (marine biologist) as Gabriel
+    (British gentleman) as Aria (starship AI), completely ignoring their unique
+    CDL personality data stored in character_response_style table.
+    
     Args:
         bot_name: Name of the bot/character
         priority: Priority (default: 6)
@@ -277,7 +286,18 @@ def create_guidance_component(
         
     Returns:
         PromptComponent configured for communication guidance
+        
+    See Also:
+        create_response_style_component() in cdl_component_factories.py (Priority 17)
     """
+    import warnings
+    warnings.warn(
+        "create_guidance_component() is deprecated. Use create_response_style_component() "
+        "from cdl_component_factories.py for character-specific guidance from CDL database.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
     content = (
         f"Communication style: Respond naturally and authentically as {bot_name} - "
         f"be warm, genuine, and conversational. No meta-analysis, breakdowns, "

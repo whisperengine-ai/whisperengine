@@ -3570,11 +3570,29 @@ class MessageProcessor:
             logger.debug("📚 Enriched summaries disabled (ENABLE_ENRICHED_SUMMARIES=false)")
         
         # ================================
-        # COMPONENT 8: Communication Style Guidance
+        # COMPONENT 8: Response Style Guidance (CDL-Based)
         # ================================
-        # Note: Uses legacy GUIDANCE type at priority 17 (CDL RESPONSE_STYLE priority)
-        bot_name_for_guidance = os.getenv('DISCORD_BOT_NAME', 'Assistant')
-        assembler.add_component(create_guidance_component(bot_name_for_guidance, priority=17))  # Priority 17: Response style
+        # CDL RESPONSE_STYLE component (Priority 17) - replaces legacy hardcoded create_guidance_component
+        from src.prompts.cdl_component_factories import create_response_style_component
+        try:
+            bot_name = get_normalized_bot_name_from_env()
+            pool = await get_postgres_pool()
+            if pool:
+                enhanced_manager = create_enhanced_cdl_manager(pool)
+                response_style_component = await create_response_style_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name,
+                    priority=17
+                )
+                if response_style_component:
+                    assembler.add_component(response_style_component)
+                    logger.debug("✅ Added CDL-based RESPONSE_STYLE component (Priority 17)")
+                else:
+                    logger.warning("⚠️ No CDL response_style data - skipping component")
+            else:
+                logger.warning("⚠️ No PostgreSQL pool - skipping CDL RESPONSE_STYLE component")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to add CDL RESPONSE_STYLE component: {e}")
         
         # ================================
         # ASSEMBLE SYSTEM MESSAGE

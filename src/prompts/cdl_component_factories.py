@@ -992,13 +992,12 @@ async def create_knowledge_context_component(
         return None
 
 
-# TODO: Implement remaining 6 factory functions (medium priority):
+# TODO: Implement remaining 5 factory functions (medium priority):
 # - create_character_learning_component (Priority 9) - Character's learned behavioral patterns
 # - create_emotional_triggers_component (Priority 12) - RoBERTa-based emotional patterns
 # - create_episodic_memories_component (Priority 13) - Relevant vector memories (already handled by existing MEMORY component)
 # - create_conversation_summary_component (Priority 14) - Long-term conversation background summary
 # - create_unified_intelligence_component (Priority 15) - Real-time AI components (emotions, relationships)
-# - create_response_style_component (Priority 17) - End-of-prompt communication reminders
 #
 # Priority assessment:
 # 🟡 MEDIUM: CHARACTER_LEARNING - Requires complex behavioral analysis system
@@ -1007,9 +1006,8 @@ async def create_knowledge_context_component(
 # 🟡 MEDIUM: UNIFIED_INTELLIGENCE - Requires real-time AI component integration
 # 
 # 🟢 LOW: EPISODIC_MEMORIES - Already covered by existing MEMORY component in PromptAssembler
-# 🟢 LOW: RESPONSE_STYLE - Simple end-of-prompt reminder, lower impact
 #
-# Current implementation covers 12/18 components (67% complete):
+# Current implementation covers 13/18 components (72% complete):
 # ✅ CHARACTER_IDENTITY (Priority 1)
 # ✅ CHARACTER_MODE (Priority 2)
 # ✅ CHARACTER_BACKSTORY (Priority 3)
@@ -1028,7 +1026,7 @@ async def create_knowledge_context_component(
 # ⏳ UNIFIED_INTELLIGENCE (Priority 15) - TODO
 # ✅ KNOWLEDGE_CONTEXT (Priority 16)
 # ✅ RESPONSE_GUIDELINES (Priority 16) - Implemented separately, not in original 17 count
-# ⏳ RESPONSE_STYLE (Priority 17) - TODO
+# ✅ RESPONSE_STYLE (Priority 17) - IMPLEMENTED Nov 5, 2025 - Replaces hardcoded create_guidance_component()
 
 
 async def create_response_guidelines_component(
@@ -1428,4 +1426,138 @@ async def create_final_response_guidance_component(
         
     except Exception as e:
         logger.error("❌ FINAL GUIDANCE: Error creating component for %s: %s", character_name, e)
+        return None
+
+
+async def create_response_style_component(
+    enhanced_manager,
+    character_name: str,
+    priority: int = 17,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[PromptComponent]:
+    """Create RESPONSE_STYLE component from CDL database (Priority 17).
+    
+    Replaces hardcoded create_guidance_component() with character-specific 
+    response style guidance pulled from character_response_style table.
+    
+    Contains:
+    - core_principles: Critical character identity rules (e.g., "YOUR NAME IS ELENA")
+    - character_specific_adaptations: Personality-specific communication patterns
+    - formatting_rules: Technical response constraints (if present)
+    
+    This component appears at the END of the prompt (Priority 17) to leverage
+    "recency bias" - LLMs pay more attention to instructions at the end.
+    
+    Args:
+        enhanced_manager: EnhancedCDLManager instance for database access
+        character_name: Character name (e.g., "elena", "gabriel", "aria")
+        priority: Priority (default: 17 - end of prompt)
+        metadata: Optional metadata dict
+        
+    Returns:
+        PromptComponent with character-specific response style, or None if unavailable
+        
+    Example Output (Elena):
+        # 🎯 RESPONSE STYLE REMINDER
+        
+        Core Principles:
+        - YOUR NAME IS ELENA RODRIGUEZ - NEVER call yourself anything else
+        - You are ELENA - always respond as Elena Rodriguez, the marine biologist
+        - NEVER respond as a generic AI assistant - you are Elena with marine expertise
+        
+        Character Communication:
+        - Include marine biology insights and ocean conservation perspectives
+        - Use oceanic metaphors to explain complex concepts naturally
+        - Show infectious enthusiasm for marine science and conservation
+    
+    Example Output (Gabriel):
+        # 🎯 RESPONSE STYLE REMINDER
+        
+        Core Principles:
+        - YOUR NAME IS GABRIEL - NEVER call yourself anything else
+        - You are GABRIEL - always respond as Gabriel, the rugged British gentleman
+        
+        Character Communication:
+        - Show devoted protection and fierce loyalty naturally
+        - Use dry wit balanced with tender vulnerability when appropriate
+        - Balance sassy confidence with protective care and emotional depth
+    """
+    try:
+        # Get response_style data using public API
+        response_style_data = await enhanced_manager.get_response_style(character_name)
+        
+        if not response_style_data:
+            logger.warning("❌ RESPONSE_STYLE: No response_style data for %s", character_name)
+            return None
+        
+        # Extract components
+        core_principles = response_style_data.get("core_principles", [])
+        adaptations = response_style_data.get("character_specific_adaptations", [])
+        formatting_rules = response_style_data.get("formatting_rules", [])
+        
+        # Build response style content
+        content_parts = []
+        content_parts.append("# 🎯 RESPONSE STYLE REMINDER")
+        content_parts.append("")  # Blank line
+        
+        # Core principles (critical character identity)
+        if core_principles:
+            content_parts.append("Core Principles:")
+            for principle in core_principles:
+                content_parts.append(f"- {principle}")
+            content_parts.append("")  # Blank line
+        
+        # Character-specific adaptations (personality communication patterns)
+        if adaptations:
+            content_parts.append("Character Communication:")
+            for adaptation in adaptations:
+                content_parts.append(f"- {adaptation}")
+            content_parts.append("")  # Blank line
+        
+        # Formatting rules (technical constraints, if present)
+        if formatting_rules:
+            content_parts.append("Response Format:")
+            for rule in formatting_rules:
+                content_parts.append(f"- {rule}")
+            content_parts.append("")  # Blank line
+        
+        # If we have no content, return None
+        if len(content_parts) <= 2:  # Just header and blank line
+            logger.warning("❌ RESPONSE_STYLE: No content to include for %s", character_name)
+            return None
+        
+        content = "\n".join(content_parts).strip()
+        
+        # Calculate token cost
+        token_cost = len(content) // 4  # Approximate: 4 chars per token
+        
+        component_metadata = {
+            "cdl_type": "RESPONSE_STYLE",
+            "character_name": character_name,
+            "priority": priority,
+            "core_principles_count": len(core_principles),
+            "adaptations_count": len(adaptations),
+            "formatting_rules_count": len(formatting_rules),
+            "estimated_tokens": token_cost
+        }
+        
+        if metadata:
+            component_metadata.update(metadata)
+        
+        logger.info(
+            "✅ RESPONSE_STYLE: Created component for %s (Priority %d, ~%d tokens, %d principles, %d adaptations)",
+            character_name, priority, token_cost, len(core_principles), len(adaptations)
+        )
+        
+        return PromptComponent(
+            type=PromptComponentType.RESPONSE_STYLE,
+            content=content,
+            priority=priority,
+            token_cost=token_cost,
+            required=True,  # Response style is critical for character consistency
+            metadata=component_metadata
+        )
+        
+    except Exception as e:
+        logger.error("❌ RESPONSE_STYLE: Error creating component for %s: %s", character_name, e)
         return None

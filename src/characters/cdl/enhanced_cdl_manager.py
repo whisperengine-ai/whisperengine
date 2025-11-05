@@ -323,6 +323,52 @@ class EnhancedCDLManager:
             logger.error(f"Error retrieving response modes for {character_name}: {e}")
             return []
 
+    async def get_response_style(self, character_name: str) -> Dict[str, List[str]]:
+        """Get response style data (core_principles, character_specific_adaptations, formatting_rules).
+        
+        This is the preferred public API for accessing response style data,
+        used by create_response_style_component() in cdl_component_factories.py.
+        
+        Returns:
+            Dict with keys: 'core_principles', 'character_specific_adaptations', 'formatting_rules'
+            Each value is a list of strings.
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return {}
+
+                rows = await conn.fetch("""
+                    SELECT item_type, item_text
+                    FROM character_response_style_items rsi
+                    JOIN character_response_style rs ON rsi.response_style_id = rs.id
+                    WHERE rs.character_id = $1
+                    ORDER BY rsi.item_type, rsi.sort_order
+                """, character_id)
+
+                if not rows:
+                    return {}
+
+                response_style = {
+                    'core_principles': [],
+                    'formatting_rules': [],
+                    'character_specific_adaptations': []
+                }
+
+                for row in rows:
+                    item_type = row['item_type']
+                    item_text = row['item_text']
+
+                    if item_type in response_style:
+                        response_style[item_type].append(item_text)
+
+                return response_style
+
+        except Exception as e:
+            logger.error(f"Error retrieving response style for {character_name}: {e}")
+            return {}
+
     async def get_conversation_flows(self, character_name: str) -> List[ConversationFlow]:
         """Get conversation flow guidance for different interaction types"""
         try:
