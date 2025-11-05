@@ -1281,6 +1281,97 @@ async def create_character_communication_patterns_component(
         return None
 
 
+async def create_response_mode_component(
+    enhanced_manager,
+    character_name: str,
+    priority: int = 3,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[PromptComponent]:
+    """
+    Create RESPONSE_MODE component (Priority 3).
+    
+    Contains character's response length guidance, style, and tone adjustments.
+    This component ensures responses match the character's personality constraints
+    and appropriately balance brevity vs. elaboration based on conversation context.
+    
+    Args:
+        enhanced_manager: EnhancedCDLManager instance for database access
+        character_name: Character name (e.g., "aria", "elena", "marcus")
+        priority: Component priority in prompt assembly (lower = earlier, higher priority)
+        metadata: Additional metadata to attach to component
+    
+    Returns:
+        PromptComponent with response mode guidance, or None if unavailable
+    """
+    try:
+        # Retrieve response modes from CDL database (sorted by priority)
+        response_modes = await enhanced_manager.get_response_modes(character_name)
+        
+        if not response_modes:
+            logger.debug("ℹ️ RESPONSE MODE: No response modes configured for %s (will use defaults)", 
+                        character_name)
+            return None
+        
+        # Use highest priority mode (first in list)
+        primary_mode = response_modes[0]
+        
+        # Build EXTREMELY CLEAR and MANDATORY response mode guidance
+        # Format in a way that cannot be ignored - use explicit formatting
+        content = f"""╔══════════════════════════════════════════════════════════════╗
+║ *** CRITICAL: RESPONSE LENGTH CONSTRAINT - MUST FOLLOW *** ║
+║ This is a HARD LIMIT. Do not violate this under any condition. ║
+╚══════════════════════════════════════════════════════════════╝
+
+PRIMARY MODE: {primary_mode.mode_name.upper()}
+
+✓ LENGTH REQUIREMENT (MANDATORY): {primary_mode.length_guideline}
+  → Do NOT exceed this. Keep responses SHORT and CONCISE.
+  → This is a hard limit, not a guideline.
+
+✓ RESPONSE STYLE: {primary_mode.response_style}
+✓ TONE TO USE: {primary_mode.tone_adjustment}
+
+INSTRUCTIONS: Apply {primary_mode.mode_name} mode to your response. 
+Follow the length requirement exactly. Brevity is essential."""
+        
+        # Add secondary modes as ALTERNATIVES ONLY if user explicitly needs more detail
+        if len(response_modes) > 1:
+            content += "\n\n" + "─" * 60
+            content += "\nALTERNATIVE MODES (use ONLY if context REQUIRES more detail):"
+            for i, mode in enumerate(response_modes[1:], 1):
+                content += f"\n{i}. {mode.mode_name}: {mode.length_guideline}"
+            content += "\n" + "─" * 60
+        
+        component_metadata = {
+            "cdl_type": "RESPONSE_MODE",
+            "character_name": character_name,
+            "priority": priority,
+            "primary_mode": primary_mode.mode_name,
+            "available_modes": [m.mode_name for m in response_modes],
+            "total_modes": len(response_modes),
+            "estimated_tokens": len(content) // 4
+        }
+        
+        if metadata:
+            component_metadata.update(metadata)
+        
+        logger.info("✅ RESPONSE MODE: Added %s mode (primary) with %d alternatives for %s",
+                    primary_mode.mode_name, len(response_modes) - 1, character_name)
+        
+        return PromptComponent(
+            type=PromptComponentType.GUIDANCE,
+            content=content,
+            priority=priority,
+            token_cost=len(content) // 4,
+            required=False,  # Response modes are optional (characters work without them)
+            metadata=component_metadata
+        )
+        
+    except Exception as e:
+        logger.error("❌ RESPONSE MODE: Error creating component for %s: %s", character_name, e)
+        return None
+
+
 async def create_final_response_guidance_component(
     enhanced_manager,
     character_name: str,

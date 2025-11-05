@@ -295,6 +295,34 @@ class EnhancedCDLManager:
             logger.error(f"Error retrieving response guidelines for {character_name}: {e}")
             return []
 
+    async def get_response_modes(self, character_name: str) -> List[ResponseMode]:
+        """Get character response modes with length guidelines, style, and tone adjustments"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT mode_name, mode_description, response_style, 
+                           length_guideline, tone_adjustment, conflict_resolution_priority
+                    FROM character_response_modes 
+                    WHERE character_id = $1
+                    ORDER BY conflict_resolution_priority DESC
+                """, character_id)
+
+                return [ResponseMode(
+                    mode_name=row['mode_name'],
+                    mode_description=row['mode_description'],
+                    response_style=row['response_style'],
+                    length_guideline=row['length_guideline'],
+                    tone_adjustment=row['tone_adjustment']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving response modes for {character_name}: {e}")
+            return []
+
     async def get_conversation_flows(self, character_name: str) -> List[ConversationFlow]:
         """Get conversation flow guidance for different interaction types"""
         try:

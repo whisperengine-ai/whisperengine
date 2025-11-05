@@ -3091,6 +3091,7 @@ class MessageProcessor:
             create_character_personality_component,
             create_character_voice_component,
             create_character_defined_relationships_component,
+            create_response_mode_component,
             create_final_response_guidance_component,
         )
         from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
@@ -3125,19 +3126,33 @@ class MessageProcessor:
                 else:
                     logger.warning(f"⚠️ STRUCTURED CONTEXT: No character mode found for {bot_name}")
                 
-                # TODO: Component 3: Character Backstory (Priority 3) - NOT IMPLEMENTED
+                # Component 3: Response Mode (Priority 1 - HIGHEST!) - Response length constraints & style
+                # CRITICAL: Response mode must be HIGH priority (even higher than character identity!)
+                # The LLM must see this instruction FIRST and most prominently
+                response_mode_component = await create_response_mode_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name,
+                    priority=1  # HIGHEST priority - must be seen first by LLM
+                )
+                if response_mode_component:
+                    assembler.add_component(response_mode_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added response mode guidance (PRIORITY 1) for {bot_name}")
+                else:
+                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No response modes configured for {bot_name} (using defaults)")
+                
+                # TODO: Component 4: Character Backstory (Priority 4) - NOT IMPLEMENTED
                 # Reason: Lower priority - backstory provides depth but not critical for basic responses
                 # Requires: Professional history, formative experiences, personal background from CDL
                 # Factory exists: create_character_backstory_component() in cdl_component_factories.py
                 # Estimated tokens: 300-700
                 
-                # TODO: Component 4: Character Principles (Priority 4) - NOT IMPLEMENTED
+                # TODO: Component 5: Character Principles (Priority 5) - NOT IMPLEMENTED
                 # Reason: Lower priority - core values/beliefs add depth but not essential for personality
                 # Requires: Core values, beliefs, motivations from CDL database
                 # Factory exists: create_character_principles_component() in cdl_component_factories.py
                 # Estimated tokens: 200-600
                 
-                # Component 5: AI Identity Guidance (Priority 5) - Context-aware AI disclosure
+                # Component 6: AI Identity Guidance (Priority 6) - Context-aware AI disclosure
                 ai_guidance_component = await create_ai_identity_guidance_component(
                     enhanced_manager=enhanced_manager,
                     character_name=bot_name,
