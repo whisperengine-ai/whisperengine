@@ -224,7 +224,6 @@ class BotConfigDiscovery:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes

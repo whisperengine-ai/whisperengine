@@ -312,7 +312,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -392,7 +391,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -472,7 +470,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -552,7 +549,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -632,7 +628,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -712,7 +707,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -792,7 +786,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -872,7 +865,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -952,7 +944,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -1032,7 +1023,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -1112,7 +1102,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -1192,7 +1181,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
@@ -1233,10 +1221,10 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DEBUG_MODE=false
       - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9459
+      - HEALTH_CHECK_PORT=9785
       - HEALTH_CHECK_HOST=0.0.0.0
     ports:
-      - "9459:9459"
+      - "9785:9785"
     logging:
       driver: "json-file"
       options:
@@ -1254,7 +1242,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - curl -f http://localhost:9459/health || exit 1
+        - curl -f http://localhost:9785/health || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1272,7 +1260,6 @@ services:
       - ./scripts:/app/scripts
       - ./characters:/app/characters
       - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
       # Note: Using external host mount for logs instead of Docker volumes
