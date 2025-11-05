@@ -25,12 +25,16 @@ class PromptComponentType(Enum):
     Phase 2 (Oct 2025): Added CDL (Character Definition Language) component types
     for unified prompt assembly. This eliminates dual prompt paths by merging
     CDL character data directly into PromptAssembler components.
+    
+    Status: 12/18 implemented (67% complete). See cdl_component_factories.py line 995 for full TODO list.
+    ✅ CHARACTER_COMMUNICATION_PATTERNS implemented Nov 4, 2025
     """
     # ==========================================
-    # CDL CHARACTER COMPONENTS (Priority 1-17)
+    # CDL CHARACTER COMPONENTS (Priority 1-17+)
     # ==========================================
     # These replace the legacy CDL enhancement system that previously
     # built prompts separately and replaced the system message.
+    # Current status: 12/18 implemented (67% complete)
     
     # Character foundation (Priority 1-6)
     CHARACTER_IDENTITY = "character_identity"           # Priority 1: Name, occupation, description
@@ -38,6 +42,7 @@ class PromptComponentType(Enum):
     CHARACTER_BACKSTORY = "character_backstory"         # Priority 3: Professional/personal history
     CHARACTER_PRINCIPLES = "character_principles"       # Priority 4: Values, beliefs, motivations
     AI_IDENTITY_GUIDANCE = "ai_identity_guidance"       # Priority 5: AI disclosure handling
+    CHARACTER_COMMUNICATION_PATTERNS = "character_communication_patterns"  # Priority 5.5: ✅ IMPLEMENTED - Communication patterns (emoji, speech, behavioral triggers)
     TEMPORAL_AWARENESS = "temporal_awareness"           # Priority 6: Current date/time
     
     # User and character personality (Priority 7-10)

@@ -2,19 +2,38 @@
 
 **WhisperEngine is a production multi-character Discord AI roleplay platform with 10+ live AI characters. This is NOT a sandbox - users are actively chatting with these bots.**
 
-## 📋 DOCUMENTATION PHILOSOPHY
+## 📋 DOCUMENTATION PHILOSOPHY - HARD CONSTRAINT
 
-**Code is the source of truth.** Only document:
+**CRITICAL RULE: DO NOT CREATE UNDOCUMENTED FILES WITHOUT EXPLICIT USER APPROVAL**
+
+This is a HARD CONSTRAINT, not a guideline. Before you create ANY non-code file (.md, .txt, .json doc, guide, summary, index, etc.):
+1. **STOP** - Do not create the file
+2. **ASK** - Explicitly ask the user if they want this documentation
+3. **WAIT** - Get explicit approval before proceeding
+4. **CREATE** - Only then create the file if approved
+
+**What counts as "documentation to ask about":**
+- ❌ README files (even if "helpful")
+- ❌ Markdown guides or tutorials
+- ❌ Summary documents or analyses
+- ❌ Implementation status trackers
+- ❌ Index or navigation files
+- ❌ Architecture diagrams (text or image)
+- ❌ Change logs or session summaries
+
+**What does NOT require asking (code is exempt):**
+- ✅ Python source files
+- ✅ Test files
+- ✅ SQL migrations
+- ✅ Configuration files (if part of the task)
+- ✅ Updated git commits
+
+**Code is the source of truth.** Only document when explicitly asked:
 - ✅ Architecture WHY (decisions that can't be inferred from code)
 - ✅ Critical constraints (production stability rules)
 - ✅ Development workflows (commands, testing patterns)
 
-**Never document:**
-- ❌ Implementation details (code documents itself)
-- ❌ API signatures (docstrings + type hints are source of truth)
-- ❌ Change summaries (git commits capture history)
-
-**Before creating new docs: ASK USER FIRST.** Stale documentation creates hallucinations and technical debt.
+**Why?** Stale documentation creates hallucinations and technical debt. If you create docs without being asked, they will rot and confuse future developers (including yourself in the next conversation).
 
 ## 🔒 CRITICAL SECURITY - NEVER COMMIT SECRETS
 

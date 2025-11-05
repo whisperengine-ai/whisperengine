@@ -3087,6 +3087,7 @@ class MessageProcessor:
             create_character_identity_component,
             create_character_mode_component,
             create_ai_identity_guidance_component,
+            create_character_communication_patterns_component,
             create_character_personality_component,
             create_character_voice_component,
             create_character_defined_relationships_component,
@@ -3146,6 +3147,19 @@ class MessageProcessor:
                     assembler.add_component(ai_guidance_component)
                     logger.info(f"✅ STRUCTURED CONTEXT: Added AI identity guidance for {bot_name}")
                 # Note: No warning if None - this is context-dependent (only when user asks about AI)
+                
+                # Component 5.5: Character Communication Patterns (Priority 6) - NEW COMPONENT
+                # Communication patterns define HOW character communicates (emoji, speech, behavior)
+                communication_patterns_component = await create_character_communication_patterns_component(
+                    enhanced_manager=enhanced_manager,
+                    character_name=bot_name,
+                    priority=6
+                )
+                if communication_patterns_component:
+                    assembler.add_component(communication_patterns_component)
+                    logger.info(f"✅ STRUCTURED CONTEXT: Added communication patterns for {bot_name}")
+                else:
+                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No communication patterns found for {bot_name}")
                 
                 # Component 8: Character Personality (Priority 8) - Big Five personality traits
                 personality_component = await create_character_personality_component(

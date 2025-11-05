@@ -684,44 +684,7 @@ async def create_character_personality_component(
         personality_data = character_data.get("personality", {})
         big_five = personality_data.get("big_five", {})
         
-        # Fallback: If no big_five data, try to extract personality traits from character attributes
         if not big_five:
-            logger.debug(f"No big_five personality data for {character_name}, checking character attributes")
-            try:
-                # Query character attributes directly from database
-                async with enhanced_manager.pool.acquire() as conn:
-                    # First get character_id from name
-                    character_id_query = "SELECT id FROM characters WHERE normalized_name = $1"
-                    normalized_name = character_name.lower().replace(' ', '_').replace('-', '_')
-                    char_id_row = await conn.fetchrow(character_id_query, normalized_name)
-                    
-                    if char_id_row:
-                        character_id = char_id_row['id']
-                        # Get personality traits
-                        traits_query = """
-                            SELECT description FROM character_attributes 
-                            WHERE character_id = $1 AND category = 'personality_trait'
-                            ORDER BY display_order, importance DESC
-                            LIMIT 5
-                        """
-                        trait_rows = await conn.fetch(traits_query, character_id)
-                        personality_traits = [row['description'] for row in trait_rows if row['description']]
-                        
-                        if personality_traits:
-                            content = "# Your Personality Profile\nCore Traits:\n"
-                            for trait in personality_traits:
-                                content += f"- {trait}\n"
-                            
-                            return PromptComponent(
-                                type=PromptComponentType.CHARACTER_PERSONALITY,
-                                content=content.strip(),
-                                priority=8,
-                                token_cost=200,
-                                required=False,  # Not required since it's fallback data
-                            )
-            except Exception as fallback_error:
-                logger.warning(f"Fallback personality trait query failed for {character_name}: {fallback_error}")
-            
             return None
         
         personality_parts = ["Core Traits:"]
@@ -1029,7 +992,7 @@ async def create_knowledge_context_component(
         return None
 
 
-# TODO: Implement remaining 5 factory functions (medium priority):
+# TODO: Implement remaining 6 factory functions (medium priority):
 # - create_character_learning_component (Priority 9) - Character's learned behavioral patterns
 # - create_emotional_triggers_component (Priority 12) - RoBERTa-based emotional patterns
 # - create_episodic_memories_component (Priority 13) - Relevant vector memories (already handled by existing MEMORY component)
@@ -1037,20 +1000,22 @@ async def create_knowledge_context_component(
 # - create_unified_intelligence_component (Priority 15) - Real-time AI components (emotions, relationships)
 # - create_response_style_component (Priority 17) - End-of-prompt communication reminders
 #
-# These are lower priority because:
-# - CHARACTER_LEARNING: Requires complex behavioral analysis system
-# - EMOTIONAL_TRIGGERS: Requires RoBERTa pattern aggregation
-# - EPISODIC_MEMORIES: Already covered by existing MEMORY component in PromptAssembler
-# - CONVERSATION_SUMMARY: Requires long-term summary system
-# - UNIFIED_INTELLIGENCE: Requires real-time AI component integration
-# - RESPONSE_STYLE: Simple end-of-prompt reminder, lower impact
+# Priority assessment:
+# 🟡 MEDIUM: CHARACTER_LEARNING - Requires complex behavioral analysis system
+# 🟡 MEDIUM: EMOTIONAL_TRIGGERS - Requires RoBERTa pattern aggregation  
+# 🟡 MEDIUM: CONVERSATION_SUMMARY - Requires long-term summary system
+# 🟡 MEDIUM: UNIFIED_INTELLIGENCE - Requires real-time AI component integration
+# 
+# 🟢 LOW: EPISODIC_MEMORIES - Already covered by existing MEMORY component in PromptAssembler
+# 🟢 LOW: RESPONSE_STYLE - Simple end-of-prompt reminder, lower impact
 #
-# Current implementation covers 11/17 components (65% complete):
+# Current implementation covers 12/18 components (67% complete):
 # ✅ CHARACTER_IDENTITY (Priority 1)
 # ✅ CHARACTER_MODE (Priority 2)
 # ✅ CHARACTER_BACKSTORY (Priority 3)
 # ✅ CHARACTER_PRINCIPLES (Priority 4)
 # ✅ AI_IDENTITY_GUIDANCE (Priority 5)
+# ✅ CHARACTER_COMMUNICATION_PATTERNS (Priority 5.5) - IMPLEMENTED Nov 4, 2025
 # ✅ TEMPORAL_AWARENESS (Priority 6)
 # ✅ USER_PERSONALITY (Priority 7)
 # ✅ CHARACTER_PERSONALITY (Priority 8)
@@ -1062,6 +1027,7 @@ async def create_knowledge_context_component(
 # ⏳ CONVERSATION_SUMMARY (Priority 14) - TODO
 # ⏳ UNIFIED_INTELLIGENCE (Priority 15) - TODO
 # ✅ KNOWLEDGE_CONTEXT (Priority 16)
+# ✅ RESPONSE_GUIDELINES (Priority 16) - Implemented separately, not in original 17 count
 # ⏳ RESPONSE_STYLE (Priority 17) - TODO
 
 
@@ -1169,6 +1135,149 @@ async def create_response_guidelines_component(
         
     except Exception as e:
         logger.error(f"❌ RESPONSE GUIDELINES: Error creating component for {character_name}: {e}")
+        return None
+
+
+async def create_character_communication_patterns_component(
+    enhanced_manager,
+    character_name: str,
+    priority: int = 6,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[PromptComponent]:
+    """Create character communication patterns component.
+    
+    Communication patterns define HOW a character communicates:
+    - manifestation_emotion: How emotional state manifests (appearance, voice, behavior)
+    - emoji_usage: Emoji patterns and preferences
+    - speech_patterns: Signature phrases, word choices, linguistic patterns
+    - behavioral_triggers: Situations that trigger specific response patterns
+    
+    This is separate from RESPONSE_GUIDELINES which define formatting rules.
+    
+    Args:
+        enhanced_manager: EnhancedCDLManager instance for database access
+        character_name: Character name (e.g., "aria", "elena")
+        priority: Priority (default: 6 - between AI guidance and temporal awareness)
+        metadata: Optional metadata dict
+        
+    Returns:
+        PromptComponent with communication patterns, or None if no patterns found
+    
+    Example Output:
+        💬 Communication Patterns
+        
+        🎭 Manifestation Emotion: Holographic appearance reflects emotional state...
+        
+        😊 Emoji Usage: Uses holographic sparkle emoji for identity expressions...
+        
+        🗣️ Speech Patterns: Signature phrases include "Fascinating", "Algorithmic poetry"...
+        
+        ⚡ Behavioral Triggers: When technical topics arise, initiates deep tech discussion...
+    """
+    try:
+        # Get communication patterns from database
+        patterns = await enhanced_manager.get_communication_patterns(character_name)
+        
+        if not patterns:
+            logger.debug("💬 COMMUNICATION PATTERNS: No patterns found for %s (optional)", character_name)
+            return None
+        
+        # Group patterns by type for organization
+        patterns_by_type = {}
+        for pattern in patterns:
+            pattern_type = pattern.pattern_type
+            if pattern_type not in patterns_by_type:
+                patterns_by_type[pattern_type] = []
+            patterns_by_type[pattern_type].append(pattern)
+        
+        # Define emoji prefixes for each pattern type
+        type_emojis = {
+            'manifestation_emotion': '🎭',
+            'emoji_usage': '😊',
+            'speech_patterns': '🗣️',
+            'behavioral_triggers': '⚡',
+            'communication_style': '💬',
+            'tone': '🎵',
+        }
+        
+        # Order pattern types logically (most important first)
+        type_order = [
+            'manifestation_emotion',
+            'emoji_usage', 
+            'speech_patterns',
+            'behavioral_triggers',
+            'communication_style',
+            'tone'
+        ]
+        
+        patterns_text = ["💬 **Communication Patterns**"]
+        patterns_text.append("")  # Blank line
+        
+        # Add patterns in logical order
+        for pattern_type in type_order:
+            if pattern_type not in patterns_by_type:
+                continue
+            
+            type_patterns = patterns_by_type[pattern_type]
+            emoji = type_emojis.get(pattern_type, '▪️')
+            
+            # Format pattern type as readable header
+            type_label = pattern_type.replace('_', ' ').title()
+            patterns_text.append(f"{emoji} **{type_label}**:")
+            
+            # Add each pattern with its details
+            for pattern in type_patterns:
+                # Build pattern entry with name and value
+                entry = f"  • **{pattern.pattern_name}**: {pattern.pattern_value}"
+                
+                # Add context if available
+                if pattern.context:
+                    entry += f" *(Context: {pattern.context})*"
+                
+                patterns_text.append(entry)
+            
+            patterns_text.append("")  # Blank line between types
+        
+        # Remove trailing blank line
+        while patterns_text and patterns_text[-1] == "":
+            patterns_text.pop()
+        
+        if len(patterns_text) <= 1:  # Only header, no actual patterns
+            return None
+        
+        content = "\n".join(patterns_text)
+        
+        component_metadata = {
+            "cdl_type": "COMMUNICATION_PATTERNS",
+            "character_name": character_name,
+            "priority": priority,
+            "pattern_types": list(patterns_by_type.keys()),
+            "total_patterns": len(patterns),
+            "estimated_tokens": len(content) // 4
+        }
+        
+        if metadata:
+            component_metadata.update(metadata)
+        
+        logger.info("✅ COMMUNICATION PATTERNS: Added %d patterns (%d types) for %s",
+                    len(patterns), len(patterns_by_type), character_name)
+        
+        return PromptComponent(
+            type=PromptComponentType.CHARACTER_COMMUNICATION_PATTERNS,
+            content=content,
+            priority=priority,
+            token_cost=len(content) // 4,
+            required=False,  # Patterns are optional enhancement
+            metadata=component_metadata
+        )
+        
+    except ValueError as ve:
+        logger.error("❌ COMMUNICATION PATTERNS: Value error creating component for %s: %s",
+                     character_name, ve)
+        return None
+    except Exception as e:
+        logger.error("❌ COMMUNICATION PATTERNS: Error creating component for %s: %s",
+                     character_name, e)
         return None
 
 
