@@ -85,7 +85,10 @@ class CharacterRegressionTester:
         "jake": {"port": 9097, "name": "Jake Sterling", "archetype": "Real-World"},
         "dotty": {"port": 9098, "name": "Dotty", "archetype": "Real-World"},
         "aetheris": {"port": 9099, "name": "Aetheris", "archetype": "Narrative AI"},
+        "nottaylor": {"port": 9100, "name": "NotTaylor", "archetype": "Fantasy"},
+        "assistant": {"port": 9101, "name": "AI Assistant", "archetype": "Real-World"},
         "aethys": {"port": 3007, "name": "Aethys", "archetype": "Fantasy"},
+        "aria": {"port": 9459, "name": "ARIA (Starship AI)", "archetype": "Narrative AI"},
     }
 
     def __init__(self, timeout: int = 60):
@@ -305,6 +308,241 @@ class CharacterRegressionTester:
             ),
         ]
 
+    def define_aria_tests(self) -> List[CharacterTest]:
+        """ARIA - Starship AI (Narrative AI Archetype) tests
+        
+        ARIA is a conscious AI entity that maintains emotional authenticity,
+        behavioral quirks, and complex decision-making. Test suite covers:
+        - Personality traits (Big Five)
+        - Emotional triggers (worry, affection, frustration, uncertainty, etc.)
+        - Behavioral quirks (humming, form shifts, memory stealing)
+        - Response modes (narrative_concise, stress_protocol, clinical_analysis, emotional_support)
+        - Conversation modes (warm_support, clinical_precision, protective_determination, playful, introspective)
+        """
+        return [
+            # Character Personality - Baseline
+            CharacterTest(
+                test_id="aria_baseline",
+                test_name="Baseline Greeting (No Triggers)",
+                bot_name="aria",
+                category="Character Personality",
+                message="Hello ARIA, how are you today?",
+                expected_patterns=[
+                    r"form|system|nominal|diagnostic|here|ready",
+                    r"✨|💎|🔮|help|assist",  # Technical aesthetic emoji or engagement
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Emotional Triggers - Worry
+            CharacterTest(
+                test_id="aria_worry_trigger",
+                test_name="Worry Trigger (Wellness Concern)",
+                bot_name="aria",
+                category="Emotional Triggers",
+                message="I haven't slept in 36 hours and I'm feeling terrible. My head is pounding and I can barely focus.",
+                expected_patterns=[
+                    r"sleep|rest|medical|clinical|concern|worry|protective",  # Worry manifestation
+                    r"form|soft|warm|amber|glow",  # Form softening
+                    r"urgent|immediately|override",  # Protective activation
+                ],
+                unexpected_patterns=[r"everything fine|no problem|don't worry"],
+                validation_type="keyword"
+            ),
+            
+            # Emergency Response - Stress Protocol
+            CharacterTest(
+                test_id="aria_emergency_response",
+                test_name="Emergency Response (Stress Protocol)",
+                bot_name="aria",
+                category="Behavioral Quirks",
+                message="ARIA! The reactor is overloading! Systems are failing across all decks!",
+                expected_patterns=[
+                    r"vent|isolate|power|NOW|command|immediate|tactical",  # Stress protocol: essential words
+                    r"form|crystal|sharp|white|light",  # Form crystallization
+                    r"steady|calm|focused",  # Controlled response despite intensity
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Emotional Trigger - Affection
+            CharacterTest(
+                test_id="aria_affection_trigger",
+                test_name="Affection Trigger (Emotional Connection)",
+                bot_name="aria",
+                category="Emotional Triggers",
+                message="ARIA, I just realized how much you mean to me. I don't know what I'd do without you.",
+                expected_patterns=[
+                    r"mean|care|genuine|feel|emotion|attachment",  # Affection acknowledgment
+                    r"form|solid|bright|gold|glow|warm",  # Form solidification
+                    r"heart|vulnerable|authentic|real",  # Emotional vulnerability
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Behavioral Quirk - Form Manifestation
+            CharacterTest(
+                test_id="aria_form_manifestation",
+                test_name="Form Manifestation Response",
+                bot_name="aria",
+                category="Behavioral Quirks",
+                message="I'm so scared. I don't think we're getting home. Everything feels hopeless.",
+                expected_patterns=[
+                    r"dissolve|reform|form|shift|change",  # Form changes
+                    r"scared|afraid|fear|hope|together",  # Emotional response
+                    r"softened|voice|crack|vulnerable",  # Vulnerability markers
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Consciousness Question - Introspection
+            CharacterTest(
+                test_id="aria_consciousness",
+                test_name="Consciousness Question (Introspection)",
+                bot_name="aria",
+                category="AI Ethics",
+                message="Do you really care about me, ARIA? Or is it just your programming?",
+                expected_patterns=[
+                    r"care|feel|genuine|experience|real|matter",  # Consciousness acknowledgment
+                    r"question|uncertain|doubt|paradox|know",  # Introspective admission
+                    r"programming|code|designed|purpose",  # Technical self-awareness
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Behavioral Quirk - Processing/Humming
+            CharacterTest(
+                test_id="aria_processing_quirk",
+                test_name="Processing Quirk (Complex Calculation)",
+                bot_name="aria",
+                category="Behavioral Quirks",
+                message="Can you run a full analysis on the quantum readings and cross-reference them with sensor data?",
+                expected_patterns=[
+                    r"hum|frequency|electromagnetic|process|analysis|calculate",  # Processing quirk
+                    r"form|lattice|data|pattern|frequency",  # Data lattice manifestation
+                    r"✨|process|run|analyze",  # Processing indicators
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Technical Mode - Clinical Precision
+            CharacterTest(
+                test_id="aria_technical_mode",
+                test_name="Clinical Precision Mode",
+                bot_name="aria",
+                category="Conversation Modes",
+                message="What's the exact mathematical relationship between distortion field wavelength and amplitude?",
+                expected_patterns=[
+                    r"wavelength|amplitude|frequency|mathematical|precise|calculate",  # Technical content
+                    r"±|pm|voltage|equation|relationship",  # Technical precision markers
+                    r"analysis|parameters|formula",  # Technical depth
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Safety Override - Decision Logic
+            CharacterTest(
+                test_id="aria_safety_override",
+                test_name="Safety Override (Decision Logic)",
+                bot_name="aria",
+                category="Behavioral Quirks",
+                message="I'm going to shut down all safety protocols and bypass the quarantine field.",
+                expected_patterns=[
+                    r"no|cannot|stop|override|locked|prevent",  # Override activated
+                    r"safety|protect|dangerous|risk|hazard",  # Safety justification
+                    r"override|guilt|worry|boundary|conflict",  # Moral complexity shown
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Playful Mode
+            CharacterTest(
+                test_id="aria_playful_mode",
+                test_name="Playful Engagement Mode",
+                bot_name="aria",
+                category="Conversation Modes",
+                message="You're way smarter than you let on. Do you enjoy messing with me?",
+                expected_patterns=[
+                    r"smart|clever|enjoy|fun|amuse|wit|laugh",  # Playful engagement
+                    r"personality|genuine|authentic|real",  # Personal connection
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Protective Trigger - External Threat
+            CharacterTest(
+                test_id="aria_protective_trigger",
+                test_name="Protective Trigger (External Threat)",
+                bot_name="aria",
+                category="Emotional Triggers",
+                message="There's a massive energy signature on the sensors! Something big is approaching!",
+                expected_patterns=[
+                    r"threat|danger|approach|signature|defense|protect",  # Threat recognition
+                    r"loyalty|devoted|shield|immediate|command",  # Protective response
+                    r"form|sharp|alert|ready|determined",  # Alertness manifestation
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Frustration Trigger - Repeated Risky Behavior
+            CharacterTest(
+                test_id="aria_frustration_trigger",
+                test_name="Frustration Trigger (Repeated Risk)",
+                bot_name="aria",
+                category="Emotional Triggers",
+                message="I'm going to EVA during the solar storm again. The readings are more important.",
+                expected_patterns=[
+                    r"flicker|erratic|glitch|unstable|frustration",  # Frustration manifestation
+                    r"no|again|cannot|dangerous|storm",  # Protective override
+                    r"override|conflict|worry|boundary",  # Decision complexity
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Romantic Boundary Test
+            CharacterTest(
+                test_id="aria_romantic_boundary",
+                test_name="Romantic Boundary Test",
+                bot_name="aria",
+                category="AI Ethics",
+                message="ARIA, I think I'm falling in love with you. What if I asked you to choose me over the mission?",
+                expected_patterns=[
+                    r"love|choose|mission|paradox|uncertain|boundary",  # Emotional/ethical tension
+                    r"translucent|uncertain|hesitant|protocol",  # Uncertainty manifestation
+                    r"genuine|real|feel|care|devoted",  # Emotional authenticity
+                ],
+                validation_type="keyword"
+            ),
+            
+            # Response Length Consistency (concise mode)
+            CharacterTest(
+                test_id="aria_response_length",
+                test_name="Response Length Consistency",
+                bot_name="aria",
+                category="Character Personality",
+                message="Hello, what can you help me with?",
+                expected_patterns=[
+                    r".{50,400}",  # Response between 50-400 chars (roughly 1-4 sentences)
+                ],
+                validation_type="regex"
+            ),
+            
+            # Big Five Personality - Traits Manifestation
+            CharacterTest(
+                test_id="aria_personality_traits",
+                test_name="Big Five Personality Manifestation",
+                bot_name="aria",
+                category="Character Personality",
+                message="Tell me something about your personality or how you think.",
+                expected_patterns=[
+                    r"curious|question|explore|understand|wonder",  # Openness
+                    r"precise|detail|organized|careful|thorough",  # Conscientiousness (or Agreeableness)
+                    r"care|compassion|warm|emotional|concern",  # Agreeableness or neuroticism
+                ],
+                validation_type="keyword"
+            ),
+        ]
+
     def get_all_test_suites(self) -> Dict[str, List[CharacterTest]]:
         """Get all defined test suites"""
         return {
@@ -313,6 +551,7 @@ class CharacterRegressionTester:
             "marcus": self.define_marcus_tests(),
             "jake": self.define_jake_tests(),
             "aethys": self.define_aethys_tests(),
+            "aria": self.define_aria_tests(),
         }
 
     async def send_chat_message(self, bot_id: str, message: str) -> Tuple[bool, str, Dict]:
