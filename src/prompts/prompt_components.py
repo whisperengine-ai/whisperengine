@@ -26,8 +26,9 @@ class PromptComponentType(Enum):
     for unified prompt assembly. This eliminates dual prompt paths by merging
     CDL character data directly into PromptAssembler components.
     
-    Status: 12/18 implemented (67% complete). See cdl_component_factories.py line 995 for full TODO list.
+    Status: 14/18 implemented (78% complete). See cdl_component_factories.py line 995 for full TODO list.
     ✅ CHARACTER_COMMUNICATION_PATTERNS implemented Nov 4, 2025
+    ✅ RESPONSE_STYLE implemented Nov 5, 2025 - Replaces hardcoded create_guidance_component()
     """
     # ==========================================
     # CDL CHARACTER COMPONENTS (Priority 1-17+)
