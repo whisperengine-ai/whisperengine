@@ -139,7 +139,7 @@ COPY --from=model-downloader /root/.cache/fastembed /app/cache/fastembed
 
 # Copy application code
 COPY src/ ./src/
-COPY pyproject.toml validate_config.py env_manager.py run.py ./
+COPY pyproject.toml env_manager.py run.py ./
 COPY config/ ./config/
 COPY sql/ ./sql/
 COPY scripts/ ./scripts/
