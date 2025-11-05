@@ -729,14 +729,20 @@ class EnhancedCDLManager:
     async def _build_cdl_structure(self, conn: asyncpg.Connection, character_row, character_id: int) -> Dict[str, Any]:
         """Build backward-compatible CDL structure (maintains API compatibility)"""
         
-        # Core identity
+        # Core identity - include emoji configuration from character_row
         cdl_data = {
             'id': character_id,  # Include character ID for persistence operations
             'identity': {
                 'name': character_row['name'],
                 'occupation': character_row['occupation'] or '',
                 'description': character_row['description'] or '',
-                'archetype': character_row['archetype'] or ''
+                'archetype': character_row['archetype'] or '',
+                'emoji_frequency': character_row.get('emoji_frequency', 'moderate'),
+                'emoji_style': character_row.get('emoji_style', 'general'),
+                'emoji_combination': character_row.get('emoji_combination', 'text_with_accent_emoji'),
+                'emoji_placement': character_row.get('emoji_placement', 'end_of_message'),
+                'emoji_age_demographic': character_row.get('emoji_age_demographic', 'millennial'),
+                'emoji_cultural_influence': character_row.get('emoji_cultural_influence', 'general')
             },
             'allow_full_roleplay_immersion': character_row['allow_full_roleplay'] or False
         }

@@ -684,7 +684,44 @@ async def create_character_personality_component(
         personality_data = character_data.get("personality", {})
         big_five = personality_data.get("big_five", {})
         
+        # Fallback: If no big_five data, try to extract personality traits from character attributes
         if not big_five:
+            logger.debug(f"No big_five personality data for {character_name}, checking character attributes")
+            try:
+                # Query character attributes directly from database
+                async with enhanced_manager.pool.acquire() as conn:
+                    # First get character_id from name
+                    character_id_query = "SELECT id FROM characters WHERE normalized_name = $1"
+                    normalized_name = character_name.lower().replace(' ', '_').replace('-', '_')
+                    char_id_row = await conn.fetchrow(character_id_query, normalized_name)
+                    
+                    if char_id_row:
+                        character_id = char_id_row['id']
+                        # Get personality traits
+                        traits_query = """
+                            SELECT description FROM character_attributes 
+                            WHERE character_id = $1 AND category = 'personality_trait'
+                            ORDER BY display_order, importance DESC
+                            LIMIT 5
+                        """
+                        trait_rows = await conn.fetch(traits_query, character_id)
+                        personality_traits = [row['description'] for row in trait_rows if row['description']]
+                        
+                        if personality_traits:
+                            content = "# Your Personality Profile\nCore Traits:\n"
+                            for trait in personality_traits:
+                                content += f"- {trait}\n"
+                            
+                            return PromptComponent(
+                                type=PromptComponentType.CHARACTER_PERSONALITY,
+                                content=content.strip(),
+                                priority=8,
+                                token_cost=200,
+                                required=False,  # Not required since it's fallback data
+                            )
+            except Exception as fallback_error:
+                logger.warning(f"Fallback personality trait query failed for {character_name}: {fallback_error}")
+            
             return None
         
         personality_parts = ["Core Traits:"]

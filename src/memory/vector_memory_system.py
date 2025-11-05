@@ -4134,9 +4134,11 @@ class VectorMemoryManager:
                         'emotional_intensity_raw': raw_intensity
                     }
                     
+                    # Format EMA debug info with proper None handling
+                    ema_prev_str = f"{previous_ema:.3f}" if previous_ema is not None else "None"
                     logger.debug(
                         f"EMA Storage: user={user_id}, raw={raw_intensity:.3f}, "
-                        f"ema_prev={previous_ema:.3f if previous_ema is not None else 'None'}, "
+                        f"ema_prev={ema_prev_str}, "
                         f"ema_new={ema_intensity:.3f}"
                     )
                 except Exception as e:
@@ -4422,7 +4424,7 @@ class VectorMemoryManager:
                         collection_name=self.collection_name,
                         query_vector=(
                             "semantic",  # Named vector for conceptual understanding
-                            self.embedding_generator.embed(query).tolist()
+                            list(self.embedder.embed([query]))[0].tolist()
                         ),
                         query_filter=models.Filter(
                             must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
