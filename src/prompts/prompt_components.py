@@ -367,3 +367,37 @@ def create_ai_intelligence_component(
         condition=lambda: bool(content and content.strip()),
         metadata=metadata or {}
     )
+
+
+def create_attachment_guard_component(
+    bot_name: str,
+    priority: int = 3,
+    required: bool = True,
+    metadata: Optional[Dict[str, Any]] = None
+) -> PromptComponent:
+    """Create a guardrail component for handling message attachments.
+
+    Enforces in-character responses when images/files are present and prevents
+    tool-like analysis formats (headings, scores, tables, coaching prompts).
+
+    Args:
+        bot_name: The active character name for in-character guidance
+        priority: Priority in prompt assembly (default: 3, right after core)
+        required: Whether this component is required (default: True)
+        metadata: Optional metadata dictionary
+
+    Returns:
+        PromptComponent configured for attachment safety guardrails
+    """
+    content = (
+        f"Image policy: respond only in-character ({bot_name}), never output analysis sections, "
+        f"headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
+    )
+
+    return PromptComponent(
+        type=PromptComponentType.ATTACHMENT_GUARD,
+        content=content,
+        priority=priority,
+        required=required,
+        metadata=metadata or {}
+    )

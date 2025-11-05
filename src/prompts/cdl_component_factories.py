@@ -22,7 +22,7 @@ Date: 2025
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from src.prompts.prompt_components import (
     PromptComponent,
     PromptComponentType,
@@ -1133,6 +1133,64 @@ async def create_response_guidelines_component(
         
     except Exception as e:
         logger.error(f"❌ RESPONSE GUIDELINES: Error creating component for {character_name}: {e}")
+        return None
+
+
+async def create_conversation_summary_component(
+    summary_text: Optional[str],
+    *,
+    priority: int = 14,
+    timeframe_label: Optional[str] = None,
+    message_count: Optional[int] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[PromptComponent]:
+    """Create CONVERSATION_SUMMARY component from enrichment data.
+
+    Wrapper around the enrichment worker output. This function does not query
+    the database directly; it formats already-available summary text into a
+    structured PromptComponent for the PromptAssembler.
+
+    Args:
+        summary_text: The summarized conversation text (already computed by enrichment worker)
+        priority: Component priority (default: 14)
+        timeframe_label: Optional human-friendly timeframe label (e.g., "Last 24 hours")
+        message_count: Optional number of messages represented in the summary
+        metadata: Optional metadata dict
+
+    Returns:
+        PromptComponent or None if no summary_text provided
+    """
+    try:
+        if not summary_text or not summary_text.strip():
+            return None
+
+        header_parts: List[str] = ["# Conversation Summary"]
+        subheader_parts: List[str] = []
+
+        if timeframe_label:
+            subheader_parts.append(f"Timeframe: {timeframe_label}")
+        if isinstance(message_count, int) and message_count > 0:
+            subheader_parts.append(f"Messages summarized: {message_count}")
+
+        content_parts: List[str] = []
+        content_parts.extend(header_parts)
+        if subheader_parts:
+            content_parts.append("(" + ", ".join(subheader_parts) + ")")
+        content_parts.append("")  # blank line
+        content_parts.append(summary_text.strip())
+
+        content = "\n".join(content_parts)
+
+        return PromptComponent(
+            type=PromptComponentType.CONVERSATION_SUMMARY,
+            content=content,
+            priority=priority,
+            token_cost=len(summary_text) // 4,  # rough token estimate
+            required=False,
+            metadata=metadata or {}
+        )
+    except Exception as e:
+        logger.warning("Failed to create conversation summary component: %s", e)
         return None
 
 

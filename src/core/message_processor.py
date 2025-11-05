@@ -3307,15 +3307,11 @@ class MessageProcessor:
         except Exception as e:
             # Fallback to legacy on exception
             logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL temporal component error: {e}")
-            from src.utils.helpers import get_current_time_context
-            time_context = get_current_time_context()
-            time_component = PromptComponent(
-                type=PromptComponentType.TIME_CONTEXT,
-                content=f"CURRENT DATE & TIME: {time_context}",
-                priority=6,
-                required=True
-            )
-            assembler.add_component(time_component)
+            # Use CDL factory for temporal awareness
+            from src.prompts.cdl_component_factories import create_temporal_awareness_component
+            time_component = await create_temporal_awareness_component(priority=6)
+            if time_component:
+                assembler.add_component(time_component)
         
         # TODO: Component 7: User Personality (Priority 7) - NOT IMPLEMENTED
         # Reason: Requires Big Five personality analysis system for users
@@ -3329,17 +3325,15 @@ class MessageProcessor:
         # COMPONENT 5: Attachment Guard (if needed)
         # ================================
         if message_context.attachments and len(message_context.attachments) > 0:
+            from src.prompts.prompt_components import create_attachment_guard_component
             bot_name_for_guard = os.getenv('DISCORD_BOT_NAME', 'Assistant')
-            attachment_guard = (
-                f"Image policy: respond only in-character ({bot_name_for_guard}), never output analysis sections, "
-                f"headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
+            assembler.add_component(
+                create_attachment_guard_component(
+                    bot_name=bot_name_for_guard,
+                    priority=3,
+                    required=True
+                )
             )
-            assembler.add_component(PromptComponent(
-                type=PromptComponentType.ATTACHMENT_GUARD,
-                content=attachment_guard,
-                priority=3,
-                required=True
-            ))
         
         # ================================
         # CDL COMPONENT 16: Knowledge Context (User Facts)
@@ -3542,19 +3536,23 @@ class MessageProcessor:
                         end_date = summary['end_timestamp'].strftime('%Y-%m-%d')
                         timeframe = f"{start_date}" if start_date == end_date else f"{start_date} to {end_date}"
                         
-                        summary_text = f"=== EARLIER CONVERSATION SUMMARY ({timeframe}) ===\n"
-                        summary_text += f"[{summary['message_count']} messages from previous conversation]\n\n"
-                        summary_text += f"{summary['summary_text']}\n"
-                        
+                        # Build final summary text, optionally appending key topics
+                        final_summary_text = f"{summary['summary_text']}"
                         if summary.get('key_topics'):
                             topics = ', '.join(summary['key_topics'][:5])
-                            summary_text += f"\nKey topics discussed: {topics}"
-                        
-                        assembler.add_component(create_memory_component(
-                            summary_text,
-                            priority=11  # Priority 11: Before detailed memories (13)
-                        ))
-                        logger.info(f"✅ TIERED CONTEXT: Added earlier conversation summary ({timeframe}, {summary['message_count']} messages)")
+                            final_summary_text += f"\n\nKey topics discussed: {topics}"
+
+                        # Add as dedicated CONVERSATION_SUMMARY component (Priority 14)
+                        from src.prompts.cdl_component_factories import create_conversation_summary_component
+                        summary_component = await create_conversation_summary_component(
+                            summary_text=final_summary_text,
+                            priority=14,  # After episodic memories (13)
+                            timeframe_label=timeframe,
+                            message_count=summary['message_count']
+                        )
+                        if summary_component:
+                            assembler.add_component(summary_component)
+                            logger.info(f"✅ TIERED CONTEXT: Added conversation summary component ({timeframe}, {summary['message_count']} messages)")
                     
                     # TIER 2: Recent detailed memories are already added at priority 13
                     # This gives us two-tier context: summary (older) + detailed (recent)
