@@ -16,7 +16,11 @@ import logging
 from typing import List, Optional, Set
 from collections import defaultdict
 
-from src.prompts.prompt_components import PromptComponent, PromptComponentType
+from src.prompts.prompt_components import (
+    PromptComponent,
+    is_component_enabled,
+    feature_flag_env_var,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +65,24 @@ class PromptAssembler:
         Args:
             component: PromptComponent to add
         """
+        # Feature flag gating per component type (default enabled)
+        try:
+            if not is_component_enabled(component.type):
+                env_name = feature_flag_env_var(component.type)
+                logger.info(
+                    "⏸️ Skipped component due to feature flag: type=%s (%s=false)",
+                    component.type.value,
+                    env_name,
+                )
+                return
+        except Exception as e:
+            # Fail-open on any gating error to avoid breaking prompt assembly
+            logger.warning(
+                "Feature flag check failed for %s, proceeding enabled by default: %s",
+                component.type.value,
+                str(e),
+            )
+        
         self.components.append(component)
         logger.debug(
             "Added component: type=%s, priority=%d, required=%s, tokens~%d",

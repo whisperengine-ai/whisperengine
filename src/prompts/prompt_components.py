@@ -13,6 +13,9 @@ Status: ACTIVE IMPLEMENTATION
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Callable, Dict, Any
+import os
+import re
+import logging
 
 
 class PromptComponentType(Enum):
@@ -105,6 +108,45 @@ class PromptComponentType(Enum):
     
     # Custom components
     CUSTOM = "custom"
+
+
+# =============================================================
+# Feature Flag Utilities
+# =============================================================
+# Each prompt component can be individually disabled via env var.
+# Naming pattern: ENABLE_PROMPT_COMPONENT_<UPPER_SNAKE_CASE_TYPE>
+# Examples:
+#   ENABLE_PROMPT_COMPONENT_CHARACTER_IDENTITY=false
+#   ENABLE_PROMPT_COMPONENT_MEMORY=false
+# All flags default to TRUE (enabled) when unset.
+
+_FEATURE_ENV_PREFIX = "ENABLE_PROMPT_COMPONENT_"
+
+
+def _normalize_component_name(component_type: PromptComponentType) -> str:
+    """Convert component enum value to UPPER_SNAKE for env var construction."""
+    value = component_type.value.upper()
+    # Replace non-alphanumeric with underscore
+    value = re.sub(r"[^A-Z0-9]+", "_", value)
+    # Collapse multiple underscores
+    value = re.sub(r"_+", "_", value).strip('_')
+    return value
+
+
+def feature_flag_env_var(component_type: PromptComponentType) -> str:
+    """Return the environment variable name controlling this component."""
+    return f"{_FEATURE_ENV_PREFIX}{_normalize_component_name(component_type)}"
+
+
+def is_component_enabled(component_type: PromptComponentType) -> bool:
+    """Check if a component is enabled via its feature flag.
+
+    Defaults to True (enabled) if the environment variable is not set.
+    Any case-insensitive value of 'false', '0', 'off', 'disabled' disables it.
+    """
+    env_name = feature_flag_env_var(component_type)
+    raw = os.getenv(env_name, 'true').strip().lower()
+    return raw not in {"false", "0", "off", "disabled"}
 
 
 @dataclass
@@ -401,3 +443,30 @@ def create_attachment_guard_component(
         required=required,
         metadata=metadata or {}
     )
+
+
+def dump_prompt_component_feature_flags(log_level=logging.INFO):
+    """Log the enable/disable state of all PromptComponentType feature flags."""
+    logger = logging.getLogger(__name__)
+    results = []
+    for ctype in PromptComponentType:
+        env_name = feature_flag_env_var(ctype)
+        enabled = is_component_enabled(ctype)
+        raw = os.getenv(env_name, None)
+        results.append((ctype.value, env_name, enabled, raw))
+        logger.log(
+            log_level,
+            "PROMPT FEATURE FLAG: %-30s | %s = %-8s | raw=%r",
+            ctype.value,
+            env_name,
+            str(enabled).upper(),
+            raw
+        )
+    return results
+
+
+# Dump feature flag states at import (startup)
+if os.getenv("DUMP_PROMPT_COMPONENT_FLAGS", "true").lower() in ("1", "true", "yes", "on"):
+    dump_prompt_component_feature_flags()
+
+

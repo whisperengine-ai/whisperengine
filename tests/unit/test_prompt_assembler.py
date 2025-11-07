@@ -114,6 +114,29 @@ class TestPromptAssembler:
         
         assert len(assembler.components) == 1
         assert assembler.components[0] == component
+
+    def test_add_component_feature_flag_disable(self, monkeypatch):
+        """Component should be skipped when feature flag disables it (default is enabled)."""
+        from src.prompts.prompt_components import feature_flag_env_var
+
+        assembler = PromptAssembler()
+        memory_component = PromptComponent(
+            type=PromptComponentType.MEMORY,
+            content="Memory content",
+            priority=4
+        )
+
+        # Disable MEMORY component via feature flag
+        env_name = feature_flag_env_var(PromptComponentType.MEMORY)
+        monkeypatch.setenv(env_name, "false")
+
+        assembler.add_component(memory_component)
+        assert len(assembler.components) == 0
+
+        # Re-enable (unset) and verify it gets added
+        monkeypatch.delenv(env_name, raising=False)
+        assembler.add_component(memory_component)
+        assert len(assembler.components) == 1
     
     def test_add_multiple_components(self):
         """Test adding multiple components."""
@@ -310,6 +333,36 @@ class TestIntegrationScenarios:
         # Verify metrics
         assert metrics['total_components'] == 3
         assert metrics['within_budget'] is True
+
+    def test_pipeline_with_component_disabled(self, monkeypatch):
+        """End-to-end: disabling a component removes it from the assembled prompt."""
+        from src.prompts.prompt_components import feature_flag_env_var
+
+        # Disable GUIDANCE component
+        env_name = feature_flag_env_var(PromptComponentType.GUIDANCE)
+        monkeypatch.setenv(env_name, "off")
+
+        assembler = create_prompt_assembler(max_tokens=1000)
+        assembler.add_component(create_core_system_component(
+            "You are a helpful assistant", priority=1
+        ))
+        assembler.add_component(create_memory_component(
+            "USER FACTS: Name is Mark", priority=4
+        ))
+        assembler.add_component(create_guidance_component(
+            "Assistant", priority=6
+        ))
+
+        result = assembler.assemble(model_type="generic")
+        metrics = assembler.get_assembly_metrics()
+
+        # Guidance text should be absent
+        assert "Assistant" not in result
+        # Other components still present
+        assert "You are a helpful assistant" in result
+        assert "USER FACTS" in result
+        # Components count reflects skip (2 instead of 3)
+        assert metrics['total_components'] == 2
     
     def test_no_memory_scenario(self):
         """Test assembly when no memory is available."""
