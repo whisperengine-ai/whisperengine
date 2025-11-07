@@ -36,7 +36,8 @@ from src.prompts.prompt_components import (
     create_guidance_component,
     create_user_facts_component,
     PromptComponent,
-    PromptComponentType
+    PromptComponentType,
+    is_component_enabled  # Feature flag check for early-exit optimization
 )
 
 # Relationship Intelligence components
@@ -1158,11 +1159,17 @@ class MessageProcessor:
                     logger.warning(f"Strategic cache retrieval failed (non-blocking): {e}", exc_info=True)
             
             # Phase 3: Memory retrieval with emotional context-aware filtering
-            relevant_memories = await self._retrieve_relevant_memories(
-                message_context, 
-                early_emotion_context,
-                memory_health_cache
-            )
+            # Check if memory component is enabled before expensive retrieval
+            relevant_memories = []
+            if is_component_enabled(PromptComponentType.MEMORY) or is_component_enabled(PromptComponentType.EPISODIC_MEMORIES):
+                relevant_memories = await self._retrieve_relevant_memories(
+                    message_context, 
+                    early_emotion_context,
+                    memory_health_cache
+                )
+                logger.debug(f"✅ Retrieved {len(relevant_memories)} relevant memories (memory component enabled)")
+            else:
+                logger.debug("⏭️  Skipped memory retrieval (MEMORY component disabled)")
             
             # Phase 4: Conversation history and context building
             # 🚀 Structured Prompt Assembly (default - no feature flag!)
@@ -3097,6 +3104,7 @@ class MessageProcessor:
         from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
         from src.database.postgres_pool_manager import get_postgres_pool
         from src.prompts.cdl_component_factories import create_final_response_guidance_component
+        from src.prompts.prompt_components import is_component_enabled
         
         try:
             bot_name = get_normalized_bot_name_from_env()
@@ -3105,40 +3113,49 @@ class MessageProcessor:
                 enhanced_manager = create_enhanced_cdl_manager(pool)
                 
                 # Component 1: Character Identity (Priority 1)
-                identity_component = await create_character_identity_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if identity_component:
-                    assembler.add_component(identity_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character identity for {bot_name}")
+                if is_component_enabled(PromptComponentType.CHARACTER_IDENTITY):
+                    identity_component = await create_character_identity_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if identity_component:
+                        assembler.add_component(identity_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character identity for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character identity found for {bot_name}")
                 else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character identity found for {bot_name}")
+                    logger.debug(f"⏭️  STRUCTURED CONTEXT: Skipped character identity processing (disabled)")
                 
                 # Component 2: Character Mode (Priority 2) - AI identity handling
-                mode_component = await create_character_mode_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if mode_component:
-                    assembler.add_component(mode_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character mode for {bot_name}")
+                if is_component_enabled(PromptComponentType.CHARACTER_MODE):
+                    mode_component = await create_character_mode_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if mode_component:
+                        assembler.add_component(mode_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character mode for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character mode found for {bot_name}")
                 else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character mode found for {bot_name}")
+                    logger.debug(f"⏭️  STRUCTURED CONTEXT: Skipped character mode processing (disabled)")
                 
                 # Component 3: Response Mode (Priority 1 - HIGHEST!) - Response length constraints & style
                 # CRITICAL: Response mode must be HIGH priority (even higher than character identity!)
                 # The LLM must see this instruction FIRST and most prominently
-                response_mode_component = await create_response_mode_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name,
-                    priority=1  # HIGHEST priority - must be seen first by LLM
-                )
-                if response_mode_component:
-                    assembler.add_component(response_mode_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added response mode guidance (PRIORITY 1) for {bot_name}")
+                if is_component_enabled(PromptComponentType.RESPONSE_STYLE):  # Note: RESPONSE_STYLE enum for response_mode
+                    response_mode_component = await create_response_mode_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name,
+                        priority=1  # HIGHEST priority - must be seen first by LLM
+                    )
+                    if response_mode_component:
+                        assembler.add_component(response_mode_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added response mode guidance (PRIORITY 1) for {bot_name}")
+                    else:
+                        logger.debug(f"ℹ️ STRUCTURED CONTEXT: No response modes configured for {bot_name} (using defaults)")
                 else:
-                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No response modes configured for {bot_name} (using defaults)")
+                    logger.debug(f"⏭️  STRUCTURED CONTEXT: Skipped response mode processing (disabled)")
                 
                 # TODO: Component 4: Character Backstory (Priority 4) - NOT IMPLEMENTED
                 # Reason: Lower priority - backstory provides depth but not critical for basic responses
@@ -3153,50 +3170,62 @@ class MessageProcessor:
                 # Estimated tokens: 200-600
                 
                 # Component 6: AI Identity Guidance (Priority 6) - Context-aware AI disclosure
-                ai_guidance_component = await create_ai_identity_guidance_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name,
-                    message_content=message_context.content
-                )
-                if ai_guidance_component:
-                    assembler.add_component(ai_guidance_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added AI identity guidance for {bot_name}")
-                # Note: No warning if None - this is context-dependent (only when user asks about AI)
+                if is_component_enabled(PromptComponentType.AI_IDENTITY_GUIDANCE):
+                    ai_guidance_component = await create_ai_identity_guidance_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name,
+                        message_content=message_context.content
+                    )
+                    if ai_guidance_component:
+                        assembler.add_component(ai_guidance_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added AI identity guidance for {bot_name}")
+                    # Note: No warning if None - this is context-dependent (only when user asks about AI)
+                else:
+                    logger.debug(f"⏭️  STRUCTURED CONTEXT: Skipped AI identity guidance processing (disabled)")
                 
                 # Component 5.5: Character Communication Patterns (Priority 6) - NEW COMPONENT
                 # Communication patterns define HOW character communicates (emoji, speech, behavior)
-                communication_patterns_component = await create_character_communication_patterns_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name,
-                    priority=6
-                )
-                if communication_patterns_component:
-                    assembler.add_component(communication_patterns_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added communication patterns for {bot_name}")
+                if is_component_enabled(PromptComponentType.CHARACTER_COMMUNICATION_PATTERNS):
+                    communication_patterns_component = await create_character_communication_patterns_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name,
+                        priority=6
+                    )
+                    if communication_patterns_component:
+                        assembler.add_component(communication_patterns_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added communication patterns for {bot_name}")
+                    else:
+                        logger.debug(f"ℹ️ STRUCTURED CONTEXT: No communication patterns found for {bot_name}")
                 else:
-                    logger.debug(f"ℹ️ STRUCTURED CONTEXT: No communication patterns found for {bot_name}")
+                    logger.debug(f"⏭️  STRUCTURED CONTEXT: Skipped communication patterns processing (disabled)")
                 
                 # Component 8: Character Personality (Priority 8) - Big Five personality traits
-                personality_component = await create_character_personality_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if personality_component:
-                    assembler.add_component(personality_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character personality for {bot_name}")
+                if is_component_enabled(PromptComponentType.CHARACTER_PERSONALITY):
+                    personality_component = await create_character_personality_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if personality_component:
+                        assembler.add_component(personality_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character personality for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character personality found for {bot_name}")
                 else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character personality found for {bot_name}")
+                    logger.debug(f"⏭️  STRUCTURED CONTEXT: Skipped character personality processing (disabled)")
                 
                 # Component 10: Character Voice (Priority 10) - Speaking style and linguistic patterns
-                voice_component = await create_character_voice_component(
-                    enhanced_manager=enhanced_manager,
-                    character_name=bot_name
-                )
-                if voice_component:
-                    assembler.add_component(voice_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character voice for {bot_name}")
+                if is_component_enabled(PromptComponentType.CHARACTER_VOICE):
+                    voice_component = await create_character_voice_component(
+                        enhanced_manager=enhanced_manager,
+                        character_name=bot_name
+                    )
+                    if voice_component:
+                        assembler.add_component(voice_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL character voice for {bot_name}")
+                    else:
+                        logger.warning(f"⚠️ STRUCTURED CONTEXT: No character voice found for {bot_name}")
                 else:
-                    logger.warning(f"⚠️ STRUCTURED CONTEXT: No character voice found for {bot_name}")
+                    logger.debug(f"⏭️  STRUCTURED CONTEXT: Skipped character voice processing (disabled)")
                 
                 # ================================
                 # COMPONENT 9: Emotional Intelligence Context (Priority 9)
@@ -3285,33 +3314,38 @@ class MessageProcessor:
         # CDL COMPONENT 6: Temporal Awareness (Priority 6)
         # ================================
         # 🕒 CDL TEMPORAL: Current date/time context for temporal grounding
-        from src.prompts.cdl_component_factories import create_temporal_awareness_component
         
-        try:
-            temporal_component = await create_temporal_awareness_component(priority=6)
-            if temporal_component:
-                assembler.add_component(temporal_component)
-                logger.info("✅ STRUCTURED CONTEXT: Added CDL temporal awareness")
-            else:
-                # Fallback to legacy if CDL component fails
-                from src.utils.helpers import get_current_time_context
-                time_context = get_current_time_context()
-                time_component = PromptComponent(
-                    type=PromptComponentType.TIME_CONTEXT,
-                    content=f"CURRENT DATE & TIME: {time_context}",
-                    priority=6,
-                    required=True
-                )
-                assembler.add_component(time_component)
-                logger.warning("⚠️ STRUCTURED CONTEXT: Using legacy time context (CDL temporal component failed)")
-        except Exception as e:
-            # Fallback to legacy on exception
-            logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL temporal component error: {e}")
-            # Use CDL factory for temporal awareness
+        # Check if temporal awareness component is enabled
+        if is_component_enabled(PromptComponentType.TEMPORAL_AWARENESS):
             from src.prompts.cdl_component_factories import create_temporal_awareness_component
-            time_component = await create_temporal_awareness_component(priority=6)
-            if time_component:
-                assembler.add_component(time_component)
+            
+            try:
+                temporal_component = await create_temporal_awareness_component(priority=6)
+                if temporal_component:
+                    assembler.add_component(temporal_component)
+                    logger.info("✅ STRUCTURED CONTEXT: Added CDL temporal awareness")
+                else:
+                    # Fallback to legacy if CDL component fails
+                    from src.utils.helpers import get_current_time_context
+                    time_context = get_current_time_context()
+                    time_component = PromptComponent(
+                        type=PromptComponentType.TIME_CONTEXT,
+                        content=f"CURRENT DATE & TIME: {time_context}",
+                        priority=6,
+                        required=True
+                    )
+                    assembler.add_component(time_component)
+                    logger.warning("⚠️ STRUCTURED CONTEXT: Using legacy time context (CDL temporal component failed)")
+            except Exception as e:
+                # Fallback to legacy on exception
+                logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL temporal component error: {e}")
+                # Use CDL factory for temporal awareness
+                from src.prompts.cdl_component_factories import create_temporal_awareness_component
+                time_component = await create_temporal_awareness_component(priority=6)
+                if time_component:
+                    assembler.add_component(time_component)
+        else:
+            logger.debug("⏭️  Skipped temporal awareness processing (TEMPORAL_AWARENESS component disabled)")
         
         # TODO: Component 7: User Personality (Priority 7) - NOT IMPLEMENTED
         # Reason: Requires Big Five personality analysis system for users
@@ -3340,53 +3374,58 @@ class MessageProcessor:
         # ================================
         # 📚 CDL KNOWLEDGE: User facts and learned information
         # Note: Eventually replace with separate USER_PERSONALITY (Priority 7) + KNOWLEDGE_CONTEXT (Priority 16)
-        from src.prompts.cdl_component_factories import create_knowledge_context_component
         
-        # Get user facts from existing system
-        user_facts_content = await self._build_user_facts_content(
-            message_context.user_id, 
-            message_context.content  # Pass message content for context-based filtering
-        )
-        
-        if user_facts_content:
-            # Try CDL knowledge context component first
-            try:
-                # Parse user facts into list format for CDL component
-                user_facts_list = []
-                if user_facts_content:
-                    # Split by newlines and clean up
-                    facts = user_facts_content.split('\n')
-                    for fact in facts:
-                        fact = fact.strip()
-                        if fact and fact.startswith('-'):
-                            user_facts_list.append(fact[1:].strip())
-                        elif fact and not fact.startswith('Known facts'):
-                            user_facts_list.append(fact)
-                
-                knowledge_component = await create_knowledge_context_component(
-                    user_facts=user_facts_list,
-                    priority=16
-                )
-                
-                if knowledge_component:
-                    assembler.add_component(knowledge_component)
-                    logger.info(f"✅ STRUCTURED CONTEXT: Added CDL knowledge context ({len(knowledge_component.content)} chars)")
-                else:
-                    # Fallback to legacy user facts component
+        # Check if user facts component is enabled before database queries
+        if is_component_enabled(PromptComponentType.USER_FACTS):
+            from src.prompts.cdl_component_factories import create_knowledge_context_component
+            
+            # Get user facts from existing system
+            user_facts_content = await self._build_user_facts_content(
+                message_context.user_id, 
+                message_context.content  # Pass message content for context-based filtering
+            )
+            
+            if user_facts_content:
+                # Try CDL knowledge context component first
+                try:
+                    # Parse user facts into list format for CDL component
+                    user_facts_list = []
+                    if user_facts_content:
+                        # Split by newlines and clean up
+                        facts = user_facts_content.split('\n')
+                        for fact in facts:
+                            fact = fact.strip()
+                            if fact and fact.startswith('-'):
+                                user_facts_list.append(fact[1:].strip())
+                            elif fact and not fact.startswith('Known facts'):
+                                user_facts_list.append(fact)
+                    
+                    knowledge_component = await create_knowledge_context_component(
+                        user_facts=user_facts_list,
+                        priority=16
+                    )
+                    
+                    if knowledge_component:
+                        assembler.add_component(knowledge_component)
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added CDL knowledge context ({len(knowledge_component.content)} chars)")
+                    else:
+                        # Fallback to legacy user facts component
+                        assembler.add_component(create_user_facts_component(
+                            user_facts_content,
+                            priority=16
+                        ))
+                        logger.info(f"✅ STRUCTURED CONTEXT: Added legacy user facts ({len(user_facts_content)} chars)")
+                        
+                except Exception as e:
+                    # Fallback to legacy on error
+                    logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL knowledge component error: {e}")
                     assembler.add_component(create_user_facts_component(
                         user_facts_content,
                         priority=16
                     ))
                     logger.info(f"✅ STRUCTURED CONTEXT: Added legacy user facts ({len(user_facts_content)} chars)")
-                    
-            except Exception as e:
-                # Fallback to legacy on error
-                logger.warning(f"⚠️ STRUCTURED CONTEXT: CDL knowledge component error: {e}")
-                assembler.add_component(create_user_facts_component(
-                    user_facts_content,
-                    priority=16
-                ))
-                logger.info(f"✅ STRUCTURED CONTEXT: Added legacy user facts ({len(user_facts_content)} chars)")
+        else:
+            logger.debug("⏭️  Skipped user facts processing (USER_FACTS component disabled)")
         
         # ================================
         # COMPONENT 7: Memory Narrative (or anti-hallucination warning)
@@ -3507,7 +3546,8 @@ class MessageProcessor:
         # - Prevents "context cliff" where AI forgets earlier conversation
         # Feature flagged for testing and gradual rollout
         
-        if os.getenv('ENABLE_ENRICHED_SUMMARIES', 'false').lower() == 'true':
+        # Check if conversation summary component is enabled before processing
+        if is_component_enabled(PromptComponentType.CONVERSATION_SUMMARY) and os.getenv('ENABLE_ENRICHED_SUMMARIES', 'false').lower() == 'true':
             try:
                 from src.memory.vector_memory_system import get_normalized_bot_name_from_env
                 bot_name = get_normalized_bot_name_from_env()
@@ -3564,6 +3604,8 @@ class MessageProcessor:
                     
             except Exception as e:
                 logger.warning(f"⚠️ Failed to add enriched summaries to context: {e}")
+        elif not is_component_enabled(PromptComponentType.CONVERSATION_SUMMARY):
+            logger.debug("⏭️  Skipped conversation summary processing (CONVERSATION_SUMMARY component disabled)")
         else:
             logger.debug("📚 Enriched summaries disabled (ENABLE_ENRICHED_SUMMARIES=false)")
         
@@ -4207,47 +4249,51 @@ class MessageProcessor:
         # ================================
         # COMPONENT 2: Emotional Intelligence (Priority 18.5)
         # ================================
-        try:
-            from src.prompts.emotional_intelligence_component import create_emotional_intelligence_component
-            
-            bot_name = get_normalized_bot_name_from_env()
-            
-            # Create emotional intelligence component with InfluxDB trajectory data
-            emotional_component, trajectory_metadata = await create_emotional_intelligence_component(
-                user_id=message_context.user_id,
-                bot_name=bot_name,
-                current_user_emotion=ai_components.get('emotion_data'),
-                current_bot_emotion=ai_components.get('bot_emotion'),
-                character_emotional_state=ai_components.get('character_emotional_state'),
-                temporal_client=self.temporal_client,
-                priority=19,  # Same priority as AI Intelligence (will appear before due to add order)
-                confidence_threshold=0.7,
-                intensity_threshold=0.5,
-                trajectory_window_minutes=60,  # Last hour
-                return_metadata=True  # Get trajectory data for footer display
-            )
-            
-            if emotional_component:
-                # Keep priority 19 but it will appear before AI Intelligence due to add order
-                ai_assembler.add_component(emotional_component)
-                logger.info(
-                    "🎭 EMOTIONAL INTELLIGENCE: Added component (priority 18.5, user=%s, bot=%s)",
-                    ai_components.get('emotion_data', {}).get('primary_emotion') if ai_components.get('emotion_data') else None,
-                    ai_components.get('bot_emotion', {}).get('primary_emotion') if ai_components.get('bot_emotion') else None
-                )
-            
-            # Store trajectory metadata for footer display
-            if trajectory_metadata:
-                ai_components['emotional_trajectory_data'] = trajectory_metadata
-                logger.debug("🎭 EMOTIONAL TRAJECTORY: Stored metadata for footer display")
-            
-            if not emotional_component:
-                logger.debug("🎭 EMOTIONAL INTELLIGENCE: No significant emotions - component skipped")
+        # Check if emotional context component is enabled
+        if is_component_enabled(PromptComponentType.EMOTIONAL_CONTEXT):
+            try:
+                from src.prompts.emotional_intelligence_component import create_emotional_intelligence_component
                 
-        except ImportError as import_err:
-            logger.warning("Could not import emotional intelligence component: %s", import_err)
-        except (AttributeError, TypeError, KeyError) as component_err:
-            logger.warning("Failed to create emotional intelligence component: %s", component_err)
+                bot_name = get_normalized_bot_name_from_env()
+                
+                # Create emotional intelligence component with InfluxDB trajectory data
+                emotional_component, trajectory_metadata = await create_emotional_intelligence_component(
+                    user_id=message_context.user_id,
+                    bot_name=bot_name,
+                    current_user_emotion=ai_components.get('emotion_data'),
+                    current_bot_emotion=ai_components.get('bot_emotion'),
+                    character_emotional_state=ai_components.get('character_emotional_state'),
+                    temporal_client=self.temporal_client,
+                    priority=19,  # Same priority as AI Intelligence (will appear before due to add order)
+                    confidence_threshold=0.7,
+                    intensity_threshold=0.5,
+                    trajectory_window_minutes=60,  # Last hour
+                    return_metadata=True  # Get trajectory data for footer display
+                )
+                
+                if emotional_component:
+                    # Keep priority 19 but it will appear before AI Intelligence due to add order
+                    ai_assembler.add_component(emotional_component)
+                    logger.info(
+                        "🎭 EMOTIONAL INTELLIGENCE: Added component (priority 18.5, user=%s, bot=%s)",
+                        ai_components.get('emotion_data', {}).get('primary_emotion') if ai_components.get('emotion_data') else None,
+                        ai_components.get('bot_emotion', {}).get('primary_emotion') if ai_components.get('bot_emotion') else None
+                    )
+                
+                # Store trajectory metadata for footer display
+                if trajectory_metadata:
+                    ai_components['emotional_trajectory_data'] = trajectory_metadata
+                    logger.debug("🎭 EMOTIONAL TRAJECTORY: Stored metadata for footer display")
+                
+                if not emotional_component:
+                    logger.debug("🎭 EMOTIONAL INTELLIGENCE: No significant emotions - component skipped")
+                    
+            except ImportError as import_err:
+                logger.warning("Could not import emotional intelligence component: %s", import_err)
+            except (AttributeError, TypeError, KeyError) as component_err:
+                logger.warning("Failed to create emotional intelligence component: %s", component_err)
+        else:
+            logger.debug("⏭️  Skipped emotional intelligence processing (EMOTIONAL_INTELLIGENCE component disabled)")
         
         # ================================
         # COMPONENT 2.5: Strategic Intelligence (Priority 18.7)
