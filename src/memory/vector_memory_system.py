@@ -2413,29 +2413,57 @@ class VectorMemoryStore:
                 collection_name=self.collection_name,
                 query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR: Use content vector
                 query_filter=query_filter,
-                limit=top_k,
+                limit=top_k * 2,  # 🎯 OVER-FETCH: Get 2x results for emotional intensity re-ranking
                 score_threshold=min_score,
                 with_payload=True
             )
             
-            # Format results
+            # 🎯 IMPORTANT MOMENTS BOOST: Re-rank using emotional_intensity
+            # This solves the "Luna recovered" problem - emotionally significant moments surface better
             enriched_results = []
             for point in search_results:
+                # Defensive: payload can be None depending on Qdrant client/version
+                payload = point.payload or {}
+                
+                # Extract emotional_intensity from payload (0.0-1.0 scale, default 0.5)
+                emotional_intensity = payload.get('emotional_intensity', 0.5)
+                
+                # Boost formula: boosted_score = base_score * (1 + intensity * 0.3)
+                # High-intensity moments (joy, sadness, fear) get up to 30% boost
+                # Example: base=0.70, intensity=0.85 → 0.70 * 1.255 = 0.8785
+                # Example: base=0.70, intensity=0.50 → 0.70 * 1.150 = 0.8050
+                boost_factor = 1 + (emotional_intensity * 0.3)
+                boosted_score = point.score * boost_factor
+                
                 result = {
                     "id": point.id,
-                    "score": point.score,
-                    "content": point.payload['content'],
-                    "memory_type": point.payload['memory_type'],
-                    "timestamp": point.payload['timestamp'],
-                    "confidence": point.payload.get('confidence', 0.5),
-                    "metadata": point.payload,
+                    "score": boosted_score,  # Use emotionally-boosted score
+                    "base_score": point.score,  # Keep original for debugging
+                    "emotional_intensity": emotional_intensity,  # Track intensity
+                    "emotional_boost": boost_factor,  # Track boost amount
+                    "content": payload.get('content', ''),
+                    "memory_type": payload.get('memory_type', 'conversation'),
+                    "timestamp": payload.get('timestamp', ''),
+                    "confidence": payload.get('confidence', 0.5),
+                    "metadata": payload,
                     "qdrant_native": True,
                     "temporal_query": False
                 }
                 enriched_results.append(result)
             
+            # Re-sort by boosted score and trim to requested limit
+            if enriched_results:
+                enriched_results.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+                enriched_results = enriched_results[:top_k]
+            
+            # Re-sort by boosted score (high emotional intensity memories rise to top)
+            enriched_results.sort(key=lambda x: x["score"], reverse=True)
+            
+            # Trim to original limit after re-ranking
+            enriched_results = enriched_results[:top_k]
+            
             self.stats["searches_performed"] += 1
-            logger.info(f"🎯 QDRANT-SEMANTIC: Retrieved {len(enriched_results)} memories")
+            logger.info(f"🎯 QDRANT-SEMANTIC: Retrieved {len(enriched_results)} memories (boosted by emotional_intensity)")
             
             return enriched_results
             
@@ -4085,13 +4113,17 @@ class VectorMemoryManager:
         **kwargs
     ) -> bool:
         """
-        Store a conversation exchange as separate user and bot messages with proper chronological timestamps.
+        Store a conversation exchange in DUAL format for optimal retrieval and ordering.
         
-        � FIX: Instead of atomic pairs, store user message and bot response as separate entries
-        with proper timestamps to ensure correct chronological ordering.
-        - User message: Gets timestamp T (when received/processed)
-        - Bot response: Gets timestamp T + small delta (when generated)
-        - Benefits: Correct chronological order, proper conversation flow
+        🚀 HYBRID STORAGE (3 entries per conversation):
+        1. User message entry (role="user", source="user_message") - for chronological history
+        2. Bot response entry (role="assistant", source="bot_response") - for chronological history  
+        3. Atomic pair entry (role="conversation_pair", source="conversation_pair") - for semantic search
+        
+        Benefits:
+        - Atomic pairs: Easy semantic retrieval with both user+bot in single point (no pairing needed!)
+        - Separate entries: Correct chronological ordering for conversation history
+        - Timestamps: User gets T, Bot gets T+1ms, ensuring proper order
         """
         try:
             logger.debug(f"MEMORY MANAGER DEBUG: store_conversation called for user {user_id}")
@@ -4187,6 +4219,30 @@ class VectorMemoryManager:
             await self.vector_store.store_memory(bot_memory)
             
             logger.info(f"✅ SEPARATE MESSAGES: Stored user message (T={base_timestamp}) and bot response (T={bot_timestamp}) for user {user_id}")
+            
+            # 🚀 ALSO store as atomic pair for semantic search compatibility
+            # This enables proper conversation turn retrieval without complex pairing algorithms
+            atomic_pair_memory = VectorMemory(
+                id=str(uuid4()),
+                user_id=user_id,
+                memory_type=MemoryType.CONVERSATION,
+                content=user_message,  # Primary content is user message for semantic search
+                source="conversation_pair",
+                timestamp=base_timestamp,
+                metadata={
+                    "channel_id": channel_id,
+                    "channel_type": channel_type,
+                    "emotion_data": pre_analyzed_emotion_data,
+                    "role": "conversation_pair",
+                    "user_message": user_message,  # 🚨 CRITICAL: Store both in metadata
+                    "bot_response": bot_response,   # 🚨 CRITICAL: Store both in metadata
+                    **ema_data,  # Include EMA calculation results
+                    **(metadata or {})
+                }
+            )
+            await self.vector_store.store_memory(atomic_pair_memory)
+            
+            logger.info(f"✅ ATOMIC PAIR: Stored conversation pair for semantic search (user+bot) for user {user_id}")
             
             return True
         except Exception as e:

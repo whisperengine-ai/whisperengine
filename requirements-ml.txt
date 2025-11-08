@@ -12,6 +12,9 @@ scikit-learn>=1.5.0     # ML algorithms (Random Forest, preprocessing)
 xgboost>=2.1.3          # Gradient boosting with GPU support (CUDA/CPU)
 lightgbm>=4.5.0         # Fast gradient boosting for large datasets
 
+# Cross-Encoder Re-Ranking (REQUIRED for semantic search precision boost)
+sentence-transformers>=3.3.1  # Cross-encoder models for re-ranking (+15-25% precision)
+
 # Jupyter Notebook Environment
 jupyterlab>=4.3.3       # Interactive notebook environment
 ipywidgets>=8.1.5       # Interactive widgets for notebooks

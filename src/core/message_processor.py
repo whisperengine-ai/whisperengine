@@ -3104,7 +3104,7 @@ class MessageProcessor:
         from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
         from src.database.postgres_pool_manager import get_postgres_pool
         from src.prompts.cdl_component_factories import create_final_response_guidance_component
-        from src.prompts.prompt_components import is_component_enabled
+        from src.prompts.prompt_components import is_component_enabled, PromptComponent, PromptComponentType
         
         try:
             bot_name = get_normalized_bot_name_from_env()
@@ -3450,7 +3450,12 @@ class MessageProcessor:
                 # Get character name for personalized conversation turn labels
                 character_display_name = self.character_name.capitalize() if self.character_name else "Bot"
                 
-                for memory in relevant_memories[:10]:  # Top 10 semantic memories
+                # Separate atomic pairs from separate messages
+                atomic_pairs = []
+                separate_user_messages = []
+                separate_bot_messages = []
+                
+                for memory in relevant_memories[:20]:  # Look at top 20 to find pairs
                     content = memory.get('content', '').strip()
                     metadata = memory.get('metadata', {})
                     
@@ -3462,21 +3467,91 @@ class MessageProcessor:
                         fact = metadata.get("fact", content)[:300]
                         if fact:
                             user_facts.append(fact)
+                        continue
+                    
+                    # Check if this is an atomic pair (NEW format)
+                    role = metadata.get('role', 'unknown')
+                    source = metadata.get('source', '')
+                    bot_response_in_metadata = metadata.get('bot_response', '')
+                    
+                    if (role == 'conversation_pair' or source == 'conversation_pair') and bot_response_in_metadata:
+                        # NEW FORMAT: Atomic pair with both messages in metadata
+                        user_message = metadata.get('user_message', content)
+                        atomic_pairs.append({
+                            'user': user_message,
+                            'bot': bot_response_in_metadata,
+                            'score': memory.get('score', 1.0)
+                        })
+                    elif role == 'user' or source == 'user_message':
+                        # OLD FORMAT: Separate user message
+                        separate_user_messages.append({
+                            'content': content,
+                            'timestamp': memory.get('timestamp', ''),
+                            'score': memory.get('score', 1.0)
+                        })
+                    elif role in ['bot', 'assistant'] or source == 'bot_response':
+                        # OLD FORMAT: Separate bot message
+                        separate_bot_messages.append({
+                            'content': content,
+                            'timestamp': memory.get('timestamp', ''),
+                            'score': memory.get('score', 1.0)
+                        })
+                
+                logger.info(f"📊 Memory analysis: {len(atomic_pairs)} atomic pairs, {len(separate_user_messages)} separate user, {len(separate_bot_messages)} separate bot")
+                
+                # Add atomic pairs first (they have full context)
+                for pair in atomic_pairs[:5]:  # Top 5 atomic pairs
+                    conversation_turn = f"User: {pair['user'][:300]}\n{character_display_name}: {pair['bot'][:300]}"
+                    conversation_memories.append(conversation_turn)
+                
+                # For OLD format messages, pair them by timestamp
+                # Sort by score (relevance) first
+                separate_user_messages.sort(key=lambda x: x.get('score', 0), reverse=True)
+                separate_bot_messages.sort(key=lambda x: x.get('score', 0), reverse=True)
+                
+                for user_msg in separate_user_messages[:10]:  # Top 10 relevant user messages
+                    user_content = user_msg['content']
+                    user_ts = user_msg.get('timestamp', '')
+                    
+                    # Try to find matching bot response by timestamp proximity
+                    matching_bot = None
+                    if separate_bot_messages and user_ts:
+                        try:
+                            from datetime import datetime
+                            user_dt = datetime.fromisoformat(user_ts.replace('Z', '+00:00'))
+                            
+                            best_match = None
+                            best_time_diff = float('inf')
+                            
+                            for bot_msg in separate_bot_messages:
+                                bot_ts = bot_msg.get('timestamp', '')
+                                if bot_ts:
+                                    bot_dt = datetime.fromisoformat(bot_ts.replace('Z', '+00:00'))
+                                    time_diff = abs((bot_dt - user_dt).total_seconds())
+                                    
+                                    # Bot response should be within 30 seconds of user message
+                                    if time_diff <= 30 and time_diff < best_time_diff:
+                                        best_time_diff = time_diff
+                                        best_match = bot_msg
+                            
+                            matching_bot = best_match
+                        except Exception as e:
+                            logger.debug(f"Timestamp pairing failed: {e}")
+                    
+                    # Format conversation turn
+                    if matching_bot:
+                        bot_content = matching_bot['content']
+                        conversation_turn = f"User: {user_content[:300]}\n{character_display_name}: {bot_content[:300]}"
+                        # Remove matched bot message so it's not reused
+                        if matching_bot in separate_bot_messages:
+                            separate_bot_messages.remove(matching_bot)
                     else:
-                        # Format conversation memories with structure
-                        bot_response = metadata.get('bot_response', '') if isinstance(metadata, dict) else ''
-                        
-                        if bot_response:
-                            # Full conversation turn format
-                            conversation_turn = f"User: {content[:300]}\n{character_display_name}: {bot_response[:300]}"
-                        else:
-                            # Check if already formatted, otherwise use content as-is
-                            if "User:" in content and (character_display_name in content or "Bot:" in content):
-                                conversation_turn = content[:500]
-                            else:
-                                conversation_turn = content[:500]
-                        
-                        conversation_memories.append(conversation_turn)
+                        # No matching bot response - just show user message
+                        conversation_turn = f"User: {user_content[:500]}"
+                    
+                    conversation_memories.append(conversation_turn)
+                
+                logger.info(f"✅ Formatted {len(conversation_memories)} conversation turns ({len(atomic_pairs)} from atomic pairs, {len(conversation_memories) - len(atomic_pairs)} from pairing)")
                 
                 # Build RELEVANT MEMORIES section
                 memory_parts = []
@@ -3515,6 +3590,29 @@ class MessageProcessor:
             else:
                 assembler.add_component(create_anti_hallucination_component(priority=13))
                 logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories)")
+        
+        # ================================
+        # COMPONENT 13.5: Episodic Recall Hook (NEW - November 2025)
+        # ================================
+        # When user asks to recall/remember past events AND we have high-confidence memories,
+        # inject an explicit episodic context so the bot knows it CAN reference those events
+        # This overrides AI ethics "no memory" disclaimers when memories are actually retrieved
+        logger.debug(f"🧠 EPISODIC RECALL: Checking recall intent for '{message_context.content[:50]}...' with {len(relevant_memories)} memories")
+        episodic_context = self._build_episodic_recall_context(
+            message_content=message_context.content,
+            retrieved_memories=relevant_memories
+        )
+        if episodic_context:
+            assembler.add_component(PromptComponent(
+                type=PromptComponentType.EPISODIC_MEMORIES,
+                content=episodic_context,
+                priority=12,  # Higher than regular memories (13) to emphasize authority
+                token_cost=150,
+                required=False
+            ))
+            logger.info(f"✅ EPISODIC RECALL: Injected explicit recall context ({len(episodic_context)} chars)")
+        else:
+            logger.debug(f"⏭️  EPISODIC RECALL: No context generated (intent={any(k in message_context.content.lower() for k in ['remember', 'recall', 'when'])}, memories={len(relevant_memories)})")
         
         # ================================
         # COMPONENT 8: Conversation Summary - REMOVED (October 2025)
@@ -3558,8 +3656,8 @@ class MessageProcessor:
                 )
                 recent_message_count = len(recent_messages)
                 
-                # Apply tiered context for conversations with >20 messages
-                if recent_message_count > 20:
+                # Apply tiered context for conversations with >10 messages
+                if recent_message_count > 10:
                     logger.info(f"📚 Long conversation detected ({recent_message_count} messages) - using tiered context")
                     
                     # TIER 1: Add enriched summary from last 7 days (older messages)
@@ -3669,6 +3767,91 @@ class MessageProcessor:
         
         logger.info(f"✅ STRUCTURED CONTEXT: Final context has {len(conversation_context)} messages")
         return conversation_context
+    
+    def _build_episodic_recall_context(
+        self,
+        message_content: str,
+        retrieved_memories: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        """
+        Build explicit episodic recall context when user asks to remember past events.
+        
+        This allows the bot to reference retrieved memories as actual episodic recall
+        rather than being blocked by AI ethics "no memory" disclaimers.
+        
+        Triggers on: "remember", "recall", "when", "what happened", "you told me"
+        
+        Returns: Formatted episodic context string or None if no recall intent detected
+        """
+        if not retrieved_memories or len(retrieved_memories) < 1:
+            logger.debug(f"🧠 EPISODIC RECALL: Skipped - not enough memories ({len(retrieved_memories) if retrieved_memories else 0})")
+            return None
+        
+        # Detect recall intent (simple keyword-based for now)
+        message_lower = message_content.lower()
+        recall_keywords = ['remember', 'recall', 'when', 'what happened', 'you told me', 'you said', 'earlier you']
+        
+        has_recall_intent = any(keyword in message_lower for keyword in recall_keywords)
+        logger.debug(f"🧠 EPISODIC RECALL: Recall intent={has_recall_intent} for message '{message_content[:50]}...'")
+        
+        if not has_recall_intent:
+            logger.debug(f"🧠 EPISODIC RECALL: Skipped - no recall keywords found")
+            return None
+        
+        # Filter high-confidence memories (emotional_intensity >= 0.4 or top cross_encoder scores)
+        high_conf_memories = []
+        for mem in retrieved_memories[:10]:  # Look at top 10
+            payload = mem.get('payload', {}) or {}
+            metadata = mem.get('metadata', {}) or {}
+            
+            emotional_intensity = payload.get('emotional_intensity', metadata.get('emotional_intensity', 0.0))
+            cross_encoder_score = mem.get('cross_encoder_score', 0.0)
+            
+            # Include if emotionally significant or high rerank score
+            if emotional_intensity >= 0.4 or cross_encoder_score >= 0.6:
+                high_conf_memories.append({
+                    'content': mem.get('content', ''),
+                    'timestamp': mem.get('timestamp', ''),
+                    'emotional_intensity': emotional_intensity,
+                    'metadata': metadata,
+                    'payload': payload
+                })
+        
+        if len(high_conf_memories) < 1:
+            return None
+        
+        # Build episodic recall context
+        recall_lines = []
+        recall_lines.append("🧠 EPISODIC MEMORIES: You previously discussed these events with this user:")
+        recall_lines.append("")
+        
+        for i, mem in enumerate(high_conf_memories[:3], 1):  # Top 3 memories
+            content = mem['content'][:200]
+            timestamp = mem['timestamp']
+            
+            # Format date if available
+            date_str = "previously"
+            try:
+                if timestamp:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    date_str = dt.strftime('%B %d' if dt.year == datetime.now().year else '%B %d, %Y')
+            except Exception:
+                pass
+            
+            # Check if this is a conversation pair with bot response
+            bot_response = mem['metadata'].get('bot_response') or mem['payload'].get('bot_response')
+            if bot_response:
+                recall_lines.append(f"{i}. [{date_str}] User said: \"{content}\"")
+                recall_lines.append(f"   You responded: \"{bot_response[:200]}\"")
+            else:
+                recall_lines.append(f"{i}. [{date_str}] \"{content}\"")
+        
+        recall_lines.append("")
+        recall_lines.append("✅ You MAY reference these specific past events naturally in your response.")
+        recall_lines.append("⚠️ Only reference what is explicitly shown above - do not infer or elaborate beyond these facts.")
+        
+        return "\n".join(recall_lines)
     
     async def _build_memory_narrative_structured(
         self, 
