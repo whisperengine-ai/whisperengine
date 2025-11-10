@@ -359,10 +359,12 @@ class BotEventHandlers:
                 # 3. Multi-modal data intelligence architecture
                 # The bot_core handles PostgreSQL initialization asynchronously
                 
-                # Wait for bot_core to initialize PostgreSQL pool
+                # CRITICAL: Wait for bot_core to initialize PostgreSQL pool BEFORE marking bot as ready
+                # This prevents the race condition where first Discord message arrives before pool is ready,
+                # causing CDL components to be skipped and generating sparse prompts
                 import asyncio
-                max_wait = 10  # seconds
-                wait_interval = 0.5
+                max_wait = 30  # seconds (increased from 10 to ensure pool is ready)
+                wait_interval = 0.1  # reduced from 0.5 for faster detection
                 waited = 0
                 
                 while not self.bot_core.postgres_pool and waited < max_wait:
@@ -373,8 +375,9 @@ class BotEventHandlers:
                 
                 if self.postgres_pool:
                     logger.info("✅ PostgreSQL connection established for semantic knowledge features")
+                    logger.info("✅ DATABASE POOL READY - All CDL components (identity, voice, personality, etc.) are now available")
                 else:
-                    logger.warning("⚠️ PostgreSQL pool not available - semantic knowledge features disabled")
+                    logger.warning("⚠️ PostgreSQL pool not available after 30s timeout - semantic knowledge features disabled")
 
             except ConnectionError as e:
                 # Clean error message for PostgreSQL connection failures

@@ -3109,6 +3109,10 @@ class MessageProcessor:
         try:
             bot_name = get_normalized_bot_name_from_env()
             pool = await get_postgres_pool()
+            
+            if not pool:
+                logger.error(f"❌ STRUCTURED CONTEXT: PostgreSQL pool not available for {bot_name} - CDL components will be skipped. This may indicate database connection failure on bot startup.")
+            
             if pool:
                 enhanced_manager = create_enhanced_cdl_manager(pool)
                 
