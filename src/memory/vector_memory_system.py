@@ -4983,6 +4983,29 @@ class VectorMemoryManager:
                 )
                 classification_time_ms = (time.time() - classification_start) * 1000
                 
+                # 🔍 META-QUERY DETECTION: Check if this is a meta-query first (breaks circular retrieval)
+                if unified_result.is_meta_query:
+                    logger.info("🔍 META-QUERY DETECTED: '%s' → Using diverse sampling strategy", query[:60])
+                    # Use diverse sampling instead of semantic search to break circular pattern
+                    meta_results = await self._retrieve_memories_diverse_sampling(
+                        user_id=user_id,
+                        query=query,
+                        limit=limit,
+                        channel_type=channel_type
+                    )
+                    
+                    # Track classification decision
+                    await monitor.track_classification(
+                        user_id=user_id,
+                        query=query,
+                        category=QueryCategory.GENERAL,  
+                        emotion_intensity=emotion_data.get('emotional_intensity') if emotion_data else None,
+                        is_temporal=False,
+                        classification_time_ms=classification_time_ms
+                    )
+                    
+                    return meta_results
+                
                 # Extract routing information from unified result
                 vector_strategy = unified_result.vector_strategy
                 is_temporal = unified_result.is_temporal
@@ -6569,6 +6592,226 @@ async def test_vector_memory_system():
                     'total_time_ms': (time.time() - start_time) * 1000
                 }
             }
+
+    def _detect_meta_query(self, query: str) -> bool:
+        """
+        Detect if query is about conversation history itself (meta-query).
+        
+        Meta-queries create circular retrieval patterns where semantic search
+        returns OTHER meta-queries instead of substantive content.
+        
+        Examples:
+        - "Based on everything you know about me..."
+        - "What have you learned about my interests?"
+        - "Summarize our relationship"
+        - "What patterns have you noticed?"
+        
+        Args:
+            query: User query text
+            
+        Returns:
+            True if query is a meta-query
+        """
+        query_lower = query.lower()
+        
+        # Meta-query patterns
+        meta_patterns = [
+            'everything you know about me',
+            'what you know about me',
+            'what have you learned',
+            'what do you know',
+            'what have we talked about',
+            'what did we talk about',
+            'what have we discussed',
+            'what did we discuss',
+            'conversation history',
+            'our history',
+            'summarize our relationship',
+            'our relationship',
+            'what topics should we',
+            'what should we talk about',
+            'what patterns have you noticed',
+            'tell me about our conversations',
+            'recall our conversations',
+            'remember our conversations',
+            'based on everything',
+            'based on what you know',
+        ]
+        
+        return any(pattern in query_lower for pattern in meta_patterns)
+    
+    async def _retrieve_memories_diverse_sampling(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 25,
+        channel_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve memories using diverse sampling strategy for meta-queries.
+        
+        Instead of semantic search (which returns similar meta-queries),
+        this uses temporal diversity to get substantive conversation content:
+        - Recent conversations (last 7 days): 40% of limit
+        - Medium-term (7-30 days): 30% of limit  
+        - Older conversations (30+ days): 30% of limit
+        
+        Also filters out OTHER meta-queries from results to break circular pattern.
+        
+        Args:
+            user_id: User identifier
+            query: Original query (for metadata)
+            limit: Maximum results
+            channel_type: Channel type for privacy filtering
+            
+        Returns:
+            List of diverse memories with balanced temporal distribution
+        """
+        import time
+        from datetime import datetime, timedelta
+        
+        start_time = time.time()
+        logger.info("🎯 DIVERSE SAMPLING: Retrieving memories with temporal diversity for user %s", user_id)
+        
+        try:
+            # Calculate time windows
+            now = datetime.utcnow()
+            recent_cutoff = now - timedelta(days=7)
+            medium_cutoff = now - timedelta(days=30)
+            
+            # Convert to Unix timestamps for Qdrant (uses float timestamps)
+            recent_timestamp = recent_cutoff.timestamp()
+            medium_timestamp = medium_cutoff.timestamp()
+            
+            # Calculate target counts for each time window
+            recent_count = int(limit * 0.4)
+            medium_count = int(limit * 0.3)
+            older_count = limit - recent_count - medium_count
+            
+            # Build channel privacy filter
+            privacy_filter = self._build_channel_privacy_filter(user_id, channel_type)
+            
+            # Retrieve from each time window
+            all_memories = []
+            
+            # 1. Recent memories (last 7 days)
+            if recent_count > 0:
+                # Note: Qdrant timestamp filtering requires DatetimeRange with ISO strings OR numerical comparison
+                # We'll use scroll without timestamp filter and filter in memory for reliability
+                recent_results = self.qdrant_client.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=privacy_filter,
+                    limit=recent_count * 3,  # Get more for filtering
+                    with_payload=True,
+                    with_vectors=False,
+                    order_by=models.OrderBy(
+                        key="timestamp",
+                        direction=models.Direction.DESC
+                    )
+                )
+                # Filter by timestamp in memory
+                for point in recent_results[0]:
+                    timestamp_str = point.payload.get('timestamp', '')
+                    try:
+                        point_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        if point_time >= recent_cutoff:
+                            all_memories.append(point)
+                            if len([m for m in all_memories if m.payload.get('timestamp', '') >= recent_cutoff.isoformat()]) >= recent_count:
+                                break
+                    except:
+                        continue
+            
+            # 2. Medium-term memories (7-30 days)
+            if medium_count > 0:
+                medium_results = self.qdrant_client.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=privacy_filter,
+                    limit=medium_count * 3,
+                    with_payload=True,
+                    with_vectors=False,
+                    order_by=models.OrderBy(
+                        key="timestamp",
+                        direction=models.Direction.DESC
+                    ),
+                    offset=recent_count * 3  # Skip recent memories
+                )
+                for point in medium_results[0]:
+                    timestamp_str = point.payload.get('timestamp', '')
+                    try:
+                        point_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        if medium_cutoff <= point_time < recent_cutoff:
+                            all_memories.append(point)
+                            if len([m for m in all_memories if medium_cutoff.isoformat() <= m.payload.get('timestamp', '') < recent_cutoff.isoformat()]) >= medium_count:
+                                break
+                    except:
+                        continue
+            
+            # 3. Older memories (30+ days)
+            if older_count > 0:
+                older_results = self.qdrant_client.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=privacy_filter,
+                    limit=older_count * 3,
+                    with_payload=True,
+                    with_vectors=False,
+                    order_by=models.OrderBy(
+                        key="timestamp",
+                        direction=models.Direction.DESC
+                    ),
+                    offset=(recent_count + medium_count) * 3  # Skip recent + medium
+                )
+                for point in older_results[0]:
+                    timestamp_str = point.payload.get('timestamp', '')
+                    try:
+                        point_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        if point_time < medium_cutoff:
+                            all_memories.append(point)
+                            if len([m for m in all_memories if m.payload.get('timestamp', '') < medium_cutoff.isoformat()]) >= older_count:
+                                break
+                    except:
+                        continue
+            
+            # Filter out other meta-queries from results
+            substantive_memories = []
+            for point in all_memories:
+                content = point.payload.get('content', '')
+                # Skip if this memory is also a meta-query
+                if not self._detect_meta_query(content):
+                    substantive_memories.append({
+                        'content': content,
+                        'score': 0.8,  # Fixed score for diverse sampling
+                        'timestamp': point.payload.get('timestamp', ''),
+                        'metadata': {
+                            'memory_id': str(point.id),
+                            'user_id': point.payload.get('user_id', ''),
+                            'memory_type': point.payload.get('memory_type', 'conversation'),
+                            'roberta_confidence': point.payload.get('roberta_confidence', 0.0),
+                        },
+                        'memory_type': point.payload.get('memory_type', 'conversation'),
+                        'search_type': 'diverse_sampling',
+                        'query_category': 'meta_query'
+                    })
+            
+            # Limit to requested count
+            final_results = substantive_memories[:limit]
+            
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.info("✅ DIVERSE SAMPLING: Retrieved %d substantive memories (filtered %d meta-queries) in %.1fms",
+                       len(final_results), len(all_memories) - len(substantive_memories), elapsed_ms)
+            
+            return final_results
+            
+        except Exception as e:
+            logger.error("Error in diverse sampling retrieval: %s", str(e), exc_info=True)
+            # Fallback to standard retrieval
+            logger.warning("⚠️ Falling back to standard semantic search")
+            return await self._search_single_vector(
+                vector_name="content",
+                query=query,
+                user_id=user_id,
+                limit=limit,
+                channel_type=channel_type
+            )
 
     async def _record_vector_memory_metrics(self, 
                                            bot_name: str,

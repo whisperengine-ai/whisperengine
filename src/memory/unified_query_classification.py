@@ -188,6 +188,13 @@ class UnifiedClassification:
     has_strong_preference: bool = False
     """Whether query contains strong preference modifiers (really, absolutely)"""
     
+    # Meta-query detection (NEW: queries about conversation history itself)
+    is_meta_query: bool = False
+    """Whether query is about conversation history itself (creates circular retrieval)"""
+    
+    meta_query_patterns: List[str] = field(default_factory=list)
+    """Patterns detected for meta-query classification"""
+    
     # For debugging and monitoring
     classification_time_ms: float = 0.0
 
@@ -488,6 +495,147 @@ class UnifiedQueryClassifier:
         
         return len(matched_lemmas) > 0, matched_lemmas
     
+    def _detect_meta_query_with_spacy(self, query_doc) -> tuple[bool, List[str]]:
+        """
+        Detect meta-queries using spaCy dependency parsing and linguistic analysis.
+        
+        Meta-queries are queries ABOUT the conversation history itself, not about
+        specific topics. They create circular retrieval patterns where semantic
+        search returns OTHER meta-queries instead of substantive content.
+        
+        Detection Strategy:
+        1. **Keyword patterns**: Direct matches for common meta-query phrases
+        2. **Dependency parsing**: Analyze subject-verb-object relationships
+           - "What do you know" → ROOT:know, OBJ:what, SUBJ:you
+           - "Tell me everything" → ROOT:tell, DOBJ:everything
+        3. **Semantic matching**: Find semantically similar meta-query language
+        
+        Examples of meta-queries:
+        - "Based on everything you know about me..."
+        - "What have you learned about my interests?"
+        - "Summarize our relationship"
+        - "What patterns have you noticed?"
+        - "Tell me about our conversations"
+        
+        Args:
+            query_doc: spaCy Doc object
+            
+        Returns:
+            Tuple of (is_meta: bool, detected_patterns: List[str])
+        """
+        # Early return if spaCy unavailable
+        if not self.nlp:
+            return False, []
+        
+        detected_patterns = []
+        query_text = query_doc.text.lower()
+        
+        # =====================================================================
+        # 1. KEYWORD PATTERN MATCHING (exact + lemmatized)
+        # =====================================================================
+        # Check exact multi-word patterns
+        for pattern in self.meta_query_patterns:
+            if pattern in query_text:
+                detected_patterns.append(f"pattern:{pattern[:30]}")
+        
+        # Check lemmatized forms (catches "knowing"→"know", "learned"→"learn")
+        has_meta_lemma = False
+        meta_lemmas = []
+        if query_doc:
+            # Combine meta-query verbs and subjects for lemmatization
+            meta_keywords = list(self.meta_query_verbs) + list(self.meta_query_subjects)
+            has_meta_lemma, meta_lemmas = self._check_lemmatized_patterns(
+                query_doc,
+                meta_keywords
+            )
+            if has_meta_lemma:
+                detected_patterns.append(f"lemma:{','.join(meta_lemmas[:3])}")
+                logger.debug(
+                    "🔍 META-QUERY LEMMA: Found lemmatized forms: %s",
+                    meta_lemmas[:5]
+                )
+        
+        # =====================================================================
+        # 2. DEPENDENCY PARSING ANALYSIS
+        # =====================================================================
+        for token in query_doc:
+            # Check for meta-query ROOT verbs (know, learn, remember, recall)
+            if token.dep_ == "ROOT" and token.lemma_ in self.meta_query_verbs:
+                # Check if subject is "you" (asking what bot knows)
+                for child in token.children:
+                    if child.dep_ in ("nsubj", "nsubjpass") and child.lemma_ in ("you", "we"):
+                        detected_patterns.append(f"dep:ROOT={token.lemma_}+SUBJ={child.lemma_}")
+                        logger.debug(
+                            "🔍 META-QUERY DEP: ROOT verb '%s' with subject '%s'",
+                            token.lemma_, child.lemma_
+                        )
+                    
+                    # Check for "everything/all" as object
+                    if child.dep_ in ("dobj", "pobj") and child.lemma_ in ("everything", "all", "anything"):
+                        detected_patterns.append(f"dep:ROOT={token.lemma_}+OBJ={child.lemma_}")
+                        logger.debug(
+                            "🔍 META-QUERY DEP: ROOT verb '%s' with object '%s'",
+                            token.lemma_, child.lemma_
+                        )
+            
+            # Check for self-referential noun phrases (our relationship, our history)
+            if token.pos_ == "PRON" and token.lemma_ in ("our", "we"):
+                for child in token.head.children:
+                    if child.lemma_ in ("relationship", "history", "conversation", "conversations", "chat", "discussion"):
+                        detected_patterns.append(f"dep:self_ref=our+{child.lemma_}")
+                        logger.debug(
+                            "🔍 META-QUERY DEP: Self-referential phrase 'our %s'",
+                            child.lemma_
+                        )
+        
+        # =====================================================================
+        # 3. SEMANTIC MATCHING (if vectors available)
+        # =====================================================================
+        if self.has_vectors:
+            # Check for semantic similarity to meta-query concepts
+            meta_concepts = ["knowledge", "information", "understanding", "history"]
+            
+            for token in query_doc:
+                # Skip stop words, punctuation, and tokens without vectors
+                if token.is_stop or token.is_punct or not token.has_vector:
+                    continue
+                
+                for concept in meta_concepts:
+                    # Get cached keyword token
+                    concept_token = self._get_keyword_token(concept)
+                    if concept_token is None:
+                        continue
+                    
+                    # Compute similarity with error handling
+                    try:
+                        similarity = token.similarity(concept_token)
+                        
+                        if similarity >= 0.70:  # High threshold for meta-concepts
+                            detected_patterns.append(f"semantic:{token.text}≈{concept}")
+                            logger.debug(
+                                "🔍 META-QUERY SEMANTIC: '%s' ≈ '%s' (%.3f)",
+                                token.text, concept, similarity
+                            )
+                    
+                    except Exception as e:
+                        # Gracefully handle similarity computation errors
+                        logger.debug(
+                            "⚠️ Similarity computation failed for '%s' ≈ '%s': %s",
+                            token.text, concept, str(e)
+                        )
+                        continue
+        
+        # Build result
+        is_meta = len(detected_patterns) > 0
+        
+        if is_meta:
+            logger.info(
+                "🔍 META-QUERY DETECTED: '%s' → patterns: %s",
+                query_doc.text[:60], detected_patterns[:3]
+            )
+        
+        return is_meta, detected_patterns
+    
     def _build_patterns(self):
         """Build all pattern dictionaries for classification."""
         
@@ -554,6 +702,30 @@ class UnifiedQueryClassifier:
             'find', 'search', 'look for', 'about', 'information', 'details',
             'anything about', 'know about', 'heard of', 'familiar with'
         ]
+        
+        # META-QUERY patterns (NEW: Queries about conversation history itself)
+        # These create circular retrieval patterns - semantic search returns
+        # OTHER meta-queries instead of substantive content
+        self.meta_query_patterns = [
+            'everything you know about me',
+            'what you know about me',
+            'what have you learned',
+            'what do you know',
+            'tell me everything',
+            'based on everything',
+            'based on what you know',
+            'summarize our relationship',
+            'our relationship',
+            'what topics should we',
+            'what should we talk about',
+            'what patterns have you noticed',
+        ]
+        
+        # Self-referential verbs (indicate meta-query via dependency parsing)
+        self.meta_query_verbs = ['know', 'learn', 'remember', 'recall', 'understand']
+        
+        # Self-referential subjects (asking about the relationship/history itself)
+        self.meta_query_subjects = ['our history', 'our conversations', 'our relationship', 'we']
     
     def _semantic_pattern_match(
         self,
@@ -676,6 +848,28 @@ class UnifiedQueryClassifier:
         query_doc = self.nlp(query) if self.nlp else None
         
         # =====================================================================
+        # PRIORITY 0: META-QUERY DETECTION (highest priority - breaks circular patterns)
+        # =====================================================================
+        # Queries ABOUT conversation history itself create circular retrieval
+        # where semantic search returns OTHER meta-queries instead of substantive content
+        
+        is_meta_query = False
+        meta_query_patterns = []
+        
+        if query_doc:
+            is_meta_query, meta_query_patterns = self._detect_meta_query_with_spacy(query_doc)
+        else:
+            # Fallback to keyword matching if spaCy unavailable
+            is_meta_query = any(p in query_lower for p in self.meta_query_patterns)
+            if is_meta_query:
+                meta_query_patterns = [p for p in self.meta_query_patterns if p in query_lower]
+        
+        if is_meta_query:
+            keywords.extend(meta_query_patterns)
+            matched_patterns.append("meta_query")
+            logger.info("🔍 META-QUERY: '%s' → Diverse sampling will be used", query[:60])
+        
+        # =====================================================================
         # PRIORITY 1: TEMPORAL PATTERNS (most specific)
         # =====================================================================
         
@@ -711,12 +905,33 @@ class UnifiedQueryClassifier:
             matched_patterns.append("temporal")
         
         # =====================================================================
-        # PRIORITY 2: CONVERSATIONAL PATTERNS
+        # PRIORITY 2: CONVERSATIONAL PATTERNS (exact + lemmatized)
         # =====================================================================
         
+        # Check exact keyword matching
         is_conversational = any(p in query_lower for p in self.conversational_patterns)
+        
+        # Check lemmatized forms (catches "we've discussed"→"we have discussed", "we're talking"→"we are talking")
+        has_conversational_lemma = False
+        conversational_lemmas = []
+        if query_doc:
+            has_conversational_lemma, conversational_lemmas = self._check_lemmatized_patterns(
+                query_doc,
+                self.conversational_patterns
+            )
+        
+        # Combine both signals
+        is_conversational = is_conversational or has_conversational_lemma
+        
         if is_conversational:
             keywords.extend([p for p in self.conversational_patterns if p in query_lower])
+            if has_conversational_lemma:
+                keywords.extend(conversational_lemmas)
+                matched_patterns.append("conversational_lemma")
+                logger.debug(
+                    "🗣️ CONVERSATIONAL LEMMA: Found lemmatized forms: %s",
+                    conversational_lemmas[:5]
+                )
             matched_patterns.append("conversational")
         
         # =====================================================================
@@ -984,6 +1199,8 @@ class UnifiedQueryClassifier:
             has_hedging=has_hedging,  # Task 3.1: Hedging language detection
             has_temporal_change=has_temporal_change,  # Task 3.1: Temporal change detection
             has_strong_preference=has_strong_preference,  # Task 3.1: Strong preference detection
+            is_meta_query=is_meta_query,  # NEW: Meta-query detection
+            meta_query_patterns=meta_query_patterns,  # NEW: Detected meta-query patterns
             classification_time_ms=classification_time_ms,
         )
         
