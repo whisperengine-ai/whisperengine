@@ -683,7 +683,6 @@ class UnifiedQueryClassifier:
             'calculate', 'compute', 'solve',
             'formula', 'equation',
             'meaning of', 'means',
-            'tell me about',  # Factual information request
             'information about',
             'description of',
         ]
@@ -1038,10 +1037,26 @@ class UnifiedQueryClassifier:
         intent_type = QueryIntent.FACTUAL_RECALL  # Default
         
         # Priority order for intent determination
-        # Task #2: TEMPORAL queries should ALWAYS get TEMPORAL_ANALYSIS intent
-        # because the temporal sorting direction is what matters most
-        if is_temporal:
-            # TEMPORAL_ANALYSIS has highest priority for routing
+        # SEMANTIC FUSION: When both temporal and conversational match, analyze semantic intent
+        # because context matters more than just presence of keywords
+        if is_temporal and is_conversational:
+            # Both match - use semantic analysis to determine which is primary intent
+            # Check if temporal keywords are dominant (first/last words, multiple temporal terms)
+            temporal_count = sum(1 for p in self.temporal_first_patterns if p in query_lower)
+            temporal_count += sum(1 for p in self.temporal_last_patterns if p in query_lower)
+            temporal_count += sum(1 for p in self.temporal_specific_patterns if p in query_lower)
+            
+            # If multiple temporal patterns, temporal takes priority
+            if temporal_count >= 2:
+                intent_type = QueryIntent.TEMPORAL_ANALYSIS
+                intent_confidence = 0.92
+            else:
+                # Single temporal match + conversational = conversational intent primary
+                intent_type = QueryIntent.CONVERSATION_STYLE
+                intent_confidence = 0.88
+            is_multi_category = is_emotional or is_factual
+        elif is_temporal:
+            # TEMPORAL_ANALYSIS has priority for pure temporal queries
             intent_type = QueryIntent.TEMPORAL_ANALYSIS
             intent_confidence = 0.95
             is_multi_category = is_conversational or is_emotional or is_factual
@@ -1049,8 +1064,21 @@ class UnifiedQueryClassifier:
             intent_type = QueryIntent.CONVERSATION_STYLE
             intent_confidence = 0.9
         elif is_emotional:
-            intent_type = QueryIntent.FACTUAL_RECALL  # Keep factual as intent
-            intent_confidence = 0.8  # But emotional routing in strategy
+            # IMPROVED: Use RoBERTa emotional intensity to determine routing
+            # High emotion intensity (>0.6) = Emotional support needed, lower confidence for strict factual
+            # Low intensity (<0.4) = Emotional mention but informational intent, higher confidence for factual
+            emotional_intensity = 0.0
+            if emotion_data and has_high_emotion_intensity:
+                emotional_intensity = emotion_data.get('emotional_intensity', 0.0)
+            
+            if emotional_intensity > 0.65:
+                # Strong emotional content - prioritize conversation style over pure facts
+                intent_type = QueryIntent.CONVERSATION_STYLE
+                intent_confidence = 0.85  # High confidence in emotional routing
+            else:
+                # Mild emotional content or emotional keywords in factual query
+                intent_type = QueryIntent.FACTUAL_RECALL
+                intent_confidence = 0.75  # Use factual intent but emotional routing in strategy
         elif is_relationship_discovery:
             intent_type = QueryIntent.RELATIONSHIP_DISCOVERY
             intent_confidence = 0.85
@@ -1156,7 +1184,142 @@ class UnifiedQueryClassifier:
             svo_relationships=svo_relationships
         )
         
-        # Tool calling removed - use deterministic spaCy routing instead
+        # =====================================================================
+        # PHASE 3: DETERMINISTIC SPACY ROUTING
+        # =====================================================================
+        # Replaces removed tool complexity scoring with deterministic
+        # linguistic analysis for improved intent classification accuracy
+        # =====================================================================
+        
+        # Detect analytical queries (comparative, trend, statistical, causal)
+        analytical_analysis = self._detect_analytical_query(query_doc) if query_doc else {}
+        is_analytical = analytical_analysis.get("is_analytical", False)
+        analytical_type = analytical_analysis.get("analytical_type")
+        analytical_confidence = analytical_analysis.get("confidence", 0.0)
+        
+        # Detect aggregation requests (summary, totals, counts, lists)
+        aggregation_analysis = self._detect_aggregation_request(query_doc) if query_doc else {}
+        is_aggregation = aggregation_analysis.get("is_aggregation", False)
+        aggregation_type = aggregation_analysis.get("aggregation_type")
+        aggregation_confidence = aggregation_analysis.get("confidence", 0.0)
+        
+        # Detect explicit temporal bounds (dates, date ranges)
+        temporal_bounds = self._detect_temporal_bounds(query_doc) if query_doc else {}
+        has_temporal_bound = temporal_bounds.get("has_temporal_bound", False)
+        temporal_bound_type = temporal_bounds.get("bound_type")
+        
+        # Advanced emotional routing (RoBERTa + linguistic stress markers)
+        emotion_routing = self._advanced_emotion_routing(emotion_data, query_doc)
+        needs_emotional_support = emotion_routing.get("needs_emotional_support", False)
+        support_level = emotion_routing.get("support_level")
+        
+        # =====================================================================
+        # APPLY DETERMINISTIC ROUTING ADJUSTMENTS
+        # =====================================================================
+        # Override intent/strategy based on deterministic spaCy analysis
+        # Only override if confidence is high enough (>0.75)
+        # =====================================================================
+        
+        # ANALYTICAL QUERIES: Route to appropriate analytical intent
+        if is_analytical and analytical_confidence > 0.75:
+            if analytical_type == "comparative":
+                # Comparative queries need semantic similarity analysis
+                vector_strategy = VectorStrategy.SEMANTIC_FUSION
+                strategy_confidence = min(strategy_confidence, analytical_confidence)
+                matched_patterns.append(f"analytical:{analytical_type}")
+                logger.info(
+                    "🔬 ANALYTICAL ROUTING: comparative query → SEMANTIC_FUSION (%.2f confidence)",
+                    analytical_confidence
+                )
+            
+            elif analytical_type == "trend":
+                # Trend analysis requires temporal ordering
+                if not is_temporal:  # Don't override existing temporal intent
+                    intent_type = QueryIntent.TEMPORAL_ANALYSIS
+                    intent_confidence = analytical_confidence
+                vector_strategy = VectorStrategy.TEMPORAL_CHRONOLOGICAL
+                strategy_confidence = analytical_confidence
+                matched_patterns.append(f"analytical:{analytical_type}")
+                logger.info(
+                    "🔬 ANALYTICAL ROUTING: trend query → TEMPORAL_ANALYSIS (%.2f confidence)",
+                    analytical_confidence
+                )
+            
+            elif analytical_type in ["statistical", "causal"]:
+                # Statistical/causal queries benefit from semantic fusion
+                vector_strategy = VectorStrategy.SEMANTIC_FUSION
+                strategy_confidence = min(strategy_confidence, analytical_confidence)
+                matched_patterns.append(f"analytical:{analytical_type}")
+                logger.info(
+                    "🔬 ANALYTICAL ROUTING: %s query → SEMANTIC_FUSION (%.2f confidence)",
+                    analytical_type, analytical_confidence
+                )
+        
+        # AGGREGATION REQUESTS: Route to appropriate aggregation strategy
+        if is_aggregation and aggregation_confidence > 0.80:
+            if aggregation_type == "summary":
+                # Summaries need diverse content sampling
+                vector_strategy = VectorStrategy.BALANCED_FUSION
+                strategy_confidence = aggregation_confidence
+                matched_patterns.append(f"aggregation:{aggregation_type}")
+                logger.info(
+                    "📊 AGGREGATION ROUTING: summary → BALANCED_FUSION (%.2f confidence)",
+                    aggregation_confidence
+                )
+            
+            elif aggregation_type in ["count", "list", "total"]:
+                # Counts/lists need comprehensive retrieval
+                # Keep existing intent but note the aggregation need
+                matched_patterns.append(f"aggregation:{aggregation_type}")
+                logger.info(
+                    "📊 AGGREGATION DETECTED: %s request (%.2f confidence)",
+                    aggregation_type, aggregation_confidence
+                )
+        
+        # TEMPORAL BOUNDS: Enhance temporal queries with explicit date constraints
+        if has_temporal_bound and temporal_bound_type:
+            # If temporal bound detected, ensure temporal analysis is used
+            if temporal_bound_type == "date_range":
+                intent_type = QueryIntent.TEMPORAL_ANALYSIS
+                vector_strategy = VectorStrategy.TEMPORAL_CHRONOLOGICAL
+                intent_confidence = 0.95
+                strategy_confidence = 0.95
+                matched_patterns.append(f"temporal_bound:{temporal_bound_type}")
+                logger.info(
+                    "📅 TEMPORAL BOUND: date_range detected → TEMPORAL_ANALYSIS"
+                )
+            else:
+                # Specific dates or relative time still need temporal ordering
+                if not is_temporal:
+                    vector_strategy = VectorStrategy.TEMPORAL_CHRONOLOGICAL
+                    strategy_confidence = 0.85
+                matched_patterns.append(f"temporal_bound:{temporal_bound_type}")
+        
+        # EMOTIONAL SUPPORT: Override intent for high emotional support needs
+        if needs_emotional_support and support_level:
+            if support_level == "high":
+                # High support needs override other intents
+                intent_type = QueryIntent.CONVERSATION_STYLE
+                intent_confidence = 0.95
+                vector_strategy = VectorStrategy.EMOTION_FUSION
+                strategy_confidence = 0.90
+                matched_patterns.append(f"emotional_support:{support_level}")
+                logger.info(
+                    "💙 EMOTIONAL SUPPORT ROUTING: high support → CONVERSATION_STYLE + EMOTION_FUSION"
+                )
+            
+            elif support_level == "medium":
+                # Medium support: use emotional fusion strategy
+                vector_strategy = VectorStrategy.EMOTION_FUSION
+                strategy_confidence = 0.85
+                matched_patterns.append(f"emotional_support:{support_level}")
+                logger.info(
+                    "💙 EMOTIONAL SUPPORT ROUTING: medium support → EMOTION_FUSION"
+                )
+            
+            elif support_level == "low":
+                # Low support: note in patterns but don't override
+                matched_patterns.append(f"emotional_support:{support_level}")
         
         # =====================================================================
         # GENERATE REASONING
@@ -1615,6 +1778,377 @@ class UnifiedQueryClassifier:
         }
         
         return weights_map.get(strategy, {"content": 1.0})
+    
+    # =========================================================================
+    # PHASE 3: DETERMINISTIC SPACY ROUTING
+    # =========================================================================
+    # These methods replace the removed tool complexity scoring system with
+    # deterministic linguistic analysis for improved intent classification.
+    # =========================================================================
+    
+    def _detect_analytical_query(self, query_doc) -> Dict[str, Any]:
+        """
+        Detect analytical queries using spaCy linguistic features.
+        
+        Analytical queries include:
+        - Comparative questions: "better than", "worse than", "compared to"
+        - Trend analysis: "trend", "pattern", "over time", "changes"
+        - Statistical: "average", "typical", "usually", "normally"
+        - Causal: "why", "because", "reason", "cause", "effect"
+        
+        Args:
+            query_doc: spaCy Doc object
+            
+        Returns:
+            Dict with:
+                - is_analytical: bool
+                - analytical_type: str (comparative, trend, statistical, causal, or None)
+                - confidence: float (0.0-1.0)
+                - indicators: List[str] (matched patterns)
+        """
+        if not query_doc:
+            return {"is_analytical": False, "analytical_type": None, "confidence": 0.0, "indicators": []}
+        
+        indicators = []
+        analytical_type = None
+        confidence = 0.0
+        
+        # Comparative patterns (JJR = comparative adjective, RBR = comparative adverb)
+        comparative_adjectives = [token for token in query_doc if token.tag_ in ['JJR', 'RBR']]
+        if comparative_adjectives:
+            indicators.extend([token.text for token in comparative_adjectives])
+            analytical_type = "comparative"
+            confidence = 0.85
+        
+        # Comparative keywords
+        comparative_keywords = ['better', 'worse', 'more', 'less', 'compared', 'versus', 'vs', 'than']
+        for token in query_doc:
+            if token.lemma_ in comparative_keywords:
+                indicators.append(token.text)
+                analytical_type = "comparative"
+                confidence = max(confidence, 0.80)
+        
+        # Trend analysis patterns
+        trend_keywords = ['trend', 'pattern', 'change', 'evolve', 'shift', 'progression', 'development']
+        temporal_context = ['over time', 'lately', 'recently', 'historically']
+        
+        for token in query_doc:
+            if token.lemma_ in trend_keywords:
+                indicators.append(token.text)
+                analytical_type = "trend"
+                confidence = max(confidence, 0.75)
+        
+        query_text = query_doc.text.lower()
+        for phrase in temporal_context:
+            if phrase in query_text:
+                indicators.append(phrase)
+                if analytical_type != "comparative":  # Don't override comparative
+                    analytical_type = "trend"
+                confidence = max(confidence, 0.70)
+        
+        # Statistical patterns
+        statistical_keywords = ['average', 'typical', 'usually', 'normally', 'generally', 'tend', 'often']
+        for token in query_doc:
+            if token.lemma_ in statistical_keywords:
+                indicators.append(token.text)
+                if not analytical_type:  # Only set if not already set
+                    analytical_type = "statistical"
+                confidence = max(confidence, 0.70)
+        
+        # Causal patterns (WHY questions are highly analytical)
+        if any(token.lemma_ == 'why' for token in query_doc):
+            indicators.append('why')
+            if not analytical_type or analytical_type == "statistical":
+                analytical_type = "causal"
+            confidence = max(confidence, 0.80)
+        
+        causal_keywords = ['because', 'reason', 'cause', 'effect', 'result', 'lead', 'impact']
+        for token in query_doc:
+            if token.lemma_ in causal_keywords:
+                indicators.append(token.text)
+                if not analytical_type:
+                    analytical_type = "causal"
+                confidence = max(confidence, 0.65)
+        
+        is_analytical = len(indicators) > 0
+        
+        if is_analytical:
+            logger.debug(
+                "🔬 ANALYTICAL QUERY: type=%s, confidence=%.2f, indicators=%s",
+                analytical_type, confidence, indicators[:5]
+            )
+        
+        return {
+            "is_analytical": is_analytical,
+            "analytical_type": analytical_type,
+            "confidence": confidence,
+            "indicators": indicators
+        }
+    
+    def _detect_aggregation_request(self, query_doc) -> Dict[str, Any]:
+        """
+        Detect aggregation requests using spaCy linguistic features.
+        
+        Aggregation requests include:
+        - Summary: "summarize", "overview", "recap", "summary"
+        - Totals: "total", "all", "everything", "entire"
+        - Counts: "how many", "number of", "count"
+        - Lists: "list all", "show me all", "what are all"
+        
+        Args:
+            query_doc: spaCy Doc object
+            
+        Returns:
+            Dict with:
+                - is_aggregation: bool
+                - aggregation_type: str (summary, total, count, list, or None)
+                - confidence: float (0.0-1.0)
+                - indicators: List[str]
+        """
+        if not query_doc:
+            return {"is_aggregation": False, "aggregation_type": None, "confidence": 0.0, "indicators": []}
+        
+        indicators = []
+        aggregation_type = None
+        confidence = 0.0
+        
+        query_text = query_doc.text.lower()
+        
+        # Summary requests (VB = verb base form)
+        summary_verbs = ['summarize', 'recap', 'overview', 'review', 'outline']
+        for token in query_doc:
+            if token.lemma_ in summary_verbs:
+                indicators.append(token.text)
+                aggregation_type = "summary"
+                confidence = 0.90
+        
+        # Total/entire keywords
+        total_keywords = ['total', 'all', 'everything', 'entire', 'whole', 'complete']
+        for token in query_doc:
+            if token.lemma_ in total_keywords:
+                indicators.append(token.text)
+                if not aggregation_type:
+                    aggregation_type = "total"
+                confidence = max(confidence, 0.75)
+        
+        # Count requests (detect "how many" pattern)
+        if 'how many' in query_text or 'how much' in query_text:
+            indicators.append('how many/much')
+            aggregation_type = "count"
+            confidence = 0.95
+        
+        count_keywords = ['count', 'number', 'quantity', 'amount']
+        for token in query_doc:
+            if token.lemma_ in count_keywords:
+                indicators.append(token.text)
+                if not aggregation_type or aggregation_type == "total":
+                    aggregation_type = "count"
+                confidence = max(confidence, 0.80)
+        
+        # List requests
+        if any(phrase in query_text for phrase in ['list all', 'show me all', 'what are all', 'give me all']):
+            indicators.append('list all')
+            aggregation_type = "list"
+            confidence = 0.85
+        
+        is_aggregation = len(indicators) > 0
+        
+        if is_aggregation:
+            logger.debug(
+                "📊 AGGREGATION REQUEST: type=%s, confidence=%.2f, indicators=%s",
+                aggregation_type, confidence, indicators[:5]
+            )
+        
+        return {
+            "is_aggregation": is_aggregation,
+            "aggregation_type": aggregation_type,
+            "confidence": confidence,
+            "indicators": indicators
+        }
+    
+    def _detect_temporal_bounds(self, query_doc) -> Dict[str, Any]:
+        """
+        Detect explicit temporal bounds using spaCy DATE entity recognition.
+        
+        Temporal bounds include:
+        - Specific dates: "January 2024", "last Tuesday", "yesterday"
+        - Date ranges: "between X and Y", "from X to Y"
+        - Relative time: "in the past week", "over the last month"
+        
+        Args:
+            query_doc: spaCy Doc object
+            
+        Returns:
+            Dict with:
+                - has_temporal_bound: bool
+                - bound_type: str (specific_date, date_range, relative_time, or None)
+                - entities: List[str] (detected DATE entities)
+                - confidence: float (0.0-1.0)
+        """
+        if not query_doc:
+            return {"has_temporal_bound": False, "bound_type": None, "entities": [], "confidence": 0.0}
+        
+        # Extract DATE entities using spaCy NER
+        date_entities = [ent.text for ent in query_doc.ents if ent.label_ == 'DATE']
+        
+        if not date_entities:
+            return {"has_temporal_bound": False, "bound_type": None, "entities": [], "confidence": 0.0}
+        
+        bound_type = None
+        confidence = 0.0
+        query_text = query_doc.text.lower()
+        
+        # Date range detection
+        range_indicators = ['between', 'from', 'to', 'until', 'through', 'since']
+        has_range_indicator = any(word in query_text for word in range_indicators)
+        
+        if len(date_entities) >= 2 or (len(date_entities) == 1 and has_range_indicator):
+            bound_type = "date_range"
+            confidence = 0.90
+        elif len(date_entities) == 1:
+            # Single date entity
+            # Check if it's relative ("last week") vs specific ("January 2024")
+            relative_terms = ['last', 'past', 'recent', 'previous', 'ago']
+            is_relative = any(term in date_entities[0].lower() for term in relative_terms)
+            
+            if is_relative:
+                bound_type = "relative_time"
+                confidence = 0.85
+            else:
+                bound_type = "specific_date"
+                confidence = 0.85
+        
+        has_temporal_bound = len(date_entities) > 0
+        
+        if has_temporal_bound:
+            logger.debug(
+                "📅 TEMPORAL BOUND: type=%s, entities=%s, confidence=%.2f",
+                bound_type, date_entities, confidence
+            )
+        
+        return {
+            "has_temporal_bound": has_temporal_bound,
+            "bound_type": bound_type,
+            "entities": date_entities,
+            "confidence": confidence
+        }
+    
+    def _advanced_emotion_routing(self, emotion_data: Optional[Dict], query_doc) -> Dict[str, Any]:
+        """
+        Advanced emotional routing using RoBERTa data and linguistic features.
+        
+        Provides alternative emotional routing paths based on:
+        - RoBERTa emotional intensity (already used in Fix 3)
+        - Emotional trajectory (stable, escalating, declining)
+        - Support indicators (help-seeking language)
+        - Stress markers (linguistic patterns indicating distress)
+        
+        Args:
+            emotion_data: Pre-computed RoBERTa emotion analysis
+            query_doc: spaCy Doc object
+            
+        Returns:
+            Dict with:
+                - needs_emotional_support: bool
+                - support_level: str (high, medium, low, or None)
+                - stress_indicators: List[str]
+                - trajectory: str (stable, escalating, declining, or unknown)
+                - confidence: float (0.0-1.0)
+        """
+        result = {
+            "needs_emotional_support": False,
+            "support_level": None,
+            "stress_indicators": [],
+            "trajectory": "unknown",
+            "confidence": 0.0
+        }
+        
+        if not emotion_data:
+            return result
+        
+        stress_indicators = []
+        
+        # Extract RoBERTa emotional intensity (from Fix 3)
+        emotional_intensity = emotion_data.get('emotional_intensity', 0.0)
+        primary_emotion = emotion_data.get('primary_emotion', '')
+        
+        # Negative emotions that indicate support needed
+        support_needed_emotions = ['sadness', 'fear', 'anger', 'disgust', 'anxiety', 'stress']
+        
+        # Check if primary emotion indicates distress
+        if primary_emotion in support_needed_emotions:
+            stress_indicators.append(f"emotion:{primary_emotion}")
+        
+        # Analyze linguistic stress markers using spaCy
+        if query_doc:
+            stress_keywords = ['struggling', 'worried', 'anxious', 'stressed', 'overwhelmed', 
+                             'difficult', 'hard', 'scared', 'afraid', 'confused', 'lost']
+            
+            for token in query_doc:
+                if token.lemma_ in stress_keywords:
+                    stress_indicators.append(token.text)
+            
+            # Help-seeking language
+            help_patterns = ['help', 'advice', 'guidance', 'support', 'what should i do']
+            for token in query_doc:
+                if token.lemma_ in help_patterns:
+                    stress_indicators.append(f"help-seeking:{token.text}")
+            
+            # Intensifiers (very, really, extremely) amplify stress
+            intensifiers = [token for token in query_doc if token.lemma_ in ['very', 'really', 'extremely', 'so']]
+            if intensifiers:
+                stress_indicators.append(f"intensified:{len(intensifiers)}x")
+        
+        # Emotional trajectory analysis (if available)
+        emotional_trajectory = emotion_data.get('emotional_trajectory', [])
+        if emotional_trajectory:
+            if 'escalating' in emotional_trajectory:
+                result["trajectory"] = "escalating"
+            elif 'declining' in emotional_trajectory:
+                result["trajectory"] = "declining"
+            else:
+                result["trajectory"] = "stable"
+        
+        # Determine support level based on intensity and indicators
+        needs_support = False
+        support_level = None
+        confidence = 0.0
+        
+        if emotional_intensity > 0.75 and len(stress_indicators) >= 3:
+            # High intensity + multiple stress markers = high support needed
+            needs_support = True
+            support_level = "high"
+            confidence = 0.95
+        elif emotional_intensity > 0.65 and len(stress_indicators) >= 2:
+            # Medium-high intensity + some stress markers = medium support
+            needs_support = True
+            support_level = "medium"
+            confidence = 0.85
+        elif emotional_intensity > 0.50 and len(stress_indicators) >= 1:
+            # Moderate intensity + at least one stress marker = low support
+            needs_support = True
+            support_level = "low"
+            confidence = 0.70
+        elif len(stress_indicators) >= 3:
+            # Multiple stress indicators even without high intensity
+            needs_support = True
+            support_level = "medium"
+            confidence = 0.75
+        
+        if needs_support:
+            logger.debug(
+                "💙 EMOTIONAL SUPPORT NEEDED: level=%s, intensity=%.2f, indicators=%s, trajectory=%s",
+                support_level, emotional_intensity, stress_indicators[:5], result["trajectory"]
+            )
+        
+        result.update({
+            "needs_emotional_support": needs_support,
+            "support_level": support_level,
+            "stress_indicators": stress_indicators,
+            "confidence": confidence
+        })
+        
+        return result
 
 
 # ============================================================================
