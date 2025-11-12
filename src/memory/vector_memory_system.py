@@ -4358,19 +4358,26 @@ class VectorMemoryManager:
         """
         try:
             # Use intelligent classification-based routing (Phase 2)
-            return await self.retrieve_relevant_memories_with_classification(
+            logger.debug(f"🔍 ROUTING CHECK: Starting intelligent routing for query='{query[:50]}'")
+            logger.debug(f"🔍 ROUTING CHECK: Classifier available? {self._unified_query_classifier is not None}")
+            
+            result = await self.retrieve_relevant_memories_with_classification(
                 user_id=user_id,
                 query=query,
                 limit=limit,
                 emotion_data=emotion_data,
                 channel_type=channel_type
             )
+            logger.debug(f"✅ ROUTING CHECK: Intelligent routing succeeded, got {len(result)} memories")
+            return result
         except Exception as e:
             # CRITICAL: Use simple string formatting to avoid recursive logging errors
             # exc_info=True can cause issues with large objects in exception context
             logger.error(
-                f"Intelligent routing failed for query '{query[:100]}': {type(e).__name__}: {str(e)[:200]}"
+                f"❌ INTELLIGENT ROUTING FAILED for query '{query[:100]}': {type(e).__name__}: {str(e)}"
             )
+            import traceback
+            logger.error(f"❌ FULL TRACEBACK:\n{traceback.format_exc()}")
             # Fallback to legacy method on errors
             logger.warning("⚠️ Falling back to legacy retrieval method")
             return await self._legacy_retrieve_relevant_memories(
@@ -5056,6 +5063,9 @@ class VectorMemoryManager:
                 if vector_strategy == UnifiedVectorStrategy.TEMPORAL_CHRONOLOGICAL:
                     # Task #2: Pass temporal direction from unified classifier to ensure correct sort order
                     # 🧠 RECALL: Pass keywords for memory filtering/re-ranking
+                    logger.info(f"🔍 TEMPORAL ROUTING: is_recall_query={unified_result.is_recall_query}, temporal_window_days={unified_result.temporal_window_days}")
+                    logger.info(f"🔍 TEMPORAL ROUTING: Keywords for boosting: {unified_result.keywords}")
+                    
                     results = await self.vector_store._handle_temporal_query_with_qdrant(
                         query, user_id, limit, 
                         channel_type=channel_type,

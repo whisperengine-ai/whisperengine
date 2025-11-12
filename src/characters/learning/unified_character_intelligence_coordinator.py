@@ -211,41 +211,22 @@ class UnifiedCharacterIntelligenceCoordinator:
         
         logger.info("🧠 Unified Character Intelligence Coordinator initialized")
     
-    def _should_retrieve_semantic_memories(self, query: str) -> bool:
-        """
-        Gate semantic memory retrieval - only when user explicitly wants recall.
-        
-        This is ATTENTION-AWARE design: Most queries don't need semantic search.
-        Recent conversation is sufficient for casual interaction.
-        
-        Saves ~70% of unnecessary memory searches and preserves attention capacity.
-        
-        Args:
-            query: User's message content
-            
-        Returns:
-            True if semantic search is needed, False otherwise
-        """
-        query_lower = query.lower()
-        
-        # Explicit recall signals - user wants memories
-        recall_signals = [
-            'remember', 'recall', 'you mentioned', 'we talked',
-            'you said', 'i told you', 'discussed', 'conversation about',
-            'that time', 'when i', 'when we', 'what did',
-            'tell me about', 'what was that', 'those conversations'
-        ]
-        
-        # Check for explicit recall request
-        has_recall_signal = any(signal in query_lower for signal in recall_signals)
-        
-        if has_recall_signal:
-            logger.info("🧠 RECALL SIGNAL: Detected explicit memory request in query")
-            return True
-        
-        # Default: Recent conversation is enough (no semantic search needed)
-        logger.debug("💬 CASUAL QUERY: No recall signal - skipping semantic search")
-        return False
+    # DEPRECATED (November 2025): Removed brittle keyword-based gating
+    # Now trusting UnifiedQueryClassifier for intelligent routing instead
+    # 
+    # def _should_retrieve_semantic_memories(self, query: str) -> bool:
+    #     """
+    #     DEPRECATED: This gating logic has been removed.
+    #     
+    #     Previously used keyword matching to block memory retrieval, but created
+    #     false negatives when legitimate recall queries didn't match patterns.
+    #     
+    #     Now we trust UnifiedQueryClassifier (spaCy NLP) to handle routing:
+    #     - Casual queries → recent conversation only
+    #     - Recall queries → extended temporal search  
+    #     - Meta queries → diverse sampling
+    #     """
+    #     pass
     
     async def coordinate_intelligence(self, request: IntelligenceRequest) -> IntelligenceResponse:
         """
@@ -475,31 +456,29 @@ class UnifiedCharacterIntelligenceCoordinator:
         """Gather intelligence from a single system."""
         
         if system == IntelligenceSystemType.MEMORY_BOOST and self.memory_manager:
-            # 🎯 ATTENTION-AWARE: Gate semantic retrieval - only when user explicitly wants recall
-            # Saves 70% of unnecessary memory searches and attention capacity
-            if not self._should_retrieve_semantic_memories(request.message_content):
-                logger.info("💬 CASUAL QUERY: Skipping semantic search (recent conversation sufficient)")
-                return {
-                    'type': 'memory_boost',
-                    'memories': [],
-                    'skipped': True,
-                    'reason': 'no_recall_signal',
-                    'memory_count': 0
-                }
+            # 🎯 TRUST THE CLASSIFIER: Let UnifiedQueryClassifier handle intelligent routing
+            # - Casual queries → recent conversation only (cheap, fast)
+            # - Recall queries → extended temporal search with keyword boosting (accurate)
+            # - Meta queries → diverse sampling to prevent circular retrieval
+            # 
+            # No more brittle keyword gating! The classifier uses spaCy NLP for semantic understanding.
+            logger.debug("🧠 MEMORY RETRIEVAL: Delegating to UnifiedQueryClassifier for intelligent routing")
             
-            # User explicitly wants memories - retrieve them with high relevance threshold
-            logger.info("🧠 RECALL QUERY: Enabling semantic search for: %s", request.message_content[:100])
             memories = await self.memory_manager.retrieve_relevant_memories(
                 user_id=request.user_id,
                 query=request.message_content,
                 limit=5
             )
+            
+            # Check if we got relevant results (classifier already filtered by relevance)
+            has_memories = memories and len(memories) > 0
+            
             return {
                 'type': 'memory_boost',
-                'memories': memories,
-                'episodic_context': len(memories) > 0,
-                'memory_count': len(memories) if memories else 0,
-                'recall_signal_detected': True
+                'memories': memories if has_memories else [],
+                'episodic_context': has_memories,
+                'memory_count': len(memories) if has_memories else 0,
+                'recall_signal_detected': has_memories  # True if classifier found relevant memories
             }
         
         elif system == IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE and self.character_extractor:
