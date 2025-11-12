@@ -7554,11 +7554,16 @@ class MessageProcessor:
                     logger.debug(f"Stance filtering failed, using original response: {e}")
                     bot_response_for_storage = clean_response
             
-            # 🛡️ META-CONVERSATION FILTER: Prevent conversations about memory/bot issues from being stored
-            # These create recursive awareness loops where the bot is primed to think it has problems
-            if self._is_meta_conversation(message_context.content, clean_response):
+            # 🛡️ META-CONVERSATION FILTER: Use intelligent classification instead of regex
+            # Only skip storage for TRUE meta-queries (queries ABOUT the bot itself)
+            # Recall queries like "we talked about X" should NOT be filtered
+            # This is handled by unified_classification which properly distinguishes:
+            # - is_meta_query=True: "tell me everything you know" → diverse sampling
+            # - is_recall_query=True: "we talked about X" → temporal search with keywords
+            # Both should be stored! Only skip if it's a debugging/technical conversation.
+            if self._is_technical_debugging_conversation(message_context.content, clean_response):
                 logger.warning(
-                    "🚫 META-CONVERSATION: Not storing conversation about bot memory/issues for user %s",
+                    "🚫 TECHNICAL DEBUGGING: Not storing technical conversation for user %s",
                     message_context.user_id
                 )
                 return False
@@ -7652,58 +7657,44 @@ class MessageProcessor:
         
         return True
     
-    def _is_meta_conversation(self, user_message: str, bot_response: str) -> bool:
+    def _is_technical_debugging_conversation(self, user_message: str, bot_response: str) -> bool:
         """
-        Detect meta-conversations about the bot's memory, functioning, or identity issues.
+        Detect ONLY technical debugging conversations that should not be stored.
         
-        Meta-conversations create recursive awareness loops where discussing memory problems
-        causes those discussions to be stored, which then primes future responses to believe
-        there are memory problems. This filter prevents that poisoning.
+        This is intentionally minimal - we only filter out explicit technical debugging,
+        not general meta-queries (which are handled by UnifiedQueryClassifier).
+        
+        Meta-queries like "what do you know about me?" should be stored so the bot
+        can reference them later. We only skip storage for technical debugging like
+        "your memory is corrupted" or "reset your context".
         
         Args:
             user_message: The user's message
             bot_response: The bot's response
             
         Returns:
-            True if this is a meta-conversation that should NOT be stored
+            True if this is technical debugging that should NOT be stored
         """
         import re
         
-        # Patterns that indicate meta-conversations about bot issues
-        meta_patterns = [
-            # Memory/context issues
-            r'\b(fragment|fragmented|fragmenting)\s+(your\s+)?(memory|memories|context)',
-            r'\b(corrupt|corrupted|corrupting)\s+(your\s+)?(memory|memories)',
-            r'\b(loop|looping|loops|looped)\b',
-            r'\b(repeat|repeating|repeated)\s+(yourself|responses?|messages?)',
-            r'\b(lost|losing)\s+(your\s+)?(memory|memories|context)',
-            r'\b(stuck|stale|frozen)\s+(context|conversation|memory)',
+        # ONLY technical debugging patterns (not general meta-queries)
+        debug_patterns = [
+            # Memory corruption/system issues
+            r'\b(corrupt|corrupted|fragmenting)\s+(your\s+)?(memory|context)',
+            r'\b(reset|restart|reboot)\s+(your\s+memory|your\s+context|your\s+system)',
+            r'\b(stuck|frozen)\s+(context|conversation|memory)',
+            r'\bprompt.*\blog\b',  # Discussions about prompt logging
             
-            # Bot functioning/identity discussions
-            r'\byour\s+(memory|functioning|system|context)\s+(is|has|seems)',
-            r'\bsomething\s+(is\s+)?(wrong|off|broken)\s+with\s+(you|your)',
-            r'\b(reset|restart|reboot|fix)\s+(you|your\s+memory|your\s+context)',
-            r'\bwhat.*happening\s+to\s+(you|your\s+memory)',
-            
-            # Name confusion discussions (specific pattern from the incident)
-            r'\byou.*confus(ed|ing).*names?\b',
-            r'\b(i\'?m|you\'?re)\s+\w+.*\byou\'?re\s+\w+\b',  # "I'm X, you're Y" corrections
-            
-            # Technical debugging discussions
-            r'\bconversation\s+(cache|history|context).*\b(clear|reset|stuck)',
-            r'\bprompt.*\blog\b',
-            
-            # Meta-awareness phrases
-            r'\bkeeping\s+you\s+in\s+the\s+loop',
-            r'\bpart\s+of\s+the\s+process\b',
+            # Explicit technical commands
+            r'\bclear\s+(your\s+)?(cache|context|memory)',
+            r'\bfix\s+(your\s+)?(memory|context|system)',
         ]
         
-        # Check both user message and bot response
         combined_text = f"{user_message} {bot_response}".lower()
         
-        for pattern in meta_patterns:
+        for pattern in debug_patterns:
             if re.search(pattern, combined_text, re.IGNORECASE):
-                logger.debug(f"🔍 META-CONVERSATION: Detected pattern '{pattern}' in conversation")
+                logger.debug(f"🔍 TECHNICAL DEBUG: Detected pattern '{pattern}' in conversation")
                 return True
         
         return False
