@@ -63,17 +63,19 @@ class UnifiedTestHarness:
     """YAML-driven test harness for all WhisperEngine tests"""
     
     BOT_CONFIGS = {
-        "elena": {"port": 9091, "archetype": "Real-World"},
-        "gabriel": {"port": 9095, "archetype": "Narrative AI"},
-        "marcus": {"port": 9092, "archetype": "Real-World"},
-        "jake": {"port": 9097, "archetype": "Real-World"},
-        "ryan": {"port": 9093, "archetype": "Real-World"},
-        "sophia": {"port": 9096, "archetype": "Real-World"},
+        "aetheris": {"port": 9099, "archetype": "Narrative AI"},
+        "aethys": {"port": 3007, "archetype": "Fantasy"},
+        "aria": {"port": 9785, "archetype": "Narrative AI"},
+        "assistant": {"port": 9101, "archetype": "Real-World"},
         "dotty": {"port": 9098, "archetype": "Narrative AI"},
         "dream": {"port": 9094, "archetype": "Fantasy"},
-        "aethys": {"port": 3007, "archetype": "Fantasy"},
-        "aetheris": {"port": 9099, "archetype": "Narrative AI"},
-        "aria": {"port": 9785, "archetype": "Narrative AI"},
+        "elena": {"port": 9091, "archetype": "Real-World"},
+        "gabriel": {"port": 9095, "archetype": "Narrative AI"},
+        "jake": {"port": 9097, "archetype": "Real-World"},
+        "marcus": {"port": 9092, "archetype": "Real-World"},
+        "nottaylor": {"port": 9100, "archetype": "Narrative AI"},
+        "ryan": {"port": 9093, "archetype": "Real-World"},
+        "sophia": {"port": 9096, "archetype": "Real-World"},
     }
     
     def __init__(self, timeout: float = 60.0):
