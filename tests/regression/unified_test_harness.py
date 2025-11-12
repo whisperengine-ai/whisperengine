@@ -73,7 +73,7 @@ class UnifiedTestHarness:
         "dream": {"port": 9094, "archetype": "Fantasy"},
         "aethys": {"port": 3007, "archetype": "Fantasy"},
         "aetheris": {"port": 9099, "archetype": "Narrative AI"},
-        "aria": {"port": 9459, "archetype": "Narrative AI"},
+        "aria": {"port": 9785, "archetype": "Narrative AI"},
     }
     
     def __init__(self, timeout: float = 60.0):
