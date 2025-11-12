@@ -1515,20 +1515,27 @@ class VectorMemoryStore:
         return min(1.0, intensity_factor * emotion_weight)
     
     def calculate_personal_relevance(self, memory: VectorMemory, recent_memories: List[Dict]) -> float:
-        """Calculate personal relevance based on user's conversation patterns"""
+        """
+        Calculate personal relevance based on user's conversation patterns
+        
+        ARCHITECTURE: Uses centralized text preprocessing for consistent word extraction
+        Proper spaCy lemmatization happens at query classification layer
+        """
         if not recent_memories:
             return 0.5
         
-        content_words = set(memory.content.lower().split())
+        from src.utils.stop_words import extract_content_words
+        
+        # Extract content words from memory (normalized, stop words filtered)
+        memory_keywords = set(extract_content_words(memory.content, min_length=3))
         
         # Find common themes in recent memories
         theme_counts = {}
         for mem in recent_memories:
-            words = set(mem.get('content', '').lower().split())
-            common_words = content_words.intersection(words)
+            mem_keywords = set(extract_content_words(mem.get('content', ''), min_length=3))
+            common_words = memory_keywords.intersection(mem_keywords)
             for word in common_words:
-                if len(word) > 3:  # Filter out short words
-                    theme_counts[word] = theme_counts.get(word, 0) + 1
+                theme_counts[word] = theme_counts.get(word, 0) + 1
         
         # Calculate relevance based on theme overlap
         if not theme_counts:
@@ -1539,19 +1546,27 @@ class VectorMemoryStore:
         return relevance
     
     def calculate_uniqueness_score(self, memory: VectorMemory, recent_memories: List[Dict]) -> float:
-        """Calculate uniqueness compared to recent memories"""
+        """
+        Calculate uniqueness compared to recent memories using Jaccard similarity
+        
+        ARCHITECTURE: Uses centralized text preprocessing for consistent word extraction
+        Proper spaCy lemmatization happens at query classification layer
+        """
         if not recent_memories:
             return 1.0
         
-        content_words = set(memory.content.lower().split())
+        from src.utils.stop_words import extract_content_words
+        
+        # Extract content words from memory (normalized, stop words filtered)
+        memory_keywords = set(extract_content_words(memory.content, min_length=3))
         
         # Calculate similarity with recent memories
         similarities = []
         for mem in recent_memories:
-            mem_words = set(mem.get('content', '').lower().split())
-            if content_words and mem_words:
-                intersection = len(content_words.intersection(mem_words))
-                union = len(content_words.union(mem_words))
+            mem_keywords = set(extract_content_words(mem.get('content', ''), min_length=3))
+            if memory_keywords and mem_keywords:
+                intersection = len(memory_keywords.intersection(mem_keywords))
+                union = len(memory_keywords.union(mem_keywords))
                 similarity = intersection / union if union > 0 else 0
                 similarities.append(similarity)
         
@@ -1584,14 +1599,22 @@ class VectorMemoryStore:
             return 0.3
     
     def calculate_interaction_value(self, memory: VectorMemory) -> float:
-        """Calculate value based on interaction quality"""
+        """
+        Calculate value based on interaction quality
+        
+        ARCHITECTURE: Uses pattern matching for engagement signals
+        Full linguistic analysis (POS tagging for pronouns, etc.) happens at query layer
+        """
         # Check for question marks (questions are often significant)
         has_question = '?' in memory.content
         
-        # Check for personal pronouns (more personal engagement)
+        # Check for personal pronouns using simple pattern matching
+        # NOTE: For production, proper POS tagging in spaCy would identify PRON tokens
         personal_words = ['i', 'me', 'my', 'myself', 'you', 'your', 'we', 'us', 'our']
-        content_words = memory.content.lower().split()
-        personal_count = sum(1 for word in content_words if word in personal_words)
+        content_lower = memory.content.lower()
+        
+        # Count personal pronouns (simplified - proper approach would use spaCy POS tags)
+        personal_count = sum(1 for word in personal_words if f' {word} ' in f' {content_lower} ')
         
         # Check for simple/basic questions that shouldn't be highly significant
         simple_question_patterns = [
@@ -1599,7 +1622,6 @@ class VectorMemoryStore:
             'good morning', 'good night', 'thanks', 'thank you', 'okay', 'ok', 'yes', 'no'
         ]
         
-        content_lower = memory.content.lower()
         is_simple_question = any(pattern in content_lower for pattern in simple_question_patterns)
         
         # Check memory type significance with adjustments for simple queries
@@ -2507,7 +2529,9 @@ class VectorMemoryStore:
         limit: int, 
         channel_type: Optional[str] = None,
         is_temporal_first: bool = False,
-        is_temporal_last: bool = False
+        is_temporal_last: bool = False,
+        temporal_window_days: int = 1,
+        recall_keywords: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
         🎯 QDRANT-NATIVE: Handle temporal queries using scroll API for chronological context
@@ -2515,6 +2539,10 @@ class VectorMemoryStore:
         ENHANCED (Task #2): Uses UnifiedQueryClassifier temporal direction flags
         - is_temporal_first: Return oldest memories (sort ascending by timestamp)
         - is_temporal_last: Return newest memories (sort descending by timestamp)
+        
+        ENHANCED (November 2025): Extended temporal window for recall queries
+        - temporal_window_days: Number of days to search back (1=24h, 7-30 for recall)
+        - recall_keywords: Content keywords for filtering/boosting relevant memories
         
         🔒 PRIVACY: Channel-based memory filtering
         - DM channels: Only retrieve DM memories
@@ -2557,10 +2585,14 @@ class VectorMemoryStore:
                 # from the entire 24-hour window, not the first in current conversation
                 recent_cutoff_dt = datetime.utcnow() - timedelta(hours=4)
                 logger.info(f"🎯 SESSION SCOPE: 'First' query - defaulting to 4-hour session window to avoid historical bleed")
+            elif temporal_window_days > 1:
+                # 🧠 RECALL QUERY: Extended temporal window for "we talked about X" queries
+                recent_cutoff_dt = datetime.utcnow() - timedelta(days=temporal_window_days)
+                logger.info(f"🧠 RECALL WINDOW: Using {temporal_window_days}-day extended window for past conversation retrieval")
             else:
-                # General temporal queries use 24-hour window
-                recent_cutoff_dt = datetime.utcnow() - timedelta(hours=24)
-                logger.info(f"🎯 SESSION SCOPE: General temporal query - using 24-hour window")
+                # General temporal queries use 24-hour window (1 day)
+                recent_cutoff_dt = datetime.utcnow() - timedelta(days=temporal_window_days)
+                logger.info(f"🎯 SESSION SCOPE: General temporal query - using {temporal_window_days}-day window")
             
             recent_cutoff_timestamp = recent_cutoff_dt.timestamp()
             
@@ -2664,10 +2696,25 @@ class VectorMemoryStore:
             for i, point in enumerate(recent_messages[:actual_limit]):  # Use smart limit
                 # Handle payload safely
                 payload = getattr(point, 'payload', {}) or {}
+                content = payload.get('content', '')
+                
+                # 🧠 KEYWORD RELEVANCE BOOST: Calculate relevance score based on keyword presence
+                relevance_score = 1.0
+                keyword_matches = 0  # Initialize variable
+                if recall_keywords:
+                    # Check how many keywords appear in memory content (case-insensitive)
+                    content_lower = content.lower()
+                    keyword_matches = sum(1 for kw in recall_keywords if kw.lower() in content_lower)
+                    
+                    if keyword_matches > 0:
+                        # Boost score: 1.0 base + 0.2 per keyword match
+                        relevance_score = 1.0 + (0.2 * keyword_matches)
+                        logger.debug(f"🧠 KEYWORD BOOST: Memory matches {keyword_matches}/{len(recall_keywords)} keywords → score {relevance_score:.2f}")
+                
                 formatted_results.append({
                     "id": str(point.id),
-                    "score": 1.0,  # Give temporal context high relevance score
-                    "content": payload.get('content', ''),
+                    "score": relevance_score,  # Keyword-boosted relevance score
+                    "content": content,
                     "memory_type": payload.get('memory_type', ''),
                     "timestamp": payload.get('timestamp', ''),
                     "confidence": payload.get('confidence', 0.5),
@@ -2675,8 +2722,16 @@ class VectorMemoryStore:
                     "temporal_query": True,
                     "temporal_direction": direction_label,  # 🎯 NEW: Indicate query direction
                     "qdrant_chronological": True,
-                    "temporal_rank": i + 1  # Chronological position (first/most recent = 1)
+                    "temporal_rank": i + 1,  # Chronological position (first/most recent = 1)
+                    "keyword_matches": keyword_matches  # Track keyword relevance
                 })
+            
+            # 🧠 KEYWORD FILTERING: If keywords provided, sort by relevance score (highest first)
+            if recall_keywords:
+                formatted_results.sort(key=lambda x: x['score'], reverse=True)
+                total_memories = len(formatted_results)
+                high_relevance = sum(1 for r in formatted_results if r['score'] > 1.0)
+                logger.info(f"🧠 RECALL RESULTS: {high_relevance}/{total_memories} memories match keywords {recall_keywords}")
             
             logger.info(f"🎯 QDRANT-TEMPORAL ({direction_label}): Found {len(formatted_results)} chronologically ordered memories")
             return formatted_results
@@ -3445,78 +3500,38 @@ class VectorMemoryStore:
 
     def _get_semantic_key(self, content: str) -> str:
         """
-        🎯 FASTEMBED SEMANTIC: Extract actual topic/concept from content
+        🎯 SEMANTIC KEY: Extract topic key for semantic vector grouping
         
-        Uses semantic keyword extraction (not keyword matching) to identify
-        the true topic/concept being discussed. This semantic key is used
-        to prefix the semantic vector embedding for better topic-based search.
+        ARCHITECTURE NOTE: This is a simplified extraction used for vector storage.
+        Full semantic analysis with spaCy NER/POS tagging happens in the 
+        UnifiedQueryClassifier layer during query processing.
+        
+        This method uses centralized keyword extraction to create semantic keys
+        that group similar topics together in vector space.
         
         Examples:
-        - "My cat's name is Whiskers" → "pet_identity"
-        - "I love the ocean and marine biology" → "ocean_marine_biology"
-        - "Feeling anxious about my thesis" → "anxiety_academic_work"
+        - "My cat's name is Whiskers" → "cat_name_whiskers"
+        - "I love the ocean and marine biology" → "love_ocean_marine"
+        - "Feeling anxious about my thesis" → "feeling_anxious_thesis"
         
-        Method:
-        1. Extract meaningful content words (nouns, verbs, adjectives)
-        2. Filter stop words
-        3. Return top 2-3 keywords joined as semantic key
-        4. Fallback to broad category detection if needed
+        For query-time semantic analysis, see:
+        - UnifiedQueryClassifier._extract_recall_content_keywords()
+        - UnifiedQueryClassifier spaCy NLP pipeline
         """
-        content_lower = content.lower()
+        from src.utils.stop_words import extract_content_words
         
-        # 🎯 SEMANTIC EXTRACTION: Extract meaningful keywords
-        words = content_lower.split()
+        # Extract meaningful content words (nouns, verbs, adjectives)
+        # This uses the centralized preprocessing that filters stop words
+        keywords = extract_content_words(content, min_length=3)
         
-        # Filter stop words and extract meaningful terms
-        meaningful_terms = [
-            word.strip('.,!?:;()[]{}"\'-') 
-            for word in words 
-            if len(word) > 4 and word not in self._get_stop_words()
-        ]
+        if keywords and len(keywords) >= 2:
+            # Use top 2-3 keywords for semantic grouping
+            return '_'.join(keywords[:3])
+        elif keywords:
+            return keywords[0]
         
-        # 🎯 TOPIC CATEGORIZATION: Broad semantic categories for grouping
-        # Academic/Research
-        if any(term in content_lower for term in ['research', 'study', 'thesis', 'academic', 'paper', 'data', 'hypothesis']):
-            if any(term in content_lower for term in ['anxious', 'worried', 'stressed', 'nervous']):
-                return 'academic_anxiety'
-            return 'academic_research'
-        
-        # Marine/Ocean topics
-        if any(term in content_lower for term in ['ocean', 'marine', 'coral', 'reef', 'sea', 'water', 'fish']):
-            return 'marine_biology'
-        
-        # Emotional states
-        if any(term in content_lower for term in ['feeling', 'feel', 'emotion', 'anxious', 'happy', 'sad', 'angry']):
-            emotion_words = [w for w in meaningful_terms if w in ['anxious', 'happy', 'sad', 'angry', 'excited', 'worried', 'stressed']]
-            if emotion_words:
-                return f"emotion_{emotion_words[0]}"
-            return 'emotional_state'
-        
-        # Pet/Animal identity
-        if any(word in content_lower for word in ['cat', 'dog', 'pet']) and 'name' in content_lower:
-            return 'pet_identity'
-        
-        # Personal identity
-        if 'my name is' in content_lower or 'i am called' in content_lower or 'call me' in content_lower:
-            return 'personal_identity'
-        
-        # Location/Geography
-        if any(word in content_lower for word in ['live in', 'from', 'location', 'city', 'country', 'hometown']):
-            return 'location_geography'
-        
-        # Preferences
-        if any(word in content_lower for word in ['favorite', 'prefer', 'like', 'love', 'enjoy', 'hate']):
-            return 'personal_preference'
-        
-        # 🎯 KEYWORD-BASED FALLBACK: Use top meaningful terms as semantic key
-        if meaningful_terms:
-            # Take top 2-3 most meaningful terms
-            top_terms = meaningful_terms[:3]
-            return '_'.join(top_terms)
-        
-        # Final fallback - use first few words
-        words_clean = [w.strip('.,!?:;()[]{}"\'-') for w in words[:3] if len(w) > 2]
-        return '_'.join(words_clean) if words_clean else 'general_topic'
+        # Fallback to general topic if no keywords extracted
+        return 'general_topic'
     
     def _create_abstractive_summary_from_sentences(self, sentences: List[str], themes: set) -> Dict[str, str]:
         """
@@ -5040,11 +5055,14 @@ class VectorMemoryManager:
                 # Step 2: Route based on vector strategy
                 if vector_strategy == UnifiedVectorStrategy.TEMPORAL_CHRONOLOGICAL:
                     # Task #2: Pass temporal direction from unified classifier to ensure correct sort order
+                    # 🧠 RECALL: Pass keywords for memory filtering/re-ranking
                     results = await self.vector_store._handle_temporal_query_with_qdrant(
                         query, user_id, limit, 
                         channel_type=channel_type,
                         is_temporal_first=unified_result.is_temporal_first,
-                        is_temporal_last=unified_result.is_temporal_last
+                        is_temporal_last=unified_result.is_temporal_last,
+                        temporal_window_days=unified_result.temporal_window_days,  # 🧠 Extended window for recall queries
+                        recall_keywords=unified_result.keywords  # 🧠 Content keywords for filtering/boosting
                     )
                     # Format results
                     formatted_results = []

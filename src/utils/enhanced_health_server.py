@@ -126,7 +126,8 @@ class EnhancedHealthServer:
         
         if isinstance(obj, dict):
             return {k: self._make_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
+        elif isinstance(obj, (list, tuple, set)):
+            # Handle lists, tuples, and sets (convert sets to lists)
             return [self._make_json_serializable(item) for item in obj]
         elif hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')):
             # Handle objects with to_dict method

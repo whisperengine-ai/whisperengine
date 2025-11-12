@@ -1193,8 +1193,10 @@ class MessageProcessor:
             
             # Phase 4: Conversation history and context building
             # 🚀 Structured Prompt Assembly (default - no feature flag!)
+            # Note: ai_components not yet available (created in Phase 5), so pass None
+            # Recall detection will check ai_components in Phase 4 revisit after classification
             conversation_context = await self._build_conversation_context_structured(
-                message_context, relevant_memories
+                message_context, relevant_memories, None  # ai_components available in Phase 5.5
             )
             
             # Phase 4.5: Comprehensive strategic intelligence retrieval (7 engines)
@@ -1353,6 +1355,9 @@ class MessageProcessor:
                             user_id=message_context.user_id,
                             character_name=bot_name
                         )
+                        
+                        # Store for downstream use (enriched summary keyword extraction, etc.)
+                        ai_components['unified_classification'] = unified_classification
                         
                         # Tool calling removed - use deterministic spaCy routing instead
                         # Previously: checked for LLM_TOOLS in data_sources and executed tools
@@ -3096,7 +3101,8 @@ class MessageProcessor:
     async def _build_conversation_context_structured(
         self, 
         message_context: MessageContext, 
-        relevant_memories: List[Dict[str, Any]]
+        relevant_memories: List[Dict[str, Any]],
+        ai_components: Optional[Dict[str, Any]] = None  # NEW: Optional AI components for recall detection
     ) -> List[Dict[str, str]]:
         """
         🚀 STRUCTURED CONVERSATION CONTEXT BUILDING (Phase 2 + CDL Integration)
@@ -3706,6 +3712,7 @@ class MessageProcessor:
         # Feature flagged for testing and gradual rollout
         
         # Check if conversation summary component is enabled before processing
+        logger.info(f"🔍 ENRICHED CHECK: CONVERSATION_SUMMARY enabled={is_component_enabled(PromptComponentType.CONVERSATION_SUMMARY)}, ENABLE_ENRICHED_SUMMARIES={os.getenv('ENABLE_ENRICHED_SUMMARIES', 'false')}")
         if is_component_enabled(PromptComponentType.CONVERSATION_SUMMARY) and os.getenv('ENABLE_ENRICHED_SUMMARIES', 'false').lower() == 'true':
             try:
                 from src.memory.vector_memory_system import get_normalized_bot_name_from_env
@@ -3716,17 +3723,51 @@ class MessageProcessor:
                     user_id=message_context.user_id
                 )
                 recent_message_count = len(recent_messages)
+                logger.info(f"🔍 ENRICHED SUMMARIES: Checking conversation length - {recent_message_count} messages (threshold: >10)")
                 
                 # Apply tiered context for conversations with >10 messages
                 if recent_message_count > 10:
                     logger.info(f"📚 Long conversation detected ({recent_message_count} messages) - using tiered context")
                     
                     # TIER 1: Add enriched summary from last 7 days (older messages)
+                    # 🧠 RECALL ENHANCEMENT: Extract keywords directly from query text
+                    search_keywords = None
+                    query_lower = message_context.content.lower()
+                    
+                    # Check for recall patterns to extract keywords
+                    recall_patterns_detected = any(pattern in query_lower for pattern in [
+                        'we talked about', 'we discussed', 'we were talking about',
+                        'remember when we talked', 'recall our discussion'
+                    ])
+                    
+                    if recall_patterns_detected:
+                        # Extract keywords from query using simple heuristic
+                        # Query pattern: "we talked about X" → extract X
+                        import re
+                        
+                        # Extract content after recall patterns
+                        recall_patterns = [
+                            r'we (?:talked|discussed|were talking) about (.+)',
+                            r'remember when we (?:talked|discussed) (.+)',
+                            r'recall (?:our discussion|talking) about (.+)'
+                        ]
+                        
+                        for pattern in recall_patterns:
+                            match = re.search(pattern, query_lower)
+                            if match:
+                                keyword_text = match.group(1).strip()
+                                # Split on common separators
+                                keywords = [kw.strip() for kw in re.split(r'[,;]|\band\b', keyword_text)]
+                                search_keywords = [kw for kw in keywords if len(kw) > 2]  # Filter short words
+                                logger.info(f"🔍 RECALL KEYWORDS: Extracted {search_keywords} from query")
+                                break
+                    
                     enriched_summaries = await self._retrieve_enriched_summaries(
                         user_id=message_context.user_id,
                         bot_name=bot_name,
                         days_back=7,   # Last week
-                        limit=1        # Most recent summary
+                        limit=3 if search_keywords else 1,  # Get more summaries for recall queries
+                        search_keywords=search_keywords
                     )
                     
                     if enriched_summaries:
@@ -8210,7 +8251,8 @@ class MessageProcessor:
         user_id: str, 
         bot_name: str, 
         days_back: int = 7,  # Reduced from 30 - only recent summaries
-        limit: int = 2       # Reduced from 10 - most recent 1-2 summaries max
+        limit: int = 2,      # Reduced from 10 - most recent 1-2 summaries max
+        search_keywords: Optional[List[str]] = None  # NEW: Optional keywords for recall queries
     ) -> List[Dict[str, Any]]:
         """
         Retrieve enriched conversation summaries from PostgreSQL.
@@ -8219,11 +8261,17 @@ class MessageProcessor:
         in 24-hour windows. Strategy: retrieve only the most recent 1-2 summaries
         to provide background context without overwhelming the prompt.
         
+        When search_keywords provided (recall queries like "we talked about X"):
+        - Searches key_topics array (fast GIN index)
+        - Falls back to full-text search in summary_text
+        - Returns summaries matching ANY keyword
+        
         Args:
             user_id: User identifier
             bot_name: Bot name for filtering summaries
             days_back: How many days back to look (default 7 for recent context)
             limit: Maximum summaries (default 2 - usually just 1 latest)
+            search_keywords: Optional list of keywords to search for (e.g., ["prompt engineering"])
             
         Returns:
             List of summary dictionaries with text, topics, timeframe, etc.
@@ -8238,24 +8286,68 @@ class MessageProcessor:
             cutoff_date = datetime.utcnow() - timedelta(days=days_back)
             
             async with postgres_pool.acquire() as conn:
-                rows = await conn.fetch("""
-                    SELECT 
-                        summary_text,
-                        start_timestamp,
-                        end_timestamp,
-                        message_count,
-                        key_topics,
-                        emotional_tone,
-                        confidence_score,
-                        created_at
-                    FROM conversation_summaries
-                    WHERE user_id = $1 
-                      AND bot_name = $2
-                      AND start_timestamp >= $3
-                      AND confidence_score >= 0.3  -- Only high-confidence summaries
-                    ORDER BY start_timestamp DESC
-                    LIMIT $4
-                """, user_id, bot_name, cutoff_date, limit)
+                # Build query with optional keyword search
+                if search_keywords:
+                    # 🧠 RECALL QUERY: Search by keywords/topics (hybrid approach)
+                    # Strategy: Use GIN index on key_topics[] first, fallback to full-text
+                    logger.info(f"🔍 KEYWORD SEARCH: Looking for summaries matching: {search_keywords}")
+                    
+                    # Prepare keyword array for PostgreSQL array overlap operator
+                    keyword_array = search_keywords  # ['prompt engineering', 'memory', ...]
+                    
+                    # Prepare ILIKE patterns for full-text fallback
+                    like_conditions = " OR ".join([f"summary_text ILIKE ${i+5}" for i in range(len(search_keywords))])
+                    like_params = [f'%{kw}%' for kw in search_keywords]
+                    
+                    query = f"""
+                        SELECT 
+                            summary_text,
+                            start_timestamp,
+                            end_timestamp,
+                            message_count,
+                            key_topics,
+                            emotional_tone,
+                            confidence_score,
+                            created_at
+                        FROM conversation_summaries
+                        WHERE user_id = $1 
+                          AND bot_name = $2
+                          AND start_timestamp >= $3
+                          AND confidence_score >= 0.3
+                          AND (
+                              -- Fast: GIN index array overlap (any keyword matches topic array)
+                              key_topics && $4
+                              -- Fallback: Full-text search in summary
+                              OR {like_conditions}
+                          )
+                        ORDER BY start_timestamp DESC
+                        LIMIT ${len(like_params) + 5}
+                    """
+                    
+                    rows = await conn.fetch(query, user_id, bot_name, cutoff_date, keyword_array, *like_params, limit)
+                    
+                    logger.info(f"✅ KEYWORD MATCH: Found {len(rows)} summaries matching keywords")
+                    
+                else:
+                    # Default: Most recent summaries (no keyword filtering)
+                    rows = await conn.fetch("""
+                        SELECT 
+                            summary_text,
+                            start_timestamp,
+                            end_timestamp,
+                            message_count,
+                            key_topics,
+                            emotional_tone,
+                            confidence_score,
+                            created_at
+                        FROM conversation_summaries
+                        WHERE user_id = $1 
+                          AND bot_name = $2
+                          AND start_timestamp >= $3
+                          AND confidence_score >= 0.3  -- Only high-confidence summaries
+                        ORDER BY start_timestamp DESC
+                        LIMIT $4
+                    """, user_id, bot_name, cutoff_date, limit)
                 
                 summaries = []
                 for row in rows:

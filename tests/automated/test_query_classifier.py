@@ -239,7 +239,7 @@ class TestEmotionalQueryDetection:
     
     @pytest.mark.asyncio
     async def test_emotional_no_emotion_data(self):
-        """Test queries without emotion data don't trigger emotional route."""
+        """Test queries with emotional keywords trigger emotional route even without emotion_data."""
         classifier = QueryClassifier()
         
         category = await classifier.classify_query(
@@ -248,8 +248,9 @@ class TestEmotionalQueryDetection:
             is_temporal=False
         )
         
-        # Should not be emotional without emotion_data
-        assert category != QueryCategory.EMOTIONAL
+        # Phase 3: Now detects emotional queries via keyword patterns even without RoBERTa data
+        # "feeling" is an emotional keyword
+        assert category == QueryCategory.EMOTIONAL
     
     @pytest.mark.asyncio
     async def test_emotional_various_emotions(self):
@@ -277,7 +278,7 @@ class TestTemporalQueryDetection:
     
     @pytest.mark.asyncio
     async def test_temporal_flag_true(self):
-        """Test is_temporal=True always returns TEMPORAL."""
+        """Test is_temporal=True returns TEMPORAL when no higher-priority patterns match."""
         classifier = QueryClassifier()
         
         category = await classifier.classify_query(
@@ -286,34 +287,38 @@ class TestTemporalQueryDetection:
             is_temporal=True  # Pre-detected by existing system
         )
         
-        assert category == QueryCategory.TEMPORAL
+        # Phase 2: Factual/Conversational patterns have higher priority than temporal flag
+        # "What was" matches factual pattern, so FACTUAL wins even with is_temporal=True
+        assert category == QueryCategory.FACTUAL
     
     @pytest.mark.asyncio
     async def test_temporal_overrides_factual(self):
-        """Test temporal flag overrides factual pattern."""
+        """Test factual pattern has higher priority than temporal flag."""
         classifier = QueryClassifier()
         
-        # Query matches factual pattern, but temporal flag takes priority
+        # Query matches factual pattern, and factual has higher priority
         category = await classifier.classify_query(
             query="What is the first message?",  # Has "what is" (factual)
             emotion_data=None,
-            is_temporal=True  # But temporal detection wins
+            is_temporal=True  # Temporal flag is lower priority
         )
         
-        assert category == QueryCategory.TEMPORAL
+        # Phase 2: Factual patterns checked first, higher priority than temporal
+        assert category == QueryCategory.FACTUAL
     
     @pytest.mark.asyncio
     async def test_temporal_overrides_conversational(self):
-        """Test temporal flag overrides conversational pattern."""
+        """Test conversational pattern has higher priority than temporal flag."""
         classifier = QueryClassifier()
         
         category = await classifier.classify_query(
             query="What did we talk about first?",  # Has "what did we" (conversational)
             emotion_data=None,
-            is_temporal=True  # But temporal detection wins
+            is_temporal=True  # But conversational pattern wins
         )
         
-        assert category == QueryCategory.TEMPORAL
+        # Phase 2: Conversational patterns checked before temporal flag
+        assert category == QueryCategory.CONVERSATIONAL
 
 
 class TestGeneralQueryFallback:
@@ -364,7 +369,7 @@ class TestClassificationPriority:
     
     @pytest.mark.asyncio
     async def test_temporal_highest_priority(self):
-        """Test temporal beats all other patterns."""
+        """Test factual/conversational patterns beat temporal flag, but emotional wins all."""
         classifier = QueryClassifier()
         
         # Query matches multiple patterns + high emotion + temporal flag
@@ -374,8 +379,9 @@ class TestClassificationPriority:
             is_temporal=True  # Temporal flag
         )
         
-        # Temporal should win
-        assert category == QueryCategory.TEMPORAL
+        # Phase 2: Priority order is Factual > Conversational > Emotional > Temporal
+        # "What is" matches factual first, so factual wins
+        assert category == QueryCategory.FACTUAL
     
     @pytest.mark.asyncio
     async def test_factual_beats_general(self):

@@ -191,6 +191,13 @@ class UnifiedClassification:
     meta_query_patterns: List[str] = field(default_factory=list)
     """Patterns detected for meta-query classification"""
     
+    # Recall query detection (NEW - November 2025: extended temporal search)
+    is_recall_query: bool = False
+    """Whether query is recalling past conversations ('we talked about X')"""
+    
+    temporal_window_days: int = 1
+    """Number of days to search back (1=24h default, 7-30 for recall queries)"""
+    
     # For debugging and monitoring
     classification_time_ms: float = 0.0
 
@@ -490,6 +497,76 @@ class UnifiedQueryClassifier:
                     matched_lemmas.append(keyword)
         
         return len(matched_lemmas) > 0, matched_lemmas
+    
+    def _extract_recall_content_keywords(
+        self,
+        query_doc,
+        recall_patterns: List[str]
+    ) -> List[str]:
+        """
+        Extract content keywords from recall queries using spaCy NLP pipeline.
+        
+        Example: "we talked about prompt engineering" → ['prompt', 'engineering']
+        Example: "we discussed neural networks and transformers" → ['neural', 'networks', 'transformers']
+        
+        Strategy:
+        1. Find recall pattern position in query ("we talked about", "we discussed")
+        2. Extract tokens AFTER the pattern (the actual topic content)
+        3. Filter using POS tags (keep NOUN, PROPN, ADJ, VERB - skip stop words)
+        4. Use lemmatization to normalize forms (engineering → engineer)
+        
+        Args:
+            query_doc: spaCy Doc object with parsed query
+            recall_patterns: List of recall patterns to match
+        
+        Returns:
+            List of content keywords (lemmatized nouns, proper nouns, adjectives, verbs)
+        """
+        if not query_doc:
+            return []
+        
+        query_text_lower = query_doc.text.lower()
+        
+        # Find where recall pattern appears in query
+        pattern_end_index = -1
+        for pattern in recall_patterns:
+            if pattern in query_text_lower:
+                pattern_end_index = query_text_lower.find(pattern) + len(pattern)
+                break
+        
+        if pattern_end_index == -1:
+            return []  # No recall pattern found
+        
+        # Extract tokens AFTER the recall pattern (the content keywords)
+        content_keywords = []
+        for token in query_doc:
+            # Only process tokens that come AFTER the recall pattern
+            if token.idx < pattern_end_index:
+                continue
+            
+            # Filter criteria:
+            # 1. Keep content words: NOUN, PROPN (proper noun), ADJ, VERB
+            # 2. Skip stop words (but keep meaningful verbs like "discuss", "learn")
+            # 3. Skip punctuation and short words (< 2 chars)
+            # 4. Use lemma for normalization (engineering → engineer)
+            
+            if token.pos_ in ('NOUN', 'PROPN', 'ADJ', 'VERB'):
+                # Skip stop words UNLESS they're verbs (verbs can be meaningful even if common)
+                if token.is_stop and token.pos_ != 'VERB':
+                    continue
+                
+                # Skip very short tokens (usually not meaningful)
+                if len(token.lemma_) < 2:
+                    continue
+                
+                # Use lemmatized form for better matching
+                lemma = token.lemma_.lower()
+                
+                # Avoid duplicates
+                if lemma not in content_keywords:
+                    content_keywords.append(lemma)
+        
+        return content_keywords
     
     def _detect_meta_query_with_spacy(self, query_doc) -> tuple[bool, List[str]]:
         """
@@ -1029,6 +1106,43 @@ class UnifiedQueryClassifier:
             matched_patterns.append("entity_search")
         
         # =====================================================================
+        # PRIORITY 6: RECALL DETECTION (NEW - November 2025)
+        # =====================================================================
+        # Detect "we talked about X" patterns that reference PAST conversations
+        # These need extended temporal search (days/weeks), not just 24-hour window
+        #
+        # Why this matters:
+        # - "we talked about prompt engineering" (3 days ago)
+        # - Enriched summaries give the "what" but user wants "how" (details)
+        # - Need to retrieve actual conversation messages from past
+        #
+        # Detection criteria:
+        # 1. Has conversational pattern ("we talked", "we discussed")
+        # 2. NO recent temporal markers ("today", "earlier", "just now")
+        # 3. This signals RECALL intent, not real-time conversation
+        
+        is_recall_query = False
+        recall_patterns = ['we talked about', 'we discussed', 'we were talking about']
+        recent_temporal_markers = ['today', 'earlier', 'just now', 'a minute ago', 'this morning', 'this afternoon']
+        
+        has_recall_pattern = any(p in query_lower for p in recall_patterns)
+        has_recent_temporal = any(t in query_lower for t in recent_temporal_markers)
+        
+        if has_recall_pattern and not has_recent_temporal and is_conversational:
+            is_recall_query = True
+            matched_patterns.append("recall_intent")
+            logger.info(f"🧠 RECALL DETECTED: Query '{query[:50]}...' → Extended temporal search (7-30 days)")
+            
+            # 🎯 EXTRACT RECALL CONTENT KEYWORDS using spaCy NLP pipeline
+            # Example: "we talked about prompt engineering" → keywords=['prompt', 'engineering']
+            # These keywords help filter/boost relevant memories from vector search
+            if query_doc:
+                recall_keywords = self._extract_recall_content_keywords(query_doc, recall_patterns)
+                if recall_keywords:
+                    keywords.extend(recall_keywords)
+                    logger.info(f"🧠 RECALL KEYWORDS: Extracted {recall_keywords} from query for memory filtering")
+        
+        # =====================================================================
         # DETERMINE INTENT AND STRATEGY
         # =====================================================================
         
@@ -1036,10 +1150,17 @@ class UnifiedQueryClassifier:
         intent_confidence = 0.0
         intent_type = QueryIntent.FACTUAL_RECALL  # Default
         
+        # RECALL QUERIES: Override all other patterns for past conversation retrieval
+        # "we talked about X" (without recent temporal markers) needs extended search
+        if is_recall_query:
+            intent_type = QueryIntent.TEMPORAL_ANALYSIS
+            intent_confidence = 0.93
+            logger.info(f"🧠 RECALL ROUTING: intent=temporal_analysis (extended window), confidence={intent_confidence:.2f}")
+        
         # Priority order for intent determination
         # SEMANTIC FUSION: When both temporal and conversational match, analyze semantic intent
         # because context matters more than just presence of keywords
-        if is_temporal and is_conversational:
+        elif is_temporal and is_conversational:
             # Both match - use semantic analysis to determine which is primary intent
             # Check if temporal keywords are dominant (first/last words, multiple temporal terms)
             temporal_count = sum(1 for p in self.temporal_first_patterns if p in query_lower)
@@ -1099,8 +1220,15 @@ class UnifiedQueryClassifier:
         
         is_multi_category = sum([is_conversational, is_temporal, is_emotional, is_factual]) > 1
         
+        # RECALL QUERIES: Use temporal chronological with extended window
+        # "we talked about X" queries need chronological search with 7+ day window
+        # Strategy MUST be TEMPORAL_CHRONOLOGICAL to use temporal_window_days parameter
+        if is_recall_query:
+            vector_strategy = VectorStrategy.TEMPORAL_CHRONOLOGICAL  # Chronological with extended window
+            strategy_confidence = 0.92
+            logger.info("🧠 RECALL STRATEGY: temporal_chronological (extended 7-day window)")
         # Strategy selection based on query characteristics
-        if is_temporal:
+        elif is_temporal:
             vector_strategy = VectorStrategy.TEMPORAL_CHRONOLOGICAL
             strategy_confidence = 0.95
         elif is_conversational and is_emotional:
@@ -1336,6 +1464,9 @@ class UnifiedQueryClassifier:
         
         classification_time_ms = (time.time() - start_time) * 1000
         
+        # Determine temporal window for search (1 day default, 7-30 for recall)
+        temporal_window_days = 7 if is_recall_query else 1
+        
         result = UnifiedClassification(
             intent_type=intent_type,
             vector_strategy=vector_strategy,
@@ -1364,11 +1495,13 @@ class UnifiedQueryClassifier:
             has_strong_preference=has_strong_preference,  # Task 3.1: Strong preference detection
             is_meta_query=is_meta_query,  # NEW: Meta-query detection
             meta_query_patterns=meta_query_patterns,  # NEW: Detected meta-query patterns
+            is_recall_query=is_recall_query,  # NEW: Recall query detection (Nov 2025)
+            temporal_window_days=temporal_window_days,  # NEW: Extended temporal window (Nov 2025)
             classification_time_ms=classification_time_ms,
         )
         
         logger.info(
-            "🎯 UNIFIED CLASSIFICATION: query='%s...' → intent=%s, strategy=%s (conf: %.2f/%.2f)%s%s%s%s%s%s",
+            "🎯 UNIFIED CLASSIFICATION: query='%s...' → intent=%s, strategy=%s (conf: %.2f/%.2f)%s%s%s%s%s%s%s",
             query[:40], intent_type.value, vector_strategy.value,
             intent_confidence, strategy_confidence,
             f" [+{len(semantic_matches)} semantic]" if semantic_matches else "",
@@ -1376,7 +1509,8 @@ class UnifiedQueryClassifier:
             f" [complexity={question_sophistication.get('complexity_score', 0)}]" if question_sophistication.get('complexity_score', 0) > 0 else "",
             " [hedging]" if has_hedging else "",
             " [temporal_change]" if has_temporal_change else "",
-            " [strong_pref]" if has_strong_preference else ""
+            " [strong_pref]" if has_strong_preference else "",
+            f" [RECALL: {temporal_window_days}d window]" if is_recall_query else ""
         )
         
         return result
