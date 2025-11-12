@@ -6413,233 +6413,6 @@ class VectorMemoryManager:
             self.logger.error("Error getting MemoryBoost stats: %s", str(e))
             return {'error': str(e)}
 
-
-if __name__ == "__main__":
-    asyncio.run(test_vector_memory_system())
-# Example usage and testing
-async def test_vector_memory_system():
-    """Test the new vector memory system - LOCAL DEPLOYMENT"""
-    
-    # Initialize (using local Docker services)
-    config = {
-        'qdrant': {
-            'host': 'localhost',
-            'port': 6333,
-            'collection_name': 'whisperengine_memory'
-        },
-        'embeddings': {
-            'model_name': 'BAAI/bge-small-en-v1.5'
-        }
-    }
-    
-    memory_manager = VectorMemoryManager(config)
-    
-    user_id = "test_user_123"
-    
-    async def retrieve_relevant_memories_with_memoryboost(
-        self,
-        user_id: str,
-        query: str,
-        limit: int = 25,
-        conversation_context: str = None,
-        apply_quality_scoring: bool = True,
-        apply_optimizations: bool = True
-    ) -> Dict[str, Any]:
-        """
-        🚀 SPRINT 2: MemoryBoost Enhanced Memory Retrieval
-        
-        Retrieves memories with intelligent quality scoring and optimization
-        based on conversation outcome analysis. Integrates MemoryEffectivenessAnalyzer
-        and VectorRelevanceOptimizer for adaptive learning.
-        
-        Args:
-            user_id: User identifier for memory segmentation
-            query: Search query for semantic similarity
-            limit: Maximum number of memories to return
-            conversation_context: Current conversation context for optimization
-            apply_quality_scoring: Whether to apply quality scoring analysis
-            apply_optimizations: Whether to apply vector optimizations
-            
-        Returns:
-            Dictionary containing:
-            - memories: Optimized memory list
-            - optimization_metadata: Details about applied optimizations
-            - performance_metrics: Analysis performance data
-        """
-        import time
-        start_time = time.time()
-        
-        try:
-            self.logger.info("🚀 MEMORYBOOST: Enhanced memory retrieval for user %s", user_id)
-            
-            # Step 1: Get base memory results using existing method
-            base_memories = await self.retrieve_relevant_memories(
-                user_id=user_id,
-                query=query,
-                limit=limit * 2  # Get more for intelligent filtering
-            )
-            
-            result = {
-                'memories': base_memories,
-                'optimization_metadata': {
-                    'quality_scoring_applied': False,
-                    'optimizations_applied': False,
-                    'optimizations_count': 0,
-                    'performance_improvement': 0.0
-                },
-                'performance_metrics': {
-                    'base_retrieval_time_ms': 0.0,
-                    'quality_scoring_time_ms': 0.0,
-                    'optimization_time_ms': 0.0,
-                    'total_time_ms': 0.0
-                }
-            }
-            
-            base_time = time.time()
-            result['performance_metrics']['base_retrieval_time_ms'] = (base_time - start_time) * 1000
-            
-            # Step 2: Apply quality scoring if enabled
-            if apply_quality_scoring and hasattr(self, '_effectiveness_analyzer'):
-                quality_start = time.time()
-                
-                try:
-                    # Import and create relevance optimizer
-                    from src.memory.relevance_optimizer import create_vector_relevance_optimizer
-                    optimizer = create_vector_relevance_optimizer(
-                        memory_manager=self,
-                        effectiveness_analyzer=self._effectiveness_analyzer
-                    )
-                    
-                    # Apply quality scoring
-                    scored_memories = await optimizer.apply_quality_scoring(
-                        memory_results=base_memories,
-                        user_id=user_id,
-                        bot_name=self._get_bot_name()
-                    )
-                    
-                    result['memories'] = scored_memories
-                    result['optimization_metadata']['quality_scoring_applied'] = True
-                    
-                    quality_time = time.time()
-                    result['performance_metrics']['quality_scoring_time_ms'] = (quality_time - quality_start) * 1000
-                    
-                except Exception as e:
-                    self.logger.warning("Quality scoring failed, using base memories: %s", str(e))
-            
-            # Step 3: Apply vector optimizations if enabled
-            if apply_optimizations and hasattr(self, '_relevance_optimizer'):
-                opt_start = time.time()
-                
-                try:
-                    # Apply full optimization suite
-                    optimization_result = await self._relevance_optimizer.optimize_memory_retrieval(
-                        user_id=user_id,
-                        bot_name=self._get_bot_name(),
-                        query=query,
-                        original_results=result['memories'],
-                        conversation_context=conversation_context
-                    )
-                    
-                    result['memories'] = optimization_result.optimized_results[:limit]
-                    result['optimization_metadata'].update({
-                        'optimizations_applied': True,
-                        'optimizations_count': optimization_result.optimization_count,
-                        'performance_improvement': optimization_result.performance_improvement,
-                        'optimizations_details': [
-                            {
-                                'memory_id': opt.memory_id,
-                                'boost_factor': opt.boost_factor,
-                                'reason': opt.reason,
-                                'pattern': opt.pattern_match.value
-                            }
-                            for opt in optimization_result.optimizations_applied[:5]  # Top 5 for metadata
-                        ]
-                    })
-                    
-                    opt_time = time.time()
-                    result['performance_metrics']['optimization_time_ms'] = (opt_time - opt_start) * 1000
-                    
-                except Exception as e:
-                    self.logger.warning("Vector optimization failed, using scored memories: %s", str(e))
-            
-            # Apply final limit
-            result['memories'] = result['memories'][:limit]
-            
-            total_time = time.time()
-            result['performance_metrics']['total_time_ms'] = (total_time - start_time) * 1000
-            
-            self.logger.info("✅ MEMORYBOOST: Retrieved %d memories with %d optimizations in %.1fms", 
-                           len(result['memories']), 
-                           result['optimization_metadata']['optimizations_count'],
-                           result['performance_metrics']['total_time_ms'])
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error("Error in MemoryBoost enhanced retrieval: %s", str(e))
-            # Fallback to standard retrieval
-            base_memories = await self.retrieve_relevant_memories(user_id, query, limit)
-            return {
-                'memories': base_memories,
-                'optimization_metadata': {
-                    'quality_scoring_applied': False,
-                    'optimizations_applied': False,
-                    'optimizations_count': 0,
-                    'performance_improvement': 0.0,
-                    'error': str(e)
-                },
-                'performance_metrics': {
-                    'total_time_ms': (time.time() - start_time) * 1000
-                }
-            }
-
-    def _detect_meta_query(self, query: str) -> bool:
-        """
-        Detect if query is about conversation history itself (meta-query).
-        
-        Meta-queries create circular retrieval patterns where semantic search
-        returns OTHER meta-queries instead of substantive content.
-        
-        Examples:
-        - "Based on everything you know about me..."
-        - "What have you learned about my interests?"
-        - "Summarize our relationship"
-        - "What patterns have you noticed?"
-        
-        Args:
-            query: User query text
-            
-        Returns:
-            True if query is a meta-query
-        """
-        query_lower = query.lower()
-        
-        # Meta-query patterns
-        meta_patterns = [
-            'everything you know about me',
-            'what you know about me',
-            'what have you learned',
-            'what do you know',
-            'what have we talked about',
-            'what did we talk about',
-            'what have we discussed',
-            'what did we discuss',
-            'conversation history',
-            'our history',
-            'summarize our relationship',
-            'our relationship',
-            'what topics should we',
-            'what should we talk about',
-            'what patterns have you noticed',
-            'tell me about our conversations',
-            'recall our conversations',
-            'remember our conversations',
-            'based on everything',
-            'based on what you know',
-        ]
-        
-        return any(pattern in query_lower for pattern in meta_patterns)
-    
     async def _retrieve_memories_diverse_sampling(
         self,
         user_id: str,
@@ -6838,4 +6611,253 @@ async def test_vector_memory_system():
             logger.debug(f"📊 TEMPORAL: Recorded vector memory metrics for {bot_name}/{user_id}")
         except Exception as e:
             logger.error(f"Failed to record vector memory metrics: {e}")
+
+
+if __name__ == "__main__":
+    asyncio.run(test_vector_memory_system())
+# Example usage and testing
+async def test_vector_memory_system():
+    """Test the new vector memory system - LOCAL DEPLOYMENT"""
+    
+    # Initialize (using local Docker services)
+    config = {
+        'qdrant': {
+            'host': 'localhost',
+            'port': 6333,
+            'collection_name': 'whisperengine_memory'
+        },
+        'embeddings': {
+            'model_name': 'BAAI/bge-small-en-v1.5'
+        }
+    }
+    
+    memory_manager = VectorMemoryManager(config)
+    
+    user_id = "test_user_123"
+    
+    async def retrieve_relevant_memories_with_memoryboost(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 25,
+        conversation_context: str = None,
+        apply_quality_scoring: bool = True,
+        apply_optimizations: bool = True
+    ) -> Dict[str, Any]:
+        """
+        🚀 SPRINT 2: MemoryBoost Enhanced Memory Retrieval
+        
+        Retrieves memories with intelligent quality scoring and optimization
+        based on conversation outcome analysis. Integrates MemoryEffectivenessAnalyzer
+        and VectorRelevanceOptimizer for adaptive learning.
+        
+        Args:
+            user_id: User identifier for memory segmentation
+            query: Search query for semantic similarity
+            limit: Maximum number of memories to return
+            conversation_context: Current conversation context for optimization
+            apply_quality_scoring: Whether to apply quality scoring analysis
+            apply_optimizations: Whether to apply vector optimizations
             
+        Returns:
+            Dictionary containing:
+            - memories: Optimized memory list
+            - optimization_metadata: Details about applied optimizations
+            - performance_metrics: Analysis performance data
+        """
+        import time
+        start_time = time.time()
+        
+        try:
+            self.logger.info("🚀 MEMORYBOOST: Enhanced memory retrieval for user %s", user_id)
+            
+            # Step 1: Get base memory results using existing method
+            base_memories = await self.retrieve_relevant_memories(
+                user_id=user_id,
+                query=query,
+                limit=limit * 2  # Get more for intelligent filtering
+            )
+            
+            result = {
+                'memories': base_memories,
+                'optimization_metadata': {
+                    'quality_scoring_applied': False,
+                    'optimizations_applied': False,
+                    'optimizations_count': 0,
+                    'performance_improvement': 0.0
+                },
+                'performance_metrics': {
+                    'base_retrieval_time_ms': 0.0,
+                    'quality_scoring_time_ms': 0.0,
+                    'optimization_time_ms': 0.0,
+                    'total_time_ms': 0.0
+                }
+            }
+            
+            base_time = time.time()
+            result['performance_metrics']['base_retrieval_time_ms'] = (base_time - start_time) * 1000
+            
+            # Step 2: Apply quality scoring if enabled
+            if apply_quality_scoring and hasattr(self, '_effectiveness_analyzer'):
+                quality_start = time.time()
+                
+                try:
+                    # Import and create relevance optimizer
+                    from src.memory.relevance_optimizer import create_vector_relevance_optimizer
+                    optimizer = create_vector_relevance_optimizer(
+                        memory_manager=self,
+                        effectiveness_analyzer=self._effectiveness_analyzer
+                    )
+                    
+                    # Apply quality scoring
+                    scored_memories = await optimizer.apply_quality_scoring(
+                        memory_results=base_memories,
+                        user_id=user_id,
+                        bot_name=self._get_bot_name()
+                    )
+                    
+                    result['memories'] = scored_memories
+                    result['optimization_metadata']['quality_scoring_applied'] = True
+                    
+                    quality_time = time.time()
+                    result['performance_metrics']['quality_scoring_time_ms'] = (quality_time - quality_start) * 1000
+                    
+                except Exception as e:
+                    self.logger.warning("Quality scoring failed, using base memories: %s", str(e))
+            
+            # Step 3: Apply vector optimizations if enabled
+            if apply_optimizations and hasattr(self, '_relevance_optimizer'):
+                opt_start = time.time()
+                
+                try:
+                    # Apply full optimization suite
+                    optimization_result = await self._relevance_optimizer.optimize_memory_retrieval(
+                        user_id=user_id,
+                        bot_name=self._get_bot_name(),
+                        query=query,
+                        original_results=result['memories'],
+                        conversation_context=conversation_context
+                    )
+                    
+                    result['memories'] = optimization_result.optimized_results[:limit]
+                    result['optimization_metadata'].update({
+                        'optimizations_applied': True,
+                        'optimizations_count': optimization_result.optimization_count,
+                        'performance_improvement': optimization_result.performance_improvement,
+                        'optimizations_details': [
+                            {
+                                'memory_id': opt.memory_id,
+                                'boost_factor': opt.boost_factor,
+                                'reason': opt.reason,
+                                'pattern': opt.pattern_match.value
+                            }
+                            for opt in optimization_result.optimizations_applied[:5]  # Top 5 for metadata
+                        ]
+                    })
+                    
+                    opt_time = time.time()
+                    result['performance_metrics']['optimization_time_ms'] = (opt_time - opt_start) * 1000
+                    
+                except Exception as e:
+                    self.logger.warning("Vector optimization failed, using scored memories: %s", str(e))
+            
+            # Apply final limit
+            result['memories'] = result['memories'][:limit]
+            
+            total_time = time.time()
+            result['performance_metrics']['total_time_ms'] = (total_time - start_time) * 1000
+            
+            self.logger.info("✅ MEMORYBOOST: Retrieved %d memories with %d optimizations in %.1fms", 
+                           len(result['memories']), 
+                           result['optimization_metadata']['optimizations_count'],
+                           result['performance_metrics']['total_time_ms'])
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error("Error in MemoryBoost enhanced retrieval: %s", str(e))
+            # Fallback to standard retrieval
+            base_memories = await self.retrieve_relevant_memories(user_id, query, limit)
+            return {
+                'memories': base_memories,
+                'optimization_metadata': {
+                    'quality_scoring_applied': False,
+                    'optimizations_applied': False,
+                    'optimizations_count': 0,
+                    'performance_improvement': 0.0,
+                    'error': str(e)
+                },
+                'performance_metrics': {
+                    'total_time_ms': (time.time() - start_time) * 1000
+                }
+            }
+
+    def _detect_meta_query(self, query: str) -> bool:
+        """
+        Detect if query is about conversation history itself (meta-query).
+        
+        Meta-queries create circular retrieval patterns where semantic search
+        returns OTHER meta-queries instead of substantive content.
+        
+        STRICT patterns to reduce false positives:
+        - Requires explicit conversation/history keywords (not generic topics)
+        - Requires meta-reflective verbs (summarize, analyze, not generic "know")
+        - Requires user-specific context where applicable (about me, not generic)
+        
+        Examples of TRUE meta-queries:
+        - "Tell me about our conversations"
+        - "What have we talked about?"
+        - "Summarize our relationship"
+        - "What have you learned about me?"
+        - "Based on everything you know about me..."
+        
+        Examples of FALSE POSITIVES (not meta-queries):
+        - "What do you know about marine biology?" (factual, not about conversation)
+        - "Our relationship has been great" (statement, not query)
+        - "Based on what you know..." (context-setting, not meta-reflection)
+        - "What topics should we talk about?" (planning, not history)
+        
+        Args:
+            query: User query text
+            
+        Returns:
+            True if query is a strict meta-query about conversation history
+        """
+        query_lower = query.lower()
+        
+        # STRICT meta-query patterns - only clear cases of querying about conversation history
+        meta_patterns = [
+            # Explicit conversation history queries
+            'tell me about our conversations',
+            'recall our conversations',
+            'remember our conversations',
+            'what have we talked about',
+            'what did we talk about',
+            'what have we discussed',
+            'what did we discuss',
+            
+            # Explicit relationship analysis (with verbs)
+            'summarize our relationship',
+            'analyze our relationship',
+            'tell me about our relationship',
+            
+            # Explicit patterns about user (not generic)
+            'everything you know about me',
+            'what you know about me',
+            'what have you learned about me',
+            'patterns in our conversations',
+            'what patterns have you noticed about me',
+            
+            # Explicit meta-reflection with relationship context
+            'based on everything you know about me',
+            'based on our conversations',
+            'based on our history',
+            'based on what i\'ve told you',
+        ]
+        
+        return any(pattern in query_lower for pattern in meta_patterns)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    logger.info("VectorMemorySystem module loaded")

@@ -252,6 +252,26 @@ class MessageProcessor:
             logger.warning("Stance Analyzer not available: %s", e)
             self._stance_analyzer = None
         
+        # Character Emotional State Manager: Analytics-only tracking (NOT used in prompts)
+        # RE-ENABLED for historical state tracking and quality analysis reports
+        # Tracks bot's internal emotional state evolution without injecting into prompts
+        # (CDL personality system handles prompt-level emotional expression)
+        self.character_state_manager = None
+        enable_state_analytics = os.getenv('ENABLE_CHARACTER_STATE_ANALYTICS', 'false').lower() == 'true'
+        
+        if enable_state_analytics and self.temporal_client:
+            try:
+                from src.intelligence.character_emotional_state_v2 import create_character_emotional_state_manager
+                self.character_state_manager = create_character_emotional_state_manager()
+                logger.info("🎭 Character State Analytics: Enabled for historical tracking (InfluxDB-only, no prompt injection)")
+            except ImportError as e:
+                logger.warning("Character State Manager not available: %s", e)
+                self.character_state_manager = None
+        elif enable_state_analytics and not self.temporal_client:
+            logger.warning("⚠️ Character State Analytics: Requires InfluxDB (ENABLE_CHARACTER_STATE_ANALYTICS=true but no temporal_client)")
+        else:
+            logger.debug("Character State Analytics: Disabled (set ENABLE_CHARACTER_STATE_ANALYTICS=true to enable)")
+        
         # Initialize fidelity metrics collector for performance tracking
         try:
             from src.monitoring.fidelity_metrics_collector import get_fidelity_metrics_collector
@@ -1287,8 +1307,22 @@ class MessageProcessor:
                 message_context, ai_components, relevant_memories
             )
             
-            # REMOVED: Phase 6.8 Character Emotional State (CharacterEmotionalStateManager)
-            # Overengineered - CDL personality system already handles character emotional expression
+            # Phase 6.8: Character Emotional State (Analytics-Only)
+            # RE-ENABLED for historical tracking and quality analysis reports
+            # NOT used in prompt building (CDL personality system handles that)
+            # Tracks bot's internal emotional state evolution to InfluxDB for research/analytics
+            if self.character_state_manager and self.temporal_client:
+                try:
+                    # Get bot name for state tracking
+                    from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+                    character_name = get_normalized_bot_name_from_env()
+                    
+                    # Update character state based on bot's emotional response (after response is generated)
+                    # Note: This will be called AFTER response generation in Phase 9
+                    # For now, we just ensure the manager is available
+                    logger.debug("🎭 CHARACTER STATE: Manager available for post-response analytics")
+                except Exception as e:
+                    logger.warning("Character State Analytics: Failed to prepare manager: %s", str(e))
             
             # Phase 6.9: Hybrid Query Routing (LLM Tool Calling)
             # PERFORMANCE NOTE: This feature adds significant overhead (~2x processing time)
@@ -1320,39 +1354,13 @@ class MessageProcessor:
                             character_name=bot_name
                         )
                         
-                        if DataSource.LLM_TOOLS in unified_classification.data_sources:
-                            logger.info(
-                                "🔧 TOOL ASSISTED: Unified classifier detected tool-worthy query | "
-                                "Intent: %s | Confidence: %.2f",
-                                unified_classification.intent_type.value,
-                                unified_classification.intent_confidence
-                            )
-                            
-                            # Execute tools via bot_core's knowledge_router (SemanticKnowledgeRouter)
-                            knowledge_router = getattr(self.bot_core, 'knowledge_router', None) if self.bot_core else None
-                            
-                            if knowledge_router is not None:
-                                tool_execution_result = await knowledge_router.execute_tools(
-                                    query=message_context.content,
-                                    user_id=message_context.user_id,
-                                    character_name=bot_name,
-                                    llm_client=self.llm_client
-                                )
-                                
-                                if tool_execution_result.get("enriched_context"):
-                                    # Add tool results to conversation context
-                                    conversation_context += "\n\n" + tool_execution_result["enriched_context"]
-                                    
-                                    logger.info(
-                                        "🔧 TOOL EXECUTION: Added enriched context | User: %s | Tools: %s",
-                                        message_context.user_id,
-                                        ', '.join(tool_execution_result.get("tools_used", []))
-                                    )
-                            else:
-                                logger.warning("🔧 TOOL ASSISTED: SemanticKnowledgeRouter not available")
+                        # Tool calling removed - use deterministic spaCy routing instead
+                        # Previously: checked for LLM_TOOLS in data_sources and executed tools
+                        # Now: use vector memory for all queries
+                        
                 except Exception as e:
                     logger.error(
-                        "🔧 TOOL EXECUTION FAILED: %s | Continuing with standard context",
+                        "❌ CLASSIFICATION ERROR: %s | Using fallback vector search",
                         str(e),
                         exc_info=True
                     )
@@ -1522,6 +1530,55 @@ class MessageProcessor:
                 )
             else:
                 logger.debug("⏭️ RUNTIME PREFERENCE EXTRACTION: Disabled (enrichment worker handles preference extraction)")
+            
+            # Phase 9d: Character Emotional State Analytics (InfluxDB-only)
+            # Record bot's internal emotional state for historical tracking and quality analysis
+            # NOT used in prompt building (CDL personality system handles that)
+            if self.character_state_manager and self.temporal_client:
+                try:
+                    from src.utils.bot_name_utils import get_normalized_bot_name_from_env
+                    character_name = get_normalized_bot_name_from_env()
+                    
+                    # Get bot emotion data from AI components
+                    bot_emotion_data = ai_components.get('bot_emotion', {})
+                    user_emotion_data = ai_components.get('emotion_data', {})
+                    
+                    # Update character state based on conversation
+                    character_state = await self.character_state_manager.update_character_state(
+                        character_name=character_name,
+                        user_id=message_context.user_id,
+                        bot_emotion_data=bot_emotion_data,
+                        user_emotion_data=user_emotion_data,
+                        interaction_quality=0.7  # Default quality score
+                    )
+                    
+                    # Record to InfluxDB for analytics (full 11-emotion spectrum)
+                    await self.temporal_client.record_character_emotional_state(
+                        bot_name=character_name,
+                        user_id=message_context.user_id,
+                        # V2 11-emotion parameters
+                        joy=character_state.joy,
+                        anger=character_state.anger,
+                        sadness=character_state.sadness,
+                        fear=character_state.fear,
+                        love=character_state.love,
+                        trust=character_state.trust,
+                        optimism=character_state.optimism,
+                        pessimism=character_state.pessimism,
+                        anticipation=character_state.anticipation,
+                        surprise=character_state.surprise,
+                        disgust=character_state.disgust,
+                        emotional_intensity=character_state.emotional_intensity,
+                        emotional_valence=character_state.emotional_valence,
+                        dominant_emotion=character_state.dominant_emotion
+                    )
+                    
+                    logger.debug(
+                        "🎭 CHARACTER STATE ANALYTICS: Recorded %s state (dominant: %s, intensity: %.2f)",
+                        character_name, character_state.dominant_emotion, character_state.emotional_intensity
+                    )
+                except Exception as e:
+                    logger.warning("Character State Analytics: Failed to record state: %s", str(e))
             
             # Phase 10: Learning Intelligence Orchestrator - Unified Learning Coordination
             await self._coordinate_learning_intelligence(
