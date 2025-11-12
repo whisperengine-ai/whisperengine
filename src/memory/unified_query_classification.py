@@ -945,26 +945,37 @@ class UnifiedQueryClassifier:
         query_doc = self.nlp(query) if self.nlp else None
         
         # =====================================================================
-        # PRIORITY 0: META-QUERY DETECTION (highest priority - breaks circular patterns)
+        # PRIORITY 0: SIMPLIFIED META-QUERY DETECTION (explicit patterns only)
         # =====================================================================
-        # Queries ABOUT conversation history itself create circular retrieval
-        # where semantic search returns OTHER meta-queries instead of substantive content
+        # 🎯 SIMPLIFIED: Only detect EXPLICIT meta-queries (removed aggressive spaCy lemma matching)
+        # Queries ABOUT conversation history create circular retrieval where semantic search
+        # returns OTHER meta-queries instead of substantive content
+        # Solution: Use diverse sampling for temporally diverse substantive memories
+        #
+        # 🔧 EXPLICIT PATTERNS ONLY: No spaCy lemma detection to avoid false positives
         
         is_meta_query = False
         meta_query_patterns = []
         
-        if query_doc:
-            is_meta_query, meta_query_patterns = self._detect_meta_query_with_spacy(query_doc)
-        else:
-            # Fallback to keyword matching if spaCy unavailable
-            is_meta_query = any(p in query_lower for p in self.meta_query_patterns)
-            if is_meta_query:
-                meta_query_patterns = [p for p in self.meta_query_patterns if p in query_lower]
+        # 🎯 EXPLICIT META-QUERY PATTERNS (high confidence, no ambiguity)
+        explicit_meta_patterns = [
+            'tell me everything',
+            'what do you know about me',
+            'summarize our relationship',
+            'what have we talked about',
+            'what have we discussed',
+            'tell me what you know',
+            'give me a summary',
+            'summarize everything',
+            'what have you learned about me'
+        ]
         
+        is_meta_query = any(pattern in query_lower for pattern in explicit_meta_patterns)
         if is_meta_query:
+            meta_query_patterns = [p for p in explicit_meta_patterns if p in query_lower]
             keywords.extend(meta_query_patterns)
-            matched_patterns.append("meta_query")
-            logger.info("🔍 META-QUERY: '%s' → Diverse sampling will be used", query[:60])
+            matched_patterns.append("meta_query_explicit")
+            logger.info("🔍 META-QUERY (explicit): '%s' → Diverse sampling will be used", query[:60])
         
         # =====================================================================
         # PRIORITY 1: TEMPORAL PATTERNS (most specific)
