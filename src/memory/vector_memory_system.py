@@ -2575,7 +2575,13 @@ class VectorMemoryStore:
             # 🚀 QDRANT FEATURE: Use scroll API to get recent conversation chronologically
             # Convert to Unix timestamp for Qdrant numeric range filtering
             # 🎯 SMART SESSION DETECTION: Context-aware time windows
-            if "today" in query_lower or "this morning" in query_lower or "this afternoon" in query_lower:
+            # 🧠 CRITICAL FIX: Check recall query window FIRST before applying session-scope heuristics
+            if temporal_window_days > 1:
+                # 🧠 RECALL QUERY: Extended temporal window for "we talked about X" queries
+                # This takes precedence over "today" or "first" session-scope heuristics
+                recent_cutoff_dt = datetime.utcnow() - timedelta(days=temporal_window_days)
+                logger.info(f"🧠 RECALL WINDOW: Using {temporal_window_days}-day extended window for past conversation retrieval")
+            elif "today" in query_lower or "this morning" in query_lower or "this afternoon" in query_lower:
                 # "Today" means current session (last 4 hours is typical active session)
                 recent_cutoff_dt = datetime.utcnow() - timedelta(hours=4)
                 logger.info(f"🎯 SESSION SCOPE: Detected 'today' - using 4-hour session window")
@@ -2585,10 +2591,6 @@ class VectorMemoryStore:
                 # from the entire 24-hour window, not the first in current conversation
                 recent_cutoff_dt = datetime.utcnow() - timedelta(hours=4)
                 logger.info(f"🎯 SESSION SCOPE: 'First' query - defaulting to 4-hour session window to avoid historical bleed")
-            elif temporal_window_days > 1:
-                # 🧠 RECALL QUERY: Extended temporal window for "we talked about X" queries
-                recent_cutoff_dt = datetime.utcnow() - timedelta(days=temporal_window_days)
-                logger.info(f"🧠 RECALL WINDOW: Using {temporal_window_days}-day extended window for past conversation retrieval")
             else:
                 # General temporal queries use 24-hour window (1 day)
                 recent_cutoff_dt = datetime.utcnow() - timedelta(days=temporal_window_days)

@@ -3635,12 +3635,11 @@ class MessageProcessor:
                         priority=13  # Priority 13: Episodic memories from CDL mapping
                     ))
                     logger.info(f"✅ STRUCTURED CONTEXT: Added {len(conversation_memories)} conversations + {len(user_facts)} facts (enriched mode)")
+                    has_semantic_memories = True
                 else:
-                    assembler.add_component(create_anti_hallucination_component(priority=13))
-                    logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no valid memories)")
+                    has_semantic_memories = False
             else:
-                assembler.add_component(create_anti_hallucination_component(priority=13))
-                logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories found)")
+                has_semantic_memories = False
         else:
             # Use traditional choppy memory narrative system
             memory_narrative = await self._build_memory_narrative_structured(
@@ -3654,9 +3653,9 @@ class MessageProcessor:
                     priority=13  # Priority 13: Episodic memories from CDL mapping
                 ))
                 logger.info(f"✅ STRUCTURED CONTEXT: Added memory narrative ({len(memory_narrative)} chars)")
+                has_semantic_memories = True
             else:
-                assembler.add_component(create_anti_hallucination_component(priority=13))
-                logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories)")
+                has_semantic_memories = False
         
         # ================================
         # COMPONENT 13.5: Episodic Recall Hook (NEW - November 2025)
@@ -3665,21 +3664,39 @@ class MessageProcessor:
         # inject an explicit episodic context so the bot knows it CAN reference those events
         # This overrides AI ethics "no memory" disclaimers when memories are actually retrieved
         logger.debug(f"🧠 EPISODIC RECALL: Checking recall intent for '{message_context.content[:50]}...' with {len(relevant_memories)} memories")
+        
+        # Get classification result if available (ai_components may be None in Phase 4)
+        unified_classification = ai_components.get('unified_classification') if ai_components else None
+        
         episodic_context = self._build_episodic_recall_context(
             message_content=message_context.content,
-            retrieved_memories=relevant_memories
+            retrieved_memories=relevant_memories,
+            unified_classification=unified_classification
         )
+        has_episodic_recall = False
         if episodic_context:
             assembler.add_component(PromptComponent(
                 type=PromptComponentType.EPISODIC_MEMORIES,
                 content=episodic_context,
-                priority=12,  # Higher than regular memories (13) to emphasize authority
+                priority=11,  # VERY HIGH: Before summaries (14), before memories (13) - must override everything
                 token_cost=150,
                 required=False
             ))
             logger.info(f"✅ EPISODIC RECALL: Injected explicit recall context ({len(episodic_context)} chars)")
+            has_episodic_recall = True
         else:
             logger.debug(f"⏭️  EPISODIC RECALL: No context generated (intent={any(k in message_context.content.lower() for k in ['remember', 'recall', 'when'])}, memories={len(relevant_memories)})")
+        
+        # ================================
+        # ANTI-HALLUCINATION WARNING (only if NO memories AND NO episodic recall)
+        # ================================
+        # CRITICAL: Only add anti-hallucination warning if we have NEITHER semantic memories NOR episodic recall
+        # If episodic recall is triggered, the bot SHOULD reference those memories - warning would contradict that
+        if not has_semantic_memories and not has_episodic_recall:
+            assembler.add_component(create_anti_hallucination_component(priority=13))
+            logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories and no episodic recall)")
+        elif has_episodic_recall:
+            logger.info(f"✅ STRUCTURED CONTEXT: Skipped anti-hallucination warning (episodic recall active)")
         
         # ================================
         # COMPONENT 8: Conversation Summary - REMOVED (October 2025)
@@ -3873,31 +3890,41 @@ class MessageProcessor:
     def _build_episodic_recall_context(
         self,
         message_content: str,
-        retrieved_memories: List[Dict[str, Any]]
+        retrieved_memories: List[Dict[str, Any]],
+        unified_classification: Optional[Any] = None
     ) -> Optional[str]:
         """
-        Build explicit episodic recall context when user asks to remember past events.
+        Build conversation reference context when user asks to recall past events.
         
-        This allows the bot to reference retrieved memories as actual episodic recall
-        rather than being blocked by AI ethics "no memory" disclaimers.
+        DESIGN PHILOSOPHY:
+        - Type 1 characters (Real-World Humans): Frame as "conversation notes/records"
+        - Type 2 characters (Fantasy): Frame as "episodic memories" 
+        - Type 3 characters (Narrative AI): Frame as "data logs/records"
         
-        Triggers on: "remember", "recall", "when", "what happened", "you told me"
+        This respects character archetypes instead of fighting LLM training with
+        contradictory instructions.
         
-        Returns: Formatted episodic context string or None if no recall intent detected
+        Returns: Formatted recall context string or None if no recall intent detected
         """
         if not retrieved_memories or len(retrieved_memories) < 1:
             logger.debug(f"🧠 EPISODIC RECALL: Skipped - not enough memories ({len(retrieved_memories) if retrieved_memories else 0})")
             return None
         
-        # Detect recall intent (simple keyword-based for now)
-        message_lower = message_content.lower()
-        recall_keywords = ['remember', 'recall', 'when', 'what happened', 'you told me', 'you said', 'earlier you']
+        # Check UnifiedQueryClassifier result first (most reliable)
+        has_recall_intent = False
+        if unified_classification and hasattr(unified_classification, 'is_recall_query'):
+            has_recall_intent = unified_classification.is_recall_query
+            logger.debug(f"🧠 EPISODIC RECALL: Using UnifiedClassifier result - is_recall_query={has_recall_intent}")
         
-        has_recall_intent = any(keyword in message_lower for keyword in recall_keywords)
-        logger.debug(f"🧠 EPISODIC RECALL: Recall intent={has_recall_intent} for message '{message_content[:50]}...'")
+        # Fallback to keyword-based detection if classifier not available
+        if not has_recall_intent:
+            message_lower = message_content.lower()
+            recall_keywords = ['remember', 'recall', 'when', 'what happened', 'you told me', 'you said', 'earlier you', 'we talked about', 'we discussed']
+            has_recall_intent = any(keyword in message_lower for keyword in recall_keywords)
+            logger.debug(f"🧠 EPISODIC RECALL: Keyword fallback - recall intent={has_recall_intent} for message '{message_content[:50]}...'")
         
         if not has_recall_intent:
-            logger.debug(f"🧠 EPISODIC RECALL: Skipped - no recall keywords found")
+            logger.debug(f"🧠 EPISODIC RECALL: Skipped - no recall intent detected (classifier={unified_classification is not None})")
             return None
         
         # Filter high-confidence memories (emotional_intensity >= 0.4 or top cross_encoder scores)
@@ -3922,12 +3949,12 @@ class MessageProcessor:
         if len(high_conf_memories) < 1:
             return None
         
-        # Build episodic recall context
+        # Build recall context
         recall_lines = []
-        recall_lines.append("🧠 EPISODIC MEMORIES: You previously discussed these events with this user:")
+        recall_lines.append("📝 CONVERSATION RECORDS: The user is asking about past conversations. Here's what was discussed:")
         recall_lines.append("")
         
-        for i, mem in enumerate(high_conf_memories[:3], 1):  # Top 3 memories
+        for i, mem in enumerate(high_conf_memories[:5], 1):  # Top 5 memories
             content = mem['content'][:200]
             timestamp = mem['timestamp']
             
@@ -3944,14 +3971,18 @@ class MessageProcessor:
             # Check if this is a conversation pair with bot response
             bot_response = mem['metadata'].get('bot_response') or mem['payload'].get('bot_response')
             if bot_response:
-                recall_lines.append(f"{i}. [{date_str}] User said: \"{content}\"")
+                recall_lines.append(f"{i}. [{date_str}]")
+                recall_lines.append(f"   User said: \"{content}\"")
                 recall_lines.append(f"   You responded: \"{bot_response[:200]}\"")
             else:
                 recall_lines.append(f"{i}. [{date_str}] \"{content}\"")
         
         recall_lines.append("")
-        recall_lines.append("✅ You MAY reference these specific past events naturally in your response.")
-        recall_lines.append("⚠️ Only reference what is explicitly shown above - do not infer or elaborate beyond these facts.")
+        recall_lines.append("💡 CONTEXT GUIDANCE: Use these conversation records to provide helpful context.")
+        recall_lines.append("   Frame your response appropriately for your character archetype:")
+        recall_lines.append("   - Real-world characters: Reference as 'conversation notes/records' (be honest about AI nature)")
+        recall_lines.append("   - Fantasy characters: Reference naturally as part of your experience")
+        recall_lines.append("   - AI characters: Reference as 'data logs/conversation history'")
         
         return "\n".join(recall_lines)
     
