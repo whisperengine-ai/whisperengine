@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "whisperengine"
-version = "1.0.39"
+version = "1.0.40"
 description = "WhisperEngine - Privacy-first AI conversation and roleplay platform"
 authors = [{name = "whisperengine-ai", email = "contact@whisperengine.ai"}]
 license = {text = "GPL-3.0-or-later"}
