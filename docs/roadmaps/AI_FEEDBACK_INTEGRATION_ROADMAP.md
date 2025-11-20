@@ -81,9 +81,9 @@
 ## 🔬 Phase 5: Research Track (LONG TERM)
 **Goal**: Explore the "Unified Cognitive Architecture" and "Internal Emotional States."
 
-- [ ] **Internal Emotion Modeling**: Experiment with a hidden state vector that tracks the *bot's* mood independent of the user's mood.
-- [ ] **Unified Memory Graph**: Prototype a graph database (Neo4j) that links Qdrant vectors to PostgreSQL facts for a unified view.
-- [ ] **Autonomous Goal Setting**: Experiment with characters setting their own learning goals (e.g., "I want to learn more about jazz this week").
+- [ ] **Internal Emotion Modeling**: Re-implement a simplified "State Manager" (persistent mood variable) to track the *bot's* internal emotional state across turns, distinct from the *user's* message emotion (RoBERTa).
+- [ ] **Unified Memory Graph**: Bridge Qdrant and PostgreSQL without a new graph DB. Add `entity_id` pointers to Qdrant payloads to link vector memories directly to PostgreSQL fact entities.
+- [ ] **Autonomous Goal Setting**: Activate the existing static `character_current_goals` table. Implement a module allowing the LLM to `UPDATE`, `INSERT`, or `COMPLETE` goals based on conversation context.
 
 ---
 
