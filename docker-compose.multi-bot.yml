@@ -1221,10 +1221,10 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DEBUG_MODE=false
       - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9785
+      - HEALTH_CHECK_PORT=9383
       - HEALTH_CHECK_HOST=0.0.0.0
     ports:
-      - "9785:9785"
+      - "9383:9383"
     logging:
       driver: "json-file"
       options:
@@ -1242,7 +1242,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - curl -f http://localhost:9785/health || exit 1
+        - curl -f http://localhost:9383/health || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
