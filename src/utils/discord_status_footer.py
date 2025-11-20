@@ -396,6 +396,44 @@ def generate_discord_status_footer(
     except (KeyError, TypeError, AttributeError) as e:
         logger.debug("Could not extract conversation mode/interaction type for footer: %s", str(e))
     
+    # 9. 🧠 Reasoning Transparency (Character Decision Making)
+    try:
+        character_reasoning = ai_components.get('character_reasoning', {})
+        if character_reasoning:
+            reasoning_parts = []
+            
+            # Response strategy reasoning
+            if character_reasoning.get('response_strategy'):
+                strategy = character_reasoning['response_strategy']
+                reasoning_parts.append(f"Strategy: {strategy}")
+            
+            # Emotional context reasoning
+            if character_reasoning.get('emotional_reasoning'):
+                emotional_reason = character_reasoning['emotional_reasoning']
+                reasoning_parts.append(f"Emotion: {emotional_reason}")
+            
+            # Memory context reasoning
+            if character_reasoning.get('memory_reasoning'):
+                memory_reason = character_reasoning['memory_reasoning']
+                reasoning_parts.append(f"Memory: {memory_reason}")
+            
+            # Learning moment reasoning
+            if character_reasoning.get('learning_reasoning'):
+                learning_reason = character_reasoning['learning_reasoning']
+                reasoning_parts.append(f"Learning: {learning_reason}")
+            
+            # Relationship reasoning
+            if character_reasoning.get('relationship_reasoning'):
+                relationship_reason = character_reasoning['relationship_reasoning']
+                reasoning_parts.append(f"Bond: {relationship_reason}")
+            
+            if reasoning_parts:
+                # Show up to 3 reasoning elements (most important)
+                display_reasoning = reasoning_parts[:3]
+                footer_parts.append(f"🧠 **Reasoning**: {' | '.join(display_reasoning)}")
+    except (KeyError, TypeError, AttributeError) as e:
+        logger.debug("Could not extract character reasoning for footer: %s", str(e))
+    
     # Build final footer
     if not footer_parts:
         return ""

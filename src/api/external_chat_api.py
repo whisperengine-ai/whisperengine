@@ -155,6 +155,12 @@ class ExternalChatAPI:
 
             if processing_result.metadata:
                 response_data['metadata'] = self._make_json_serializable(processing_result.metadata)
+                
+                # Extract reasoning transparency for top-level API response
+                ai_components = processing_result.metadata.get('ai_components', {})
+                character_reasoning = ai_components.get('character_reasoning')
+                if character_reasoning:
+                    response_data['reasoning'] = character_reasoning
 
             return web.json_response(response_data)
 

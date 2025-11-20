@@ -5499,6 +5499,26 @@ class MessageProcessor:
                 logger.warning("🌟 Character learning moment detection failed: %s", str(e))
                 ai_components['character_learning_moments'] = None
             
+            # 🧠 REASONING TRANSPARENCY: Build character decision-making explanation
+            try:
+                logger.debug("🧠 PROCESSING: Building character reasoning transparency")
+                character_reasoning = self._build_character_reasoning(
+                    ai_components,
+                    conversation_context,
+                    message_context
+                )
+                
+                if character_reasoning:
+                    ai_components['character_reasoning'] = character_reasoning
+                    logger.info("🧠 Added character reasoning transparency (%d reasoning elements)",
+                               len(character_reasoning))
+                else:
+                    ai_components['character_reasoning'] = None
+                    
+            except Exception as e:
+                logger.warning("🧠 Character reasoning transparency failed: %s", str(e))
+                ai_components['character_reasoning'] = None
+            
         except (AttributeError, ValueError, TypeError) as e:
             logger.error("Sophisticated AI component processing failed: %s", str(e))
             # Fallback to basic components
@@ -5514,6 +5534,76 @@ class MessageProcessor:
         
         return ai_components
 
+    def _build_character_reasoning(self, ai_components: Dict[str, Any], 
+                                   conversation_context: List[Dict[str, str]],
+                                   message_context: MessageContext) -> Dict[str, str]:
+        """Build reasoning transparency showing why character chose this response approach."""
+        reasoning = {}
+        
+        try:
+            # Response strategy reasoning (from conversation intelligence)
+            conv_intelligence = ai_components.get('conversation_intelligence', {})
+            if conv_intelligence:
+                interaction_type = conv_intelligence.get('interaction_type')
+                conversation_mode = conv_intelligence.get('conversation_mode')
+                
+                if interaction_type and interaction_type != 'general':
+                    reasoning['response_strategy'] = f"Detected {interaction_type.replace('_', ' ')}"
+                elif conversation_mode and conversation_mode != 'standard':
+                    reasoning['response_strategy'] = f"Using {conversation_mode.replace('_', ' ')} mode"
+            
+            # Emotional reasoning (from emotion analysis)
+            emotion_data = ai_components.get('emotion_data', {})
+            if emotion_data:
+                primary_emotion = emotion_data.get('primary_emotion')
+                emotional_intensity = emotion_data.get('intensity', 0)
+                
+                if primary_emotion and emotional_intensity > 0.5:
+                    reasoning['emotional_reasoning'] = f"Responding to {primary_emotion} (intensity {int(emotional_intensity * 100)}%)"
+            
+            # Memory context reasoning
+            memory_count = ai_components.get('memory_count', 0)
+            if memory_count > 0:
+                if memory_count > 10:
+                    reasoning['memory_reasoning'] = f"Drawing from {memory_count} shared memories (deep context)"
+                elif memory_count > 5:
+                    reasoning['memory_reasoning'] = f"Using {memory_count} previous interactions"
+                else:
+                    reasoning['memory_reasoning'] = f"Building on {memory_count} early conversations"
+            
+            # Learning moment reasoning
+            learning_moments = ai_components.get('character_learning_moments', {})
+            if learning_moments and learning_moments.get('learning_moments_detected', 0) > 0:
+                # Extract unique moment types (deduplicated)
+                moment_types = []
+                seen_types = set()
+                for m in learning_moments.get('moments', [])[:3]:  # Check first 3
+                    m_type = m.get('type', '')
+                    if m_type and m_type not in seen_types:
+                        moment_types.append(m_type)
+                        seen_types.add(m_type)
+                
+                if moment_types:
+                    types_display = ', '.join([t.replace('_', ' ') for t in moment_types])
+                    reasoning['learning_reasoning'] = f"Processing {types_display}"
+            
+            # Relationship reasoning
+            relationship_state = ai_components.get('relationship_state', {})
+            if relationship_state:
+                trust = relationship_state.get('trust', 0)
+                affection = relationship_state.get('affection', 0)
+                
+                if trust > 0.7 or affection > 0.7:
+                    reasoning['relationship_reasoning'] = f"Strong bond (trust {int(trust * 100)}, affection {int(affection * 100)})"
+                elif trust > 0.4 or affection > 0.4:
+                    reasoning['relationship_reasoning'] = f"Growing connection (trust {int(trust * 100)}, affection {int(affection * 100)})"
+            
+            return reasoning if reasoning else None
+            
+        except Exception as e:
+            logger.warning(f"Failed to build character reasoning: {e}")
+            return None
+    
     async def _analyze_enhanced_context(self, content: str, conversation_context: List[Dict[str, str]], 
                                       user_id: str) -> Dict[str, Any]:
         """Enhanced context analysis with vector boost and confidence scoring."""
