@@ -57,12 +57,12 @@ The models requested several features. Some we already have (under different nam
 | **"Cognitive load metrics"** | Temporal Evolution Analyzer (Confidence patterns) |
 | **"Adaptive tonal anchor"** | CDL Communication Patterns + Emotional Trajectory |
 | **"Crisis override"** | Emotional Intensity Thresholds + Context-Aware Modes |
+| **"Multi-Timescale Metrics"** | Relationship Evolution Engine (Trust/Affection/Attunement) |
 
 ### 🆕 New Roadmap Items (Derived from Feedback)
 | Feature | Description | Priority |
 |---------|-------------|----------|
 | **Reasoning Transparency** | Explain *why* a response strategy was chosen | ✅ DONE |
-| **Multi-Timescale Metrics** | Track long-term relationship depth, not just immediate engagement | 🔥 HIGH |
 | **Reflective Mode** | Optional "slow thinking" mode for deep philosophical chats | ⚡ MEDIUM |
 | **Confusion Detection** | Explicitly acknowledge uncertainty instead of hallucinating | ⚡ MEDIUM |
 

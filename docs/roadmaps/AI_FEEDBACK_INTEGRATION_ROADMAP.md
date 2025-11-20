@@ -20,17 +20,17 @@
 
 ---
 
-## 🔥 Phase 2: Multi-Timescale Value Metrics (HIGH PRIORITY)
+## ✅ Phase 2: Multi-Timescale Value Metrics (PARTIALLY COMPLETED)
 **Goal**: Address the critique that we optimize for "hedonic" (immediate engagement) rather than "eudaimonic" (long-term meaning).
 
-### 1. Long-Term Relationship Metrics
-- **Objective**: Track relationship depth over weeks/months, not just per-message.
-- **Implementation**:
-  - New InfluxDB measurement: `relationship_quality_daily`
-  - Metrics: `depth_score`, `topic_diversity`, `emotional_range`, `growth_index`
-  - Calculation: Async worker analyzes 24h windows of interaction.
+### 1. Long-Term Relationship Metrics (DONE)
+- **Status**: ✅ Implemented in `RelationshipEvolutionEngine`.
+- **Features**:
+  - Tracks `Trust`, `Affection`, `Attunement` over time.
+  - Updates dynamically based on `ConversationQuality`.
+  - Uses `emotion_variance` as a complexity modifier.
 
-### 2. "Meaningfulness" Scoring
+### 2. "Meaningfulness" Scoring (PENDING)
 - **Objective**: Distinguish between "fun" chat and "meaningful" chat.
 - **Implementation**:
   - LLM-based classification of conversation depth (1-5 scale).
@@ -39,7 +39,7 @@
 
 ---
 
-## ⚡ Phase 3: Reflective Conversation Mode (MEDIUM PRIORITY)
+## ⚡ Phase 3: Reflective Conversation Mode (NEXT PRIORITY)
 **Goal**: Address the request for "slower, deeper interaction" where the AI can "think" longer.
 
 ### 1. "Deep Thought" Protocol
@@ -92,7 +92,7 @@
 | Phase | Feature | Estimate | Status |
 |-------|---------|----------|--------|
 | **1** | Reasoning Transparency | 1 Day | ✅ DONE |
-| **2** | Multi-Timescale Metrics | 2 Weeks | 📅 Q1 2026 |
-| **3** | Reflective Mode | 3 Weeks | 📅 Q1 2026 |
+| **2** | Multi-Timescale Metrics | 2 Weeks | ✅ PARTIAL |
+| **3** | Reflective Mode | 3 Weeks | 🔥 NEXT |
 | **4** | Confusion Detection | 1 Week | 📅 Q1 2026 |
 | **5** | Research Track | Ongoing | 🔬 RESEARCH |
