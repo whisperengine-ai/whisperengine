@@ -115,6 +115,13 @@ class MemoryManagerProtocol(Protocol):
     async def health_check(self) -> Dict[str, Any]:
         """Perform health check on the memory system."""
         ...
+    
+    async def get_last_interaction_info(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get information about the very last interaction with this user, regardless of time window.
+        Used for calculating 'time since last chat' context.
+        """
+        ...
 
 
 def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManagerProtocol:
@@ -201,6 +208,9 @@ def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManage
             
             async def health_check(self) -> Dict[str, Any]:
                 return {"status": "healthy", "type": "mock"}
+            
+            async def get_last_interaction_info(self, user_id: str) -> Optional[Dict[str, Any]]:
+                return None
         
         return MockMemoryManager()
     

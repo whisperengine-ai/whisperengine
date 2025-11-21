@@ -3925,11 +3925,11 @@ class VectorMemoryManager:
                 )
             ]
             
-            # Scroll for just the 1 most recent message
+            # Scroll for the 3 most recent messages to get better context
             scroll_result = self.vector_store.client.scroll(
                 collection_name=self.vector_store.collection_name,
                 scroll_filter=models.Filter(must=must_conditions),
-                limit=1,
+                limit=3,
                 order_by=models.OrderBy(
                     key="timestamp_unix",
                     direction=models.Direction.DESC  # Newest first
@@ -3941,16 +3941,29 @@ class VectorMemoryManager:
             if not scroll_result[0]:
                 return None
                 
-            point = scroll_result[0][0]
-            payload = point.payload
+            # Get the most recent point for timestamp
+            latest_point = scroll_result[0][0]
+            latest_payload = latest_point.payload
+            timestamp = latest_payload.get("timestamp")
             
-            # Extract timestamp
-            timestamp = payload.get("timestamp")
-            content = payload.get("content", "")
+            # Collect content from last few messages (reverse to chronological)
+            messages = []
+            for point in reversed(scroll_result[0]):
+                payload = point.payload
+                content = payload.get("content", "")
+                
+                # Handle atomic pairs
+                if payload.get("source") == "conversation_pair":
+                    user_msg = payload.get("user_message", "")
+                    bot_resp = payload.get("bot_response", "")
+                    if user_msg: messages.append(f"User: {user_msg}")
+                    if bot_resp: messages.append(f"Bot: {bot_resp}")
+                else:
+                    role = payload.get("role", "unknown")
+                    messages.append(f"{role.capitalize()}: {content}")
             
-            # Handle atomic pairs - prefer user message timestamp if available
-            if payload.get("source") == "conversation_pair":
-                content = payload.get("user_message", content)
+            # Join messages for preview
+            full_preview = " | ".join(messages)
             
             # Calculate time since
             time_since_str = "unknown"
@@ -3977,7 +3990,7 @@ class VectorMemoryManager:
             return {
                 "timestamp": timestamp,
                 "time_since": time_since_str,
-                "content_preview": content[:100] + "..." if len(content) > 100 else content
+                "content_preview": full_preview[:300] + "..." if len(full_preview) > 300 else full_preview
             }
             
         except Exception as e:

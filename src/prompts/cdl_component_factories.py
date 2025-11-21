@@ -556,6 +556,7 @@ async def create_temporal_awareness_component(
         if last_interaction_info:
             time_since = last_interaction_info.get('time_since', 'unknown')
             timestamp = last_interaction_info.get('timestamp', '')
+            content_preview = last_interaction_info.get('content_preview', '')
             
             # Format timestamp nicely if possible
             ts_display = timestamp
@@ -568,6 +569,8 @@ async def create_temporal_awareness_component(
                 pass
                 
             content += f"\n\n# Last Interaction\n{time_since} ({ts_display})"
+            if content_preview:
+                content += f"\nLast Topic: {content_preview}"
         
         return PromptComponent(
             type=PromptComponentType.TEMPORAL_AWARENESS,
