@@ -572,6 +572,9 @@ async def create_temporal_awareness_component(
             if content_preview:
                 content += f"\nLast Topic: {content_preview}"
         
+        # 🛑 CRITICAL INSTRUCTION: Prevent timestamp echoing
+        content += "\n\nNOTE: Timestamps in conversation history are for your context only. DO NOT include timestamps in your responses."
+        
         return PromptComponent(
             type=PromptComponentType.TEMPORAL_AWARENESS,
             content=content,

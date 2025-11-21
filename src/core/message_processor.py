@@ -6946,6 +6946,15 @@ class MessageProcessor:
             llm_end = datetime.now()
             llm_time_ms = int((llm_end - llm_start).total_seconds() * 1000)
             
+            # 🧹 CLEANUP: Remove timestamp echoes if the model mimics the input format
+            # Pattern: [2025-11-21 18:26] or similar at start of message
+            import re
+            timestamp_pattern = r'^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}\]\s*'
+            if re.match(timestamp_pattern, response):
+                original_len = len(response)
+                response = re.sub(timestamp_pattern, '', response)
+                logger.info(f"🧹 CLEANUP: Removed timestamp echo from response (saved {original_len - len(response)} chars)")
+            
             # Store LLM timing in ai_components for footer display
             ai_components['llm_time_ms'] = llm_time_ms
             
