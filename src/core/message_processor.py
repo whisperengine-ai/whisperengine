@@ -3382,12 +3382,25 @@ class MessageProcessor:
         # ================================
         # 🕒 CDL TEMPORAL: Current date/time context for temporal grounding
         
+        # Fetch last interaction info (NEW) - regardless of time window
+        last_interaction_info = None
+        if self.memory_manager:
+            try:
+                last_interaction_info = await self.memory_manager.get_last_interaction_info(message_context.user_id)
+                if last_interaction_info:
+                    logger.info(f"🕒 LAST INTERACTION: Found interaction from {last_interaction_info.get('time_since')}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch last interaction info: {e}")
+
         # Check if temporal awareness component is enabled
         if is_component_enabled(PromptComponentType.TEMPORAL_AWARENESS):
             from src.prompts.cdl_component_factories import create_temporal_awareness_component
             
             try:
-                temporal_component = await create_temporal_awareness_component(priority=6)
+                temporal_component = await create_temporal_awareness_component(
+                    priority=6,
+                    last_interaction_info=last_interaction_info
+                )
                 if temporal_component:
                     assembler.add_component(temporal_component)
                     logger.info("✅ STRUCTURED CONTEXT: Added CDL temporal awareness")
@@ -4466,6 +4479,17 @@ class MessageProcessor:
                 
                 # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
                 truncated = self._smart_truncate(content, max_length=500)
+                
+                # 🕒 TIMESTAMP INJECTION: Add timestamp to content so LLM knows when this happened
+                timestamp = msg.get('timestamp')
+                if timestamp:
+                    try:
+                        dt = datetime.fromisoformat(str(timestamp).replace('Z', '+00:00'))
+                        time_str = dt.strftime("%Y-%m-%d %H:%M")
+                        truncated = f"[{time_str}] {truncated}"
+                    except Exception:
+                        pass
+                
                 role = "assistant" if is_bot else "user"
                 formatted_messages.append({"role": role, "content": truncated})
                 logger.debug(f"  ✅ ADDED older message: role={role}, len={len(truncated)}")
@@ -4497,6 +4521,16 @@ class MessageProcessor:
                 else:
                     # 🎯 SMART TRUNCATION: Cut middle, preserve beginning + ending for coherence
                     message_content = self._smart_truncate(content, max_length=400)
+                
+                # 🕒 TIMESTAMP INJECTION: Add timestamp to content so LLM knows when this happened
+                timestamp = msg.get('timestamp')
+                if timestamp:
+                    try:
+                        dt = datetime.fromisoformat(str(timestamp).replace('Z', '+00:00'))
+                        time_str = dt.strftime("%Y-%m-%d %H:%M")
+                        message_content = f"[{time_str}] {message_content}"
+                    except Exception:
+                        pass
                 
                 role = "assistant" if is_bot else "user"
                 formatted_messages.append({"role": role, "content": message_content})

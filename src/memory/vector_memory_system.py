@@ -3903,7 +3903,87 @@ class VectorMemoryManager:
     Replaces the entire hierarchical memory system with vector-native approach.
     This is the new primary memory interface.
     """
-    
+
+    async def get_last_interaction_info(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get information about the very last interaction with this user, regardless of time window.
+        Used for calculating 'time since last chat' context.
+        """
+        try:
+            from qdrant_client import models
+            from datetime import datetime, timezone
+            
+            # Build filter for conversation messages
+            must_conditions = [
+                models.FieldCondition(
+                    key="user_id",
+                    match=models.MatchValue(value=user_id)
+                ),
+                models.FieldCondition(
+                    key="memory_type",
+                    match=models.MatchValue(value="conversation")
+                )
+            ]
+            
+            # Scroll for just the 1 most recent message
+            scroll_result = self.vector_store.client.scroll(
+                collection_name=self.vector_store.collection_name,
+                scroll_filter=models.Filter(must=must_conditions),
+                limit=1,
+                order_by=models.OrderBy(
+                    key="timestamp_unix",
+                    direction=models.Direction.DESC  # Newest first
+                ),
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            if not scroll_result[0]:
+                return None
+                
+            point = scroll_result[0][0]
+            payload = point.payload
+            
+            # Extract timestamp
+            timestamp = payload.get("timestamp")
+            content = payload.get("content", "")
+            
+            # Handle atomic pairs - prefer user message timestamp if available
+            if payload.get("source") == "conversation_pair":
+                content = payload.get("user_message", content)
+            
+            # Calculate time since
+            time_since_str = "unknown"
+            try:
+                # Handle ISO format with Z
+                if isinstance(timestamp, str):
+                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    now = datetime.now(timezone.utc)
+                    diff = now - dt
+                    
+                    if diff.days > 365:
+                        time_since_str = f"{diff.days // 365} years ago"
+                    elif diff.days > 30:
+                        time_since_str = f"{diff.days // 30} months ago"
+                    elif diff.days > 0:
+                        time_since_str = f"{diff.days} days ago"
+                    elif diff.seconds > 3600:
+                        time_since_str = f"{diff.seconds // 3600} hours ago"
+                    else:
+                        time_since_str = f"{diff.seconds // 60} minutes ago"
+            except Exception as e:
+                logger.warning(f"Failed to calculate time since: {e}")
+            
+            return {
+                "timestamp": timestamp,
+                "time_since": time_since_str,
+                "content_preview": content[:100] + "..." if len(content) > 100 else content
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get last interaction info: {e}")
+            return None
+
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize VectorMemoryManager with configuration dict
@@ -5892,9 +5972,9 @@ class VectorMemoryManager:
             from datetime import datetime, timedelta
             from qdrant_client import models
             
-            # Get conversations from the last 24 hours for current conversation thread
-            # Previous 1 hour was too restrictive and was cutting off bot responses
-            time_window_hours = 24
+            # Get conversations from the last 7 days (168 hours) for current conversation thread
+            # Previous 24 hours was too restrictive for users who chat every few days
+            time_window_hours = 168
             cutoff_timestamp = datetime.now() - timedelta(hours=time_window_hours)
             cutoff_unix = cutoff_timestamp.timestamp()
             

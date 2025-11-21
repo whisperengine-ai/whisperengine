@@ -524,6 +524,7 @@ async def create_ai_identity_guidance_component(
 
 async def create_temporal_awareness_component(
     priority: int = 6,
+    last_interaction_info: Optional[Dict[str, Any]] = None
 ) -> Optional[PromptComponent]:
     """
     Create TEMPORAL_AWARENESS component (Priority 6).
@@ -531,18 +532,42 @@ async def create_temporal_awareness_component(
     Provides current date/time context for temporal grounding.
     Critical for time-sensitive conversations.
     
+    Args:
+        priority: Component priority
+        last_interaction_info: Optional dict with 'timestamp', 'time_since', 'content_preview'
+    
     Returns:
         PromptComponent with current date/time, or None if unavailable
     
     Example Output:
         # Current Date & Time
         Friday, October 18, 2025, 2:30 PM PST
+        
+        # Last Interaction
+        2 days ago (2025-10-16)
     """
     try:
         from src.utils.helpers import get_current_time_context
         time_context = get_current_time_context()
         
         content = f"# Current Date & Time\n{time_context}"
+        
+        # Add last interaction info if available
+        if last_interaction_info:
+            time_since = last_interaction_info.get('time_since', 'unknown')
+            timestamp = last_interaction_info.get('timestamp', '')
+            
+            # Format timestamp nicely if possible
+            ts_display = timestamp
+            try:
+                from datetime import datetime
+                if isinstance(timestamp, str):
+                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    ts_display = dt.strftime("%Y-%m-%d %H:%M")
+            except:
+                pass
+                
+            content += f"\n\n# Last Interaction\n{time_since} ({ts_display})"
         
         return PromptComponent(
             type=PromptComponentType.TEMPORAL_AWARENESS,
