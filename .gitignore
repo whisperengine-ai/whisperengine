@@ -181,3 +181,4 @@ character_intelligence_validation_results.json
 disabled.env.elena
 .gitignore
 disabled.env.ryan
+disabled.env.dotty
