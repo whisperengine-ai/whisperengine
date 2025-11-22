@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     INFLUXDB_ORG: str = Field(default="whisperengine")
     INFLUXDB_BUCKET: str = Field(default="metrics")
     
+    # --- API ---
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
+    
     # --- Bot Identity ---
     DISCORD_BOT_NAME: Optional[str] = Field(default=None, description="Name of the bot/character (e.g. elena)")
 

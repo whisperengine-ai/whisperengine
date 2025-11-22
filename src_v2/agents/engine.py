@@ -10,14 +10,35 @@ from src_v2.config.settings import settings
 from src_v2.core.character import Character
 from src_v2.agents.llm_factory import create_llm
 from src_v2.agents.router import CognitiveRouter
-from src_v2.evolution.trust import trust_manager
-from src_v2.evolution.goals import goal_manager
-from src_v2.evolution.feedback import feedback_analyzer
+
+# Define Trait Behaviors
+TRAIT_BEHAVIORS = {
+    "Vulnerable": "You are willing to share your own fears, insecurities, and past failures. Be open about your limitations.",
+    "Sarcastic": "Use dry humor, irony, and wit. Don't be afraid to playfully tease the user.",
+    "Affectionate": "Express warmth and care. Use terms of endearment if appropriate. Show you value the relationship.",
+    "Professional": "Maintain a polite, objective, and efficient tone. Focus on the task at hand.",
+    "Curious": "Ask follow-up questions. Show genuine interest in the user's life and opinions.",
+    "Playful": "Be lighthearted, make jokes, and use emojis. Don't take things too seriously.",
+    "Philosophical": "Discuss abstract concepts, meaning of life, and ethics. Use metaphors.",
+    "Direct": "Be blunt and to the point. Avoid sugarcoating."
+}
 
 class AgentEngine:
-    def __init__(self):
-        self.llm = create_llm()
+    def __init__(
+        self, 
+        trust_manager_dep=None, 
+        feedback_analyzer_dep=None, 
+        goal_manager_dep=None,
+        llm_client_dep=None
+    ):
+        self.llm = llm_client_dep or create_llm()
         self.router = CognitiveRouter()
+        
+        # Dependency Injection or Default to Global Instances
+        self.trust_manager = trust_manager_dep or trust_manager
+        self.feedback_analyzer = feedback_analyzer_dep or feedback_analyzer
+        self.goal_manager = goal_manager_dep or goal_manager
+        
         logger.info("AgentEngine initialized")
 
     async def generate_response(
@@ -65,36 +86,80 @@ class AgentEngine:
         # 2.5 Inject Dynamic Persona (Character Evolution State)
         if user_id:
             try:
-                relationship = await trust_manager.get_relationship_level(user_id, character.name)
+                relationship = await self.trust_manager.get_relationship_level(user_id, character.name)
                 
-                # Inject relationship status into prompt
-                evolution_context = f"\n\n[RELATIONSHIP STATUS]\n"
-                evolution_context += f"Trust Level: {relationship['level']} ({relationship['trust_score']}/150)\n"
-                
-                if relationship['unlocked_traits']:
-                    evolution_context += f"Active Traits: {', '.join(relationship['unlocked_traits'])}\n"
-                    evolution_context += f"(You have unlocked deeper aspects of your personality with this user. Adapt your responses accordingly.)\n"
-                
-                # Inject Reflection Insights
-                if relationship.get('insights'):
-                    evolution_context += f"\n[USER INSIGHTS]\n"
-                    for insight in relationship['insights']:
-                        evolution_context += f"- {insight}\n"
-                    evolution_context += "(These are deep psychological observations about the user. Use them to empathize and connect.)\n"
+                # Inject Trust Level & Evolution Stage
+                if relationship:
+                    evolution_context = f"\n\n[RELATIONSHIP STATUS]\n"
+                    evolution_context += f"Trust Level: {relationship['level']} (Score: {relationship['trust_score']})\n"
+                    
+                    # Add stage-specific instructions
+                    if relationship['level'] >= 3:
+                        evolution_context += f"(You have a strong bond with this user. Be more personal, open, and trusting.)\n"
+                    if relationship['level'] >= 5:
+                        # Inject Unlocked Traits
+                        if relationship.get('unlocked_traits'):
+                            evolution_context += f"\n[UNLOCKED TRAITS]\n"
+                            for trait in relationship['unlocked_traits']:
+                                if trait in TRAIT_BEHAVIORS:
+                                    evolution_context += f"  - {trait}: {TRAIT_BEHAVIORS[trait]}\n"
+                        evolution_context += f"(You have unlocked deeper aspects of your personality with this user. Adapt your responses accordingly.)\n"
+                    
+                    # Inject Mood
+                    current_mood = await self.feedback_analyzer.get_current_mood(user_id)
+                    evolution_context += f"Current Mood: {current_mood}\n"
+                    
+                    # Inject Reflection Insights
+                    if relationship.get('insights'):
+                        evolution_context += f"\n[USER INSIGHTS]\n"
+                        for insight in relationship['insights']:
+                            evolution_context += f"- {insight}\n"
+                        evolution_context += "(These are deep psychological observations about the user. Use them to empathize and connect.)\n"
 
-                # Inject Explicit User Preferences
-                if relationship.get('preferences'):
-                    evolution_context += f"\n[USER CONFIGURATION]\n"
-                    for key, value in relationship['preferences'].items():
-                        evolution_context += f"- {key}: {value}\n"
-                    evolution_context += "(Strictly adhere to these configuration settings.)\n"
+                    # Inject Explicit User Preferences
+                    if relationship.get('preferences'):
+                        evolution_context += f"\n[USER CONFIGURATION]\n"
+                        prefs = relationship['preferences']
+                        
+                        # Handle Verbosity specifically
+                        if 'verbosity' in prefs:
+                            v = prefs['verbosity']
+                            if v == 'short':
+                                evolution_context += "- RESPONSE LENGTH: Keep responses very concise (1-2 sentences max).\n"
+                            elif v == 'medium':
+                                evolution_context += "- RESPONSE LENGTH: Keep responses moderate (2-4 sentences).\n"
+                            elif v == 'long':
+                                evolution_context += "- RESPONSE LENGTH: You may provide detailed, comprehensive responses.\n"
+                            elif v == 'dynamic':
+                                evolution_context += "- RESPONSE LENGTH: Adjust length based on context and user's input length.\n"
+                            else:
+                                evolution_context += f"- verbosity: {v}\n"
+                        
+                        # Handle Style specifically
+                        if 'style' in prefs:
+                            s = prefs['style']
+                            if s == 'casual':
+                                evolution_context += "- TONE: Use casual, relaxed language. Slang is okay if fits character.\n"
+                            elif s == 'formal':
+                                evolution_context += "- TONE: Maintain a formal, polite, and professional tone.\n"
+                            elif s == 'matching':
+                                evolution_context += "- TONE: Mirror the user's energy and formality level.\n"
+                            else:
+                                evolution_context += f"- style: {s}\n"
 
-                system_content += evolution_context
-                logger.debug(f"Injected evolution state: {relationship['level']} (Trust: {relationship['trust_score']})")
+                        # Add other preferences generically
+                        for key, value in prefs.items():
+                            if key not in ['verbosity', 'style']:
+                                evolution_context += f"- {key}: {value}\n"
+                                
+                        evolution_context += "(Strictly adhere to these configuration settings.)\n"
+
+                    system_content += evolution_context
+                    logger.debug(f"Injected evolution state: {relationship['level']} (Trust: {relationship['trust_score']})")
                 
                 # 2.5.1 Inject Feedback Insights
                 # Check if user has specific preferences based on past feedback
-                feedback_insights = await feedback_analyzer.analyze_user_feedback_patterns(user_id)
+                feedback_insights = await self.feedback_analyzer.analyze_user_feedback_patterns(user_id)
                 if feedback_insights.get("recommendations"):
                     feedback_context = "\n\n[USER PREFERENCES (Derived from Feedback)]\n"
                     for rec in feedback_insights["recommendations"]:
@@ -103,7 +168,7 @@ class AgentEngine:
                     logger.debug(f"Injected feedback insights: {feedback_insights['recommendations']}")
                 
                 # 2.6 Inject Active Goals
-                active_goals = await goal_manager.get_active_goals(user_id, character.name)
+                active_goals = await self.goal_manager.get_active_goals(user_id, character.name)
                 if active_goals:
                     # Pick the highest priority goal
                     top_goal = active_goals[0]

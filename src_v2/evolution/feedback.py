@@ -307,6 +307,53 @@ class FeedbackAnalyzer:
         except Exception as e:
             logger.error(f"Failed to log reaction to InfluxDB: {e}")
 
+    async def get_current_mood(self, user_id: str) -> str:
+        """
+        Determines the bot's current mood based on recent user interactions (last 1 hour).
+        Returns: "Happy", "Neutral", "Annoyed", "Excited"
+        """
+        if not self.influx_client:
+            return "Neutral"
+
+        try:
+            query_api = self.influx_client.query_api()
+            
+            # Query for recent reactions from this user
+            flux_query = f'''
+            from(bucket: "{settings.INFLUXDB_BUCKET}")
+                |> range(start: -1h)
+                |> filter(fn: (r) => r["_measurement"] == "reaction_event")
+                |> filter(fn: (r) => r["user_id"] == "{user_id}")
+            '''
+            
+            tables = query_api.query(flux_query)
+            
+            reactions = []
+            for table in tables:
+                for record in table.records:
+                    reaction = record.values.get("reaction")
+                    if reaction:
+                        reactions.append(reaction)
+            
+            if not reactions:
+                return "Neutral"
+            
+            positive_count = sum(1 for r in reactions if r in self.POSITIVE_REACTIONS)
+            negative_count = sum(1 for r in reactions if r in self.NEGATIVE_REACTIONS)
+            
+            if negative_count > positive_count:
+                return "Annoyed (User has been reacting negatively)"
+            elif positive_count > 3:
+                return "Excited (User is very engaged)"
+            elif positive_count > 0:
+                return "Happy"
+            else:
+                return "Neutral"
+
+        except Exception as e:
+            logger.error(f"Failed to get current mood: {e}")
+            return "Neutral"
+
 
 # Global singleton
 feedback_analyzer = FeedbackAnalyzer()
