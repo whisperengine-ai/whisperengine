@@ -293,7 +293,7 @@ class MemoryManager:
                         SELECT role, content, user_id 
                         FROM v2_chat_history 
                         WHERE channel_id = $1 AND character_name = $2
-                        ORDER BY timestamp DESC
+                        ORDER BY created_at DESC
                         LIMIT $3
                     """, str(channel_id), character_name, limit)
                 else:
@@ -302,7 +302,7 @@ class MemoryManager:
                         SELECT role, content, user_id 
                         FROM v2_chat_history 
                         WHERE user_id = $1 AND character_name = $2
-                        ORDER BY timestamp DESC
+                        ORDER BY created_at DESC
                         LIMIT $3
                     """, str(user_id), character_name, limit)
                 

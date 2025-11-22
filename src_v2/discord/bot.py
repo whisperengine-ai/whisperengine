@@ -15,6 +15,7 @@ from src_v2.voice.player import play_text
 from src_v2.core.database import db_manager
 from src_v2.evolution.feedback import feedback_analyzer
 from src_v2.evolution.goals import goal_analyzer
+from src_v2.evolution.trust import trust_manager
 from influxdb_client.client.write.point import Point
 
 class WhisperBot(commands.Bot):
@@ -106,7 +107,7 @@ class WhisperBot(commands.Bot):
         else:
             logger.error(f"Could not load character '{self.character_name}'!")
 
-        logger.info("WhisperBot is ready and listening.")
+        logger.info("WhisperEngine is ready and listening.")
 
     async def on_message(self, message: discord.Message):
         # Ignore messages from self and other bots to prevent loops
@@ -331,6 +332,12 @@ class WhisperBot(commands.Bot):
                             goal_analyzer.check_goals(user_id, character.name, interaction_text)
                         )
                         
+                        # 4.6 Trust Update (Engagement Reward)
+                        # Small trust increase for every positive interaction
+                        self.loop.create_task(
+                            trust_manager.update_trust(user_id, character.name, 1)
+                        )
+                        
                         # 5. Voice Playback (use full response, not chunked)
                         if message.guild and message.guild.voice_client:
                             vc = message.guild.voice_client
@@ -392,6 +399,14 @@ class WhisperBot(commands.Bot):
                     message_id=message_id,
                     collection_name=collection_name,
                     score_delta=score_delta
+                )
+                
+                # Update Trust based on feedback
+                # Positive feedback increases trust significantly
+                # Negative feedback decreases trust
+                trust_delta = 5 if feedback["score"] > 0 else -5
+                self.loop.create_task(
+                    trust_manager.update_trust(user_id, self.character_name, trust_delta)
                 )
                 
                 logger.info(f"Feedback score for message: {feedback['score']} (adjusted memory importance)")

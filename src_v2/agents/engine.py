@@ -12,6 +12,7 @@ from src_v2.agents.llm_factory import create_llm
 from src_v2.agents.router import CognitiveRouter
 from src_v2.evolution.trust import trust_manager
 from src_v2.evolution.goals import goal_manager
+from src_v2.evolution.feedback import feedback_analyzer
 
 class AgentEngine:
     def __init__(self):
@@ -72,6 +73,16 @@ class AgentEngine:
                 
                 system_content += evolution_context
                 logger.debug(f"Injected evolution state: {relationship['level']} (Trust: {relationship['trust_score']})")
+                
+                # 2.5.1 Inject Feedback Insights
+                # Check if user has specific preferences based on past feedback
+                feedback_insights = await feedback_analyzer.analyze_user_feedback_patterns(user_id)
+                if feedback_insights.get("recommendations"):
+                    feedback_context = "\n\n[USER PREFERENCES (Derived from Feedback)]\n"
+                    for rec in feedback_insights["recommendations"]:
+                        feedback_context += f"- {rec}\n"
+                    system_content += feedback_context
+                    logger.debug(f"Injected feedback insights: {feedback_insights['recommendations']}")
                 
                 # 2.6 Inject Active Goals
                 active_goals = await goal_manager.get_active_goals(user_id, character.name)
