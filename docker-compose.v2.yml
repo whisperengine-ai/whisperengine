@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # --- Shared Infrastructure ---
+
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whisperengine-v2-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: whisper
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: whisperengine_v2
+    volumes:
+      - postgres_data_v2:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whisper -d whisperengine_v2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - v2_network
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: whisperengine-v2-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data_v2:/qdrant/storage
+    networks:
+      - v2_network
+
+  neo4j:
+    image: neo4j:5.15.0
+    container_name: whisperengine-v2-neo4j
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    environment:
+      NEO4J_AUTH: neo4j/password
+    volumes:
+      - neo4j_data_v2:/data
+    networks:
+      - v2_network
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: whisperengine-v2-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_v2:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - v2_network
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: whisperengine-v2-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: whisper
+      DOCKER_INFLUXDB_INIT_PASSWORD: password123
+      DOCKER_INFLUXDB_INIT_ORG: whisperengine
+      DOCKER_INFLUXDB_INIT_BUCKET: metrics
+    volumes:
+      - influxdb_data_v2:/var/lib/influxdb2
+    networks:
+      - v2_network
+
+volumes:
+  postgres_data_v2:
+  qdrant_data_v2:
+  neo4j_data_v2:
+  redis_data_v2:
+  influxdb_data_v2:
+
+networks:
+  v2_network:
+    driver: bridge
+
