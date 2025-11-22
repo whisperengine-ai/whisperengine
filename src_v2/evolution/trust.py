@@ -5,10 +5,11 @@ Tracks the evolving relationship between user and character, including
 trust scores, relationship levels, and unlocked personality traits.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from loguru import logger
 from src_v2.core.database import db_manager
 from src_v2.config.settings import settings
+import json
 
 
 class TrustManager:
@@ -33,16 +34,16 @@ class TrustManager:
         Retrieves the current relationship level and trust score.
         
         Returns:
-            Dict with {trust_score: int, level: str, unlocked_traits: List[str]}
+            Dict with {trust_score: int, level: str, unlocked_traits: List[str], preferences: Dict}
         """
         if not db_manager.postgres_pool:
-            return {"trust_score": 0, "level": "Stranger", "unlocked_traits": []}
+            return {"trust_score": 0, "level": "Stranger", "unlocked_traits": [], "preferences": {}}
             
         try:
             async with db_manager.postgres_pool.acquire() as conn:
                 # Check if relationship exists
                 row = await conn.fetchrow("""
-                    SELECT trust_score, unlocked_traits, insights
+                    SELECT trust_score, unlocked_traits, insights, preferences
                     FROM v2_user_relationships
                     WHERE user_id = $1 AND character_name = $2
                 """, user_id, character_name)
@@ -50,14 +51,23 @@ class TrustManager:
                 if not row:
                     # Create default relationship
                     await conn.execute("""
-                        INSERT INTO v2_user_relationships (user_id, character_name, trust_score, unlocked_traits, insights)
-                        VALUES ($1, $2, 0, '[]'::jsonb, '[]'::jsonb)
+                        INSERT INTO v2_user_relationships (user_id, character_name, trust_score, unlocked_traits, insights, preferences)
+                        VALUES ($1, $2, 0, '[]'::jsonb, '[]'::jsonb, '{}'::jsonb)
                     """, user_id, character_name)
-                    return {"trust_score": 0, "level": "Stranger", "unlocked_traits": [], "insights": []}
+                    return {"trust_score": 0, "level": "Stranger", "unlocked_traits": [], "insights": [], "preferences": {}}
                 
                 trust_score = row['trust_score']
                 unlocked_traits = row['unlocked_traits'] if row['unlocked_traits'] else []
                 insights = row['insights'] if row['insights'] else []
+                
+                preferences = row['preferences']
+                if isinstance(preferences, str):
+                    try:
+                        preferences = json.loads(preferences)
+                    except:
+                        preferences = {}
+                elif preferences is None:
+                    preferences = {}
                 
                 # Determine level
                 level = "Stranger"
@@ -71,12 +81,40 @@ class TrustManager:
                     "trust_score": trust_score, 
                     "level": level, 
                     "unlocked_traits": unlocked_traits,
-                    "insights": insights
+                    "insights": insights,
+                    "preferences": preferences
                 }
                 
         except Exception as e:
             logger.error(f"Failed to get relationship level: {e}")
-            return {"trust_score": 0, "level": "Stranger", "unlocked_traits": []}
+            return {"trust_score": 0, "level": "Stranger", "unlocked_traits": [], "preferences": {}}
+
+    async def update_preference(self, user_id: str, character_name: str, key: str, value: Any):
+        """
+        Updates a specific preference setting.
+        """
+        if not db_manager.postgres_pool:
+            return
+            
+        try:
+            async with db_manager.postgres_pool.acquire() as conn:
+                await self.get_relationship_level(user_id, character_name)
+                
+                # Update jsonb field
+                # We use jsonb_set to update a specific key
+                # value needs to be a valid JSON value
+                json_value = json.dumps(value)
+                
+                await conn.execute("""
+                    UPDATE v2_user_relationships
+                    SET preferences = jsonb_set(COALESCE(preferences, '{}'::jsonb), $3::text[], $4::jsonb),
+                        updated_at = NOW()
+                    WHERE user_id = $1 AND character_name = $2
+                """, user_id, character_name, [key], json_value)
+                
+                logger.info(f"Updated preference '{key}' to '{value}' for {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to update preference: {e}")
 
     async def update_trust(self, user_id: str, character_name: str, delta: int):
         """

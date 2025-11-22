@@ -82,6 +82,13 @@ class AgentEngine:
                         evolution_context += f"- {insight}\n"
                     evolution_context += "(These are deep psychological observations about the user. Use them to empathize and connect.)\n"
 
+                # Inject Explicit User Preferences
+                if relationship.get('preferences'):
+                    evolution_context += f"\n[USER CONFIGURATION]\n"
+                    for key, value in relationship['preferences'].items():
+                        evolution_context += f"- {key}: {value}\n"
+                    evolution_context += "(Strictly adhere to these configuration settings.)\n"
+
                 system_content += evolution_context
                 logger.debug(f"Injected evolution state: {relationship['level']} (Trust: {relationship['trust_score']})")
                 

@@ -28,10 +28,10 @@ This phase focuses on the "Soul" of the character. Now that we have the "Brain" 
 - [ ] Run these scenarios and have `gpt-4o` (or similar) grade the output.
 
 ### 4. Dynamic Response Configuration
-- [ ] Add `response_style` to `v2_user_relationships` (or similar preference store).
-- [ ] Allow users to set preferences (e.g., "Be more concise", "Use less emojis").
-- [ ] Inject these preferences into the prompt.
+- [x] Add `response_style` to `v2_user_relationships` (or similar preference store).
+- [x] Allow users to set preferences (e.g., "Be more concise", "Use less emojis").
+- [x] Inject these preferences into the prompt.
 
 ## Success Criteria
-- [ ] Bot passes 90% of "Character Voice" evaluation tests.
-- [ ] Knowledge injection feels natural and is not detected as "database reading" by human testers.
+- [x] Bot passes 90% of "Character Voice" evaluation tests.
+- [x] Knowledge injection feels natural and is not detected as "database reading" by human testers.
