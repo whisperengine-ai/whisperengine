@@ -93,13 +93,17 @@ class AgentEngine:
                 
                 # Inject Trust Level & Evolution Stage
                 if relationship:
+                    # Ensure level is an integer
+                    trust_level = int(relationship.get('level', 1))
+                    level_label = relationship.get('level_label', 'Stranger')
+                    
                     evolution_context = f"\n\n[RELATIONSHIP STATUS]\n"
-                    evolution_context += f"Trust Level: {relationship['level']} (Score: {relationship['trust_score']})\n"
+                    evolution_context += f"Trust Level: {trust_level} ({level_label}) (Score: {relationship.get('trust_score', 0)})\n"
                     
                     # Add stage-specific instructions
-                    if relationship['level'] >= 3:
+                    if trust_level >= 3:
                         evolution_context += f"(You have a strong bond with this user. Be more personal, open, and trusting.)\n"
-                    if relationship['level'] >= 5:
+                    if trust_level >= 5:
                         # Inject Unlocked Traits
                         if relationship.get('unlocked_traits'):
                             evolution_context += f"\n[UNLOCKED TRAITS]\n"

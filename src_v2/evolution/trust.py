@@ -54,7 +54,7 @@ class TrustManager:
                         INSERT INTO v2_user_relationships (user_id, character_name, trust_score, unlocked_traits, insights, preferences)
                         VALUES ($1, $2, 0, '[]'::jsonb, '[]'::jsonb, '{}'::jsonb)
                     """, user_id, character_name)
-                    return {"trust_score": 0, "level": "Stranger", "unlocked_traits": [], "insights": [], "preferences": {}}
+                    return {"trust_score": 0, "level": 1, "level_label": "Stranger", "unlocked_traits": [], "insights": [], "preferences": {}}
                 
                 trust_score = row['trust_score']
                 unlocked_traits = row['unlocked_traits'] if row['unlocked_traits'] else []
@@ -69,17 +69,27 @@ class TrustManager:
                 elif preferences is None:
                     preferences = {}
                 
-                # Determine level
-                level = "Stranger"
+                # Determine level (integer 1-5)
+                level_int = 1
+                level_label = "Stranger"
+                
+                # Map score to level (1-5)
+                if trust_score >= 90: level_int = 5
+                elif trust_score >= 70: level_int = 4
+                elif trust_score >= 50: level_int = 3
+                elif trust_score >= 20: level_int = 2
+                
+                # Map score to label
                 for threshold, label in self.RELATIONSHIP_LEVELS:
                     if trust_score >= threshold:
-                        level = label
+                        level_label = label
                     else:
                         break
                         
                 return {
                     "trust_score": trust_score, 
-                    "level": level, 
+                    "level": level_int,
+                    "level_label": level_label,
                     "unlocked_traits": unlocked_traits,
                     "insights": insights,
                     "preferences": preferences
@@ -87,7 +97,7 @@ class TrustManager:
                 
         except Exception as e:
             logger.error(f"Failed to get relationship level: {e}")
-            return {"trust_score": 0, "level": "Stranger", "unlocked_traits": [], "preferences": {}}
+            return {"trust_score": 0, "level": 1, "level_label": "Stranger", "unlocked_traits": [], "preferences": {}}
 
     async def update_preference(self, user_id: str, character_name: str, key: str, value: Any):
         """

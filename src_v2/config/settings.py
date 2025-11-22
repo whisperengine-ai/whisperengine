@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     
     # InfluxDB (Metrics)
     INFLUXDB_URL: str = Field(default="http://localhost:8086")
-    INFLUXDB_TOKEN: Optional[SecretStr] = None
+    INFLUXDB_TOKEN: SecretStr = Field(default=SecretStr("my-super-secret-auth-token"))
     INFLUXDB_ORG: str = Field(default="whisperengine")
     INFLUXDB_BUCKET: str = Field(default="metrics")
     

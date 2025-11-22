@@ -41,6 +41,36 @@ RULES:
         ])
         self.cypher_chain = self.cypher_prompt | self.llm | StrOutputParser()
 
+    async def initialize(self):
+        """
+        Initializes the Knowledge Graph schema (constraints and indexes).
+        """
+        if not db_manager.neo4j_driver:
+            logger.warning("Neo4j driver not available. Skipping Knowledge Graph initialization.")
+            return
+
+        try:
+            async with db_manager.neo4j_driver.session() as session:
+                # Create constraints (which also create indexes)
+                # User id must be unique
+                await session.run("CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE")
+                
+                # Entity name should be indexed/unique
+                await session.run("CREATE CONSTRAINT entity_name_unique IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS UNIQUE")
+                
+                # Register relationship types and properties to avoid warnings
+                # Create a dummy pattern and delete it immediately
+                await session.run("""
+                    MERGE (u:User {id: '_schema_init_'})
+                    MERGE (e:Entity {name: '_schema_init_'})
+                    MERGE (u)-[r:FACT {predicate: '_init_', confidence: 0.0}]->(e)
+                    DELETE r, u, e
+                """)
+
+                logger.info("Knowledge Graph schema initialized.")
+        except Exception as e:
+            logger.error(f"Failed to initialize Knowledge Graph schema: {e}")
+
     async def query_graph(self, user_id: str, question: str) -> str:
         """
         Generates and executes a Cypher query based on a natural language question.

@@ -66,12 +66,16 @@ class DatabaseManager:
             self.influxdb_write_api = self.influxdb_client.write_api(write_options=WriteOptions(batch_size=1))
             
             # Verify connection
-            self.influxdb_client.ping()
-            logger.info("Connected to InfluxDB.")
+            if not self.influxdb_client.ping():
+                logger.warning("InfluxDB ping failed. Metrics will not be recorded.")
+                self.influxdb_client = None
+                self.influxdb_write_api = None
+            else:
+                logger.info("Connected to InfluxDB.")
         except Exception as e:
-            logger.error(f"Failed to connect to InfluxDB: {e}")
-            # We don't raise here because InfluxDB is optional for core functionality
-            # raise
+            logger.warning(f"Failed to connect to InfluxDB: {e}. Metrics will not be recorded.")
+            self.influxdb_client = None
+            self.influxdb_write_api = None
 
     async def connect_all(self):
         await asyncio.gather(

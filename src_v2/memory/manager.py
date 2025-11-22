@@ -292,7 +292,7 @@ class MemoryManager:
                         SELECT role, content, user_id 
                         FROM v2_chat_history 
                         WHERE channel_id = $1 AND character_name = $2
-                        ORDER BY created_at DESC
+                        ORDER BY timestamp DESC
                         LIMIT $3
                     """, str(channel_id), character_name, limit)
                 else:
@@ -301,7 +301,7 @@ class MemoryManager:
                         SELECT role, content, user_id 
                         FROM v2_chat_history 
                         WHERE user_id = $1 AND character_name = $2
-                        ORDER BY created_at DESC
+                        ORDER BY timestamp DESC
                         LIMIT $3
                     """, str(user_id), character_name, limit)
                 
@@ -325,12 +325,23 @@ class MemoryManager:
             return 0
         
         try:
+            # Ensure timestamp is offset-aware (UTC) if it's naive
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=datetime.timezone.utc)
+            else:
+                # Convert to UTC if it has a timezone
+                timestamp = timestamp.astimezone(datetime.timezone.utc)
+
+            # The database column is TIMESTAMP WITHOUT TIME ZONE (naive)
+            # So we must pass a naive datetime (implicitly UTC)
+            timestamp_naive = timestamp.replace(tzinfo=None)
+
             async with db_manager.postgres_pool.acquire() as conn:
                 count = await conn.fetchval("""
                     SELECT COUNT(*) 
                     FROM v2_chat_history 
-                    WHERE user_id = $1 AND character_name = $2 AND created_at >= $3
-                """, user_id, character_name, timestamp)
+                    WHERE user_id = $1 AND character_name = $2 AND timestamp >= $3
+                """, user_id, character_name, timestamp_naive)
                 return count
         except Exception as e:
             logger.error(f"Failed to count messages: {e}")

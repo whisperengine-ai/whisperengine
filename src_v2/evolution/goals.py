@@ -8,24 +8,16 @@ from langchain_core.output_parsers import JsonOutputParser
 
 class GoalManager:
     def __init__(self):
-        # Temporary hardcoded goals for testing
+        # Default goals that apply to all characters
         # In production, these would be loaded from YAML/DB
-        self.default_goals = {
-            "elena": [
-                {
-                    "slug": "learn_name",
-                    "description": "Learn the user's name.",
-                    "success_criteria": "User explicitly states their name.",
-                    "priority": 10
-                },
-                {
-                    "slug": "discuss_ocean",
-                    "description": "Engage the user in a discussion about marine biology.",
-                    "success_criteria": "User asks a question or shares an opinion about the ocean.",
-                    "priority": 5
-                }
-            ]
-        }
+        self.default_goals = [
+            {
+                "slug": "learn_name",
+                "description": "Learn the user's name.",
+                "success_criteria": "User explicitly states their name.",
+                "priority": 10
+            }
+        ]
 
     async def ensure_goals_exist(self, character_name: str):
         """
@@ -34,7 +26,8 @@ class GoalManager:
         if not db_manager.postgres_pool:
             return
 
-        goals = self.default_goals.get(character_name, [])
+        # Use the universal default goals
+        goals = self.default_goals
         
         async with db_manager.postgres_pool.acquire() as conn:
             for goal in goals:
