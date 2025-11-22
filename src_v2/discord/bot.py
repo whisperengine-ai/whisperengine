@@ -20,6 +20,7 @@ from src_v2.evolution.goals import goal_analyzer
 from src_v2.evolution.trust import trust_manager
 from src_v2.intelligence.reflection import reflection_engine
 from src_v2.vision.manager import vision_manager
+from src_v2.discord.scheduler import ProactiveScheduler
 from influxdb_client.client.write.point import Point
 
 class WhisperBot(commands.Bot):
@@ -37,6 +38,7 @@ class WhisperBot(commands.Bot):
         
         self.agent_engine = AgentEngine()
         self.summary_manager = SummaryManager()
+        self.scheduler = ProactiveScheduler(self)
         
         # Validate Bot Identity
         if not settings.DISCORD_BOT_NAME:
@@ -100,6 +102,13 @@ class WhisperBot(commands.Bot):
             logger.info(f"Synced {len(synced)} command(s)")
         except Exception as e:
             logger.error(f"Failed to sync commands: {e}")
+
+        # Start Proactive Scheduler
+        if settings.ENABLE_PROACTIVE_MESSAGING:
+            self.scheduler.start()
+            logger.info("Proactive Scheduler enabled and started.")
+        else:
+            logger.info("Proactive Scheduler disabled in settings.")
 
     async def on_ready(self):
         logger.info(f"Logged in as {self.user} (ID: {self.user.id})")

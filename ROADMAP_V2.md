@@ -148,10 +148,20 @@ This document tracks the progress of the "Back to Basics" rewrite.
 
 ---
 
-## 🔄 Phase 12: Multimodal Capabilities (Voice & Vision)
+## ✅ Phase 12: Multimodal Capabilities (Voice & Vision) (Completed)
 **Goal**: Voice interaction and image understanding.
 
-- [ ] **Voice Output (TTS)**: ElevenLabs integration.
-- [ ] **Discord Voice**: Voice channel support.
-- [ ] **Vision Support**: Image understanding and memory.
+- [x] **Voice Output (TTS)**: ElevenLabs integration.
+- [x] **Discord Voice**: Voice channel support.
+- [x] **Vision Support**: Image understanding and memory.
+
+---
+
+## 🔄 Phase 13: Proactive Engagement
+**Goal**: Transform the bot into a proactive companion.
+
+- [ ] **Activity Modeling**: Learn user schedules.
+- [ ] **Proactive Scheduler**: Initiate conversations.
+- [ ] **Contextual Openers**: Generate relevant starting messages.
+
 
