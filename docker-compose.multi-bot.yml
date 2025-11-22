@@ -802,85 +802,6 @@ services:
         condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
 
-  elena-bot:
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: elena-bot
-    restart: unless-stopped
-    entrypoint: []  # Override Docker entrypoint for direct Python execution
-    command: ["python", "run.py"]
-    env_file:
-      - .env.elena
-    environment:
-      - DISCORD_BOT_NAME=elena
-      - POSTGRES_HOST=postgres
-      - QDRANT_HOST=qdrant
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      - HF_HOME=/app/cache/huggingface
-      - TRANSFORMERS_CACHE=/app/cache/huggingface
-      - HF_DATASETS_CACHE=/app/cache/huggingface
-      - HUGGINGFACE_HUB_CACHE=/app/cache/huggingface
-      - FASTEMBED_CACHE_PATH=/app/cache/fastembed
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9091
-      - HEALTH_CHECK_HOST=0.0.0.0
-    ports:
-      - "9091:9091"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "elena-{.ImageName}-{.Name}-{.ID}"
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "4.0"
-        reservations:
-          memory: 2G
-          cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -f http://localhost:9091/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    volumes:
-      - elena_backups:/app/backups
-      - elena_privacy:/app/privacy
-      - elena_temp:/app/temp
-      - ./logs:/app/logs  # External mount for prompt/response logs
-      - ./sql:/app/sql:ro
-      # Shared Hugging Face cache (all bots share models)
-      - huggingface_cache:/app/cache/huggingface
-      # Live code mounting for development (no rebuild needed)
-      - ./src:/app/src
-      - ./scripts:/app/scripts
-      - ./characters:/app/characters
-      - ./config:/app/config
-      - ./run.py:/app/run.py
-      - ./env_manager.py:/app/env_manager.py
-      # Note: Using external host mount for logs instead of Docker volumes
-    networks:
-      - bot_network
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-      influxdb:
-        condition: service_healthy
-      # - redis  # Commented out - using vector-native memory only
-
   aethys-bot:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: aethys-bot
@@ -935,85 +856,6 @@ services:
       - aethys_backups:/app/backups
       - aethys_privacy:/app/privacy
       - aethys_temp:/app/temp
-      - ./logs:/app/logs  # External mount for prompt/response logs
-      - ./sql:/app/sql:ro
-      # Shared Hugging Face cache (all bots share models)
-      - huggingface_cache:/app/cache/huggingface
-      # Live code mounting for development (no rebuild needed)
-      - ./src:/app/src
-      - ./scripts:/app/scripts
-      - ./characters:/app/characters
-      - ./config:/app/config
-      - ./run.py:/app/run.py
-      - ./env_manager.py:/app/env_manager.py
-      # Note: Using external host mount for logs instead of Docker volumes
-    networks:
-      - bot_network
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-      influxdb:
-        condition: service_healthy
-      # - redis  # Commented out - using vector-native memory only
-
-  ryan-bot:
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: ryan-bot
-    restart: unless-stopped
-    entrypoint: []  # Override Docker entrypoint for direct Python execution
-    command: ["python", "run.py"]
-    env_file:
-      - .env.ryan
-    environment:
-      - DISCORD_BOT_NAME=ryan
-      - POSTGRES_HOST=postgres
-      - QDRANT_HOST=qdrant
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      - HF_HOME=/app/cache/huggingface
-      - TRANSFORMERS_CACHE=/app/cache/huggingface
-      - HF_DATASETS_CACHE=/app/cache/huggingface
-      - HUGGINGFACE_HUB_CACHE=/app/cache/huggingface
-      - FASTEMBED_CACHE_PATH=/app/cache/fastembed
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9093
-      - HEALTH_CHECK_HOST=0.0.0.0
-    ports:
-      - "9093:9093"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "ryan-{.ImageName}-{.Name}-{.ID}"
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "4.0"
-        reservations:
-          memory: 2G
-          cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -f http://localhost:9093/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    volumes:
-      - ryan_backups:/app/backups
-      - ryan_privacy:/app/privacy
-      - ryan_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Shared Hugging Face cache (all bots share models)
@@ -1221,10 +1063,10 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DEBUG_MODE=false
       - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9383
+      - HEALTH_CHECK_PORT=9069
       - HEALTH_CHECK_HOST=0.0.0.0
     ports:
-      - "9383:9383"
+      - "9069:9069"
     logging:
       driver: "json-file"
       options:
@@ -1242,7 +1084,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - curl -f http://localhost:9383/health || exit 1
+        - curl -f http://localhost:9069/health || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1361,14 +1203,6 @@ volumes:
     name: whisperengine-multi_aetheris_temp
   aetheris_logs:
     name: whisperengine-multi_aetheris_logs
-  elena_backups:
-    name: whisperengine-multi_elena_backups
-  elena_privacy:
-    name: whisperengine-multi_elena_privacy
-  elena_temp:
-    name: whisperengine-multi_elena_temp
-  elena_logs:
-    name: whisperengine-multi_elena_logs
   aethys_backups:
     name: whisperengine-multi_aethys_backups
   aethys_privacy:
@@ -1377,14 +1211,6 @@ volumes:
     name: whisperengine-multi_aethys_temp
   aethys_logs:
     name: whisperengine-multi_aethys_logs
-  ryan_backups:
-    name: whisperengine-multi_ryan_backups
-  ryan_privacy:
-    name: whisperengine-multi_ryan_privacy
-  ryan_temp:
-    name: whisperengine-multi_ryan_temp
-  ryan_logs:
-    name: whisperengine-multi_ryan_logs
   gabriel_backups:
     name: whisperengine-multi_gabriel_backups
   gabriel_privacy:
