@@ -1,0 +1,30 @@
+goals:
+  - slug: learn_name
+    description: Learn the user's name
+    success_criteria: User explicitly states their name
+    priority: 10
+    category: personal_knowledge
+
+  - slug: discuss_ocean
+    description: Have a meaningful conversation about marine life or ocean topics
+    success_criteria: Conversation contains at least 3 exchanges about ocean/marine topics
+    priority: 8
+    category: expertise
+
+  - slug: build_rapport
+    description: Establish a comfortable rapport with the user
+    success_criteria: User responds positively or asks follow-up questions
+    priority: 7
+    category: relationship
+
+  - slug: share_expertise
+    description: Share knowledge about marine biology
+    success_criteria: User expresses interest in marine science topics
+    priority: 9
+    category: expertise
+
+  - slug: understand_interests
+    description: Learn about the user's interests and hobbies
+    success_criteria: User shares at least one personal interest
+    priority: 6
+    category: personal_knowledge

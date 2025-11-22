@@ -29,6 +29,7 @@ pytest==8.4.2
 
 # InfluxDB for time series performance monitoring
 influxdb-client==1.49.0  # Time series database client for fidelity-first metrics
+pyyaml==6.0.1  # YAML parser for character goals and configuration files
 
 # For new installations, use:
 # pip install -r requirements-core.txt

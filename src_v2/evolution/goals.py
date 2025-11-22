@@ -1,5 +1,7 @@
 from typing import List, Dict, Any, Optional
 import json
+import yaml
+from pathlib import Path
 from loguru import logger
 from src_v2.core.database import db_manager
 from src_v2.agents.llm_factory import create_llm
@@ -8,26 +10,72 @@ from langchain_core.output_parsers import JsonOutputParser
 
 class GoalManager:
     def __init__(self):
-        # Default goals that apply to all characters
-        # In production, these would be loaded from YAML/DB
-        self.default_goals = [
+        self.default_goals = self._load_default_goals()
+        self._character_goals_cache = {}
+    
+    def _load_default_goals(self) -> List[Dict[str, Any]]:
+        """
+        Load default goals that apply to all characters.
+        """
+        return [
             {
                 "slug": "learn_name",
-                "description": "Learn the user's name.",
-                "success_criteria": "User explicitly states their name.",
-                "priority": 10
+                "description": "Learn the user's name",
+                "success_criteria": "User explicitly states their name",
+                "priority": 10,
+                "category": "personal_knowledge"
             }
         ]
+    
+    def _get_character_goals_file(self, character_name: str) -> Optional[Path]:
+        """
+        Get the path to a character's goals.yaml file.
+        """
+        goals_file = Path(f"characters/{character_name}/goals.yaml")
+        if goals_file.exists():
+            return goals_file
+        return None
+    
+    def _load_character_goals_from_file(self, character_name: str) -> List[Dict[str, Any]]:
+        """
+        Load goals from a character's goals.yaml file.
+        Returns the goals list or default goals if file doesn't exist.
+        """
+        if character_name in self._character_goals_cache:
+            return self._character_goals_cache[character_name]
+        
+        goals_file = self._get_character_goals_file(character_name)
+        
+        if not goals_file:
+            logger.debug(f"No goals.yaml found for {character_name}, using defaults")
+            self._character_goals_cache[character_name] = self.default_goals
+            return self.default_goals
+        
+        try:
+            with open(goals_file, 'r') as f:
+                data = yaml.safe_load(f)
+                if data and 'goals' in data:
+                    goals = data['goals']
+                    logger.info(f"Loaded {len(goals)} goals for {character_name} from {goals_file}")
+                    self._character_goals_cache[character_name] = goals
+                    return goals
+                else:
+                    logger.warning(f"Invalid goals.yaml format for {character_name}")
+                    return self.default_goals
+        except Exception as e:
+            logger.error(f"Failed to load goals for {character_name}: {e}")
+            return self.default_goals
 
     async def ensure_goals_exist(self, character_name: str):
         """
-        Ensures default goals exist in the database for the character.
+        Ensures goals exist in the database for the character.
+        Loads from character's goals.yaml file or uses defaults.
         """
         if not db_manager.postgres_pool:
             return
 
-        # Use the universal default goals
-        goals = self.default_goals
+        # Load character-specific goals
+        goals = self._load_character_goals_from_file(character_name)
         
         async with db_manager.postgres_pool.acquire() as conn:
             for goal in goals:

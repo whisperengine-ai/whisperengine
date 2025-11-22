@@ -1,0 +1,17 @@
+# Character-specific goals template
+# Copy this file to characters/{character_name}/goals.yaml and customize for your character
+
+goals:
+  - slug: learn_name
+    description: Learn the user's name
+    success_criteria: User explicitly states their name
+    priority: 10
+    category: personal_knowledge
+
+  # Add more character-specific goals below
+  # Example structure:
+  # - slug: goal_identifier
+  #   description: What you want to accomplish with the user
+  #   success_criteria: How you know the goal is complete
+  #   priority: 1-10 (higher = more important)
+  #   category: personal_knowledge|expertise|relationship|learning|discovery
