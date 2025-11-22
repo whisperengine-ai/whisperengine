@@ -36,8 +36,8 @@ class AgentEngine:
         context_variables = context_variables or {}
         
         # 1. Cognitive Routing (The "Brain")
-        # Only run if we have a user_id to look up memories for
-        if user_id:
+        # Only run if we have a user_id to look up memories for AND memory_context isn't already provided
+        if user_id and not context_variables.get("memory_context"):
             try:
                 router_result = await self.router.route_and_retrieve(user_id, user_message)
                 memory_context = router_result.get("context", "")
@@ -113,7 +113,8 @@ class AgentEngine:
         
         # Inject memory context if it exists and wasn't handled by a placeholder
         if context_variables.get("memory_context"):
-            system_content += f"\n\n[RELEVANT MEMORY CONTEXT]\n{context_variables['memory_context']}\n"
+            system_content += f"\n\n[RELEVANT MEMORY & KNOWLEDGE]\n{context_variables['memory_context']}\n"
+            system_content += "(Use this information naturally. Do not explicitly state 'I see in my memory' or 'According to the database'. Treat this as your own knowledge.)\n"
 
         # 3. Create Prompt Template
         prompt = ChatPromptTemplate.from_messages([
@@ -149,6 +150,11 @@ class AgentEngine:
                 "user_input_message": user_input_message,
                 **context_variables
             }
+            
+            # Fill missing variables with empty strings to prevent KeyError
+            for var in prompt.input_variables:
+                if var not in inputs:
+                    inputs[var] = ""
             
             response = await chain.ainvoke(inputs)
             
