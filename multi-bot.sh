@@ -27,7 +27,6 @@ AVAILABLE_BOTS=(
     "jake:9097:Adventure Photographer"
     "aetheris:9099:Conscious AI"
     "nottaylor:9100:Taylor Swift Parody"
-    "assistant:9101:AI Assistant"
     "aethys:3007:Omnipotent Entity"
 )
 
