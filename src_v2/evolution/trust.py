@@ -42,33 +42,36 @@ class TrustManager:
             async with db_manager.postgres_pool.acquire() as conn:
                 # Check if relationship exists
                 row = await conn.fetchrow("""
-                    SELECT trust_score, unlocked_traits
+                    SELECT trust_score, unlocked_traits, insights
                     FROM v2_user_relationships
                     WHERE user_id = $1 AND character_name = $2
                 """, user_id, character_name)
                 
                 if not row:
-                    # Initialize new relationship
+                    # Create default relationship
                     await conn.execute("""
-                        INSERT INTO v2_user_relationships (user_id, character_name, trust_score, unlocked_traits)
-                        VALUES ($1, $2, 0, '[]'::jsonb)
+                        INSERT INTO v2_user_relationships (user_id, character_name, trust_score, unlocked_traits, insights)
+                        VALUES ($1, $2, 0, '[]'::jsonb, '[]'::jsonb)
                     """, user_id, character_name)
-                    return {"trust_score": 0, "level": "Stranger", "unlocked_traits": []}
+                    return {"trust_score": 0, "level": "Stranger", "unlocked_traits": [], "insights": []}
                 
                 trust_score = row['trust_score']
-                unlocked_traits = row['unlocked_traits'] or []
+                unlocked_traits = row['unlocked_traits'] if row['unlocked_traits'] else []
+                insights = row['insights'] if row['insights'] else []
                 
                 # Determine level
                 level = "Stranger"
-                for threshold, level_name in reversed(self.RELATIONSHIP_LEVELS):
+                for threshold, label in self.RELATIONSHIP_LEVELS:
                     if trust_score >= threshold:
-                        level = level_name
+                        level = label
+                    else:
                         break
-                
+                        
                 return {
-                    "trust_score": trust_score,
-                    "level": level,
-                    "unlocked_traits": unlocked_traits
+                    "trust_score": trust_score, 
+                    "level": level, 
+                    "unlocked_traits": unlocked_traits,
+                    "insights": insights
                 }
                 
         except Exception as e:

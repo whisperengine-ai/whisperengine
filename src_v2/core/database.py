@@ -1,6 +1,5 @@
 import asyncio
 from typing import Optional
-from redis.asyncio import Redis
 from qdrant_client import AsyncQdrantClient
 from neo4j import AsyncGraphDatabase, AsyncDriver
 import asyncpg
@@ -15,7 +14,6 @@ class DatabaseManager:
         self.postgres_pool: Optional[asyncpg.Pool] = None
         self.qdrant_client: Optional[AsyncQdrantClient] = None
         self.neo4j_driver: Optional[AsyncDriver] = None
-        self.redis_client: Optional[Redis] = None
         self.influxdb_client: Optional[InfluxDBClient] = None
         self.influxdb_write_api = None
 
@@ -55,16 +53,6 @@ class DatabaseManager:
             logger.error(f"Failed to connect to Neo4j: {e}")
             raise
 
-    async def connect_redis(self):
-        try:
-            logger.info(f"Connecting to Redis at {settings.REDIS_URL}...")
-            self.redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
-            await self.redis_client.ping()
-            logger.info("Connected to Redis.")
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e}")
-            raise
-
     async def connect_influxdb(self):
         try:
             logger.info(f"Connecting to InfluxDB at {settings.INFLUXDB_URL}...")
@@ -90,7 +78,6 @@ class DatabaseManager:
             self.connect_postgres(),
             self.connect_qdrant(),
             self.connect_neo4j(),
-            self.connect_redis(),
             self.connect_influxdb()
         )
 
@@ -100,8 +87,6 @@ class DatabaseManager:
             await self.postgres_pool.close()
         if self.neo4j_driver:
             await self.neo4j_driver.close()
-        if self.redis_client:
-            await self.redis_client.aclose()
         if self.qdrant_client:
             await self.qdrant_client.close()
         if self.influxdb_client:

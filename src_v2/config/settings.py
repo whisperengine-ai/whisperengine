@@ -49,9 +49,6 @@ class Settings(BaseSettings):
     NEO4J_USER: str = Field(default="neo4j")
     NEO4J_PASSWORD: SecretStr = Field(default=SecretStr("password"))
     
-    # Redis (Cache/Queue)
-    REDIS_URL: str = Field(default="redis://localhost:6379/0")
-    
     # InfluxDB (Metrics)
     INFLUXDB_URL: str = Field(default="http://localhost:8086")
     INFLUXDB_TOKEN: Optional[SecretStr] = None

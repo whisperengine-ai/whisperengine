@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import datetime
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
@@ -128,7 +128,7 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"Failed to save vector memory: {e}")
 
-    async def save_summary_vector(self, session_id: str, content: str, meaningfulness_score: int, emotions: List[str]):
+    async def save_summary_vector(self, session_id: str, content: str, meaningfulness_score: int, emotions: List[str]) -> Optional[str]:
         """
         Embeds and saves a summary to Qdrant.
         """
@@ -136,30 +136,29 @@ class MemoryManager:
             return None
 
         try:
-            # Generate single content embedding
-            content_embedding = await self.embedding_service.embed_query_async(content)
-            
-            payload = {
-                "type": "summary",
-                "session_id": str(session_id),
-                "content": content,
-                "meaningfulness_score": meaningfulness_score,
-                "emotions": emotions,
-                "timestamp": datetime.datetime.now().isoformat()
-            }
-            
+            # Generate embedding
+            embedding = await self.embedding_service.embed_query_async(content)
             point_id = str(uuid.uuid4())
+            
+            point = PointStruct(
+                id=point_id,
+                vector=embedding,
+                payload={
+                    "type": "summary",
+                    "session_id": session_id,
+                    "content": content,
+                    "meaningfulness_score": meaningfulness_score,
+                    "emotions": emotions,
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                }
+            )
+            
             await db_manager.qdrant_client.upsert(
                 collection_name=self.collection_name,
-                points=[
-                    PointStruct(
-                        id=point_id,
-                        vector=content_embedding,
-                        payload=payload
-                    )
-                ]
+                points=[point]
             )
-            logger.debug(f"Saved summary vector for session {session_id}")
+            
+            logger.info(f"Saved summary vector {point_id} for session {session_id}")
             return point_id
             
         except Exception as e:
@@ -319,6 +318,23 @@ class MemoryManager:
             logger.error(f"Failed to retrieve history: {e}")
             
         return messages
+
+    async def count_messages_since(self, user_id: str, character_name: str, timestamp: datetime.datetime) -> int:
+        """Counts messages since a given timestamp."""
+        if not db_manager.postgres_pool:
+            return 0
+        
+        try:
+            async with db_manager.postgres_pool.acquire() as conn:
+                count = await conn.fetchval("""
+                    SELECT COUNT(*) 
+                    FROM v2_chat_history 
+                    WHERE user_id = $1 AND character_name = $2 AND created_at >= $3
+                """, user_id, character_name, timestamp)
+                return count
+        except Exception as e:
+            logger.error(f"Failed to count messages: {e}")
+            return 0
 
 # Global instance
 memory_manager = MemoryManager()

@@ -58,6 +58,10 @@ class AgentEngine:
         # The character object already contains the full prompt loaded from the markdown file
         system_content = character.system_prompt
         
+        # 2.1 Inject Past Summaries (Long-term Context)
+        if context_variables.get("past_summaries"):
+            system_content += f"\n\n[RELEVANT PAST CONVERSATIONS]\n{context_variables['past_summaries']}\n(Use this context to maintain continuity, but don't explicitly mention 'I read a summary'.)\n"
+
         # 2.5 Inject Dynamic Persona (Character Evolution State)
         if user_id:
             try:
@@ -71,6 +75,13 @@ class AgentEngine:
                     evolution_context += f"Active Traits: {', '.join(relationship['unlocked_traits'])}\n"
                     evolution_context += f"(You have unlocked deeper aspects of your personality with this user. Adapt your responses accordingly.)\n"
                 
+                # Inject Reflection Insights
+                if relationship.get('insights'):
+                    evolution_context += f"\n[USER INSIGHTS]\n"
+                    for insight in relationship['insights']:
+                        evolution_context += f"- {insight}\n"
+                    evolution_context += "(These are deep psychological observations about the user. Use them to empathize and connect.)\n"
+
                 system_content += evolution_context
                 logger.debug(f"Injected evolution state: {relationship['level']} (Trust: {relationship['trust_score']})")
                 

@@ -1,3 +1,4 @@
+from langchain_core.messages import HumanMessage
 import discord
 from typing import Union
 from datetime import datetime
@@ -16,6 +17,7 @@ from src_v2.core.database import db_manager
 from src_v2.evolution.feedback import feedback_analyzer
 from src_v2.evolution.goals import goal_analyzer
 from src_v2.evolution.trust import trust_manager
+from src_v2.intelligence.reflection import reflection_engine
 from influxdb_client.client.write.point import Point
 
 class WhisperBot(commands.Bot):
@@ -244,6 +246,15 @@ class WhisperBot(commands.Bot):
                     except Exception as e:
                         logger.error(f"Failed to retrieve knowledge facts: {e}")
 
+                    # Retrieve Past Summaries (Long-term Context)
+                    past_summaries = ""
+                    try:
+                        summaries = await memory_manager.search_summaries(user_message, user_id, limit=3)
+                        if summaries:
+                            past_summaries = "\n".join([f"- {s['content']} (Meaningfulness: {s['meaningfulness']})" for s in summaries])
+                    except Exception as e:
+                        logger.error(f"Failed to retrieve summaries: {e}")
+
                     # 2. Save User Message & Extract Knowledge
                     try:
                         await memory_manager.add_message(user_id, character.name, 'human', user_message, channel_id=channel_id, message_id=str(message.id))
@@ -286,7 +297,8 @@ class WhisperBot(commands.Bot):
                         "time_of_day": datetime.now().strftime("%H:%M"),
                         "location": location_context,
                         "recent_memories": formatted_memories,
-                        "knowledge_context": knowledge_facts
+                        "knowledge_context": knowledge_facts,
+                        "past_summaries": past_summaries
                     }
                     
                     # Inject file content if present
@@ -418,11 +430,42 @@ class WhisperBot(commands.Bot):
         """
         Checks if summarization is needed and runs it.
         """
-        # TODO: Implement message counting logic.
-        # For now, we can just log that we are checking.
-        # In a real implementation, we would query the DB count.
-        # logger.debug(f"Checking summarization for session {session_id}")
-        pass
+        try:
+            # 1. Get session start time
+            start_time = await session_manager.get_session_start_time(session_id)
+            if not start_time:
+                return
+
+            # 2. Count messages
+            message_count = await memory_manager.count_messages_since(user_id, self.character_name, start_time)
+            
+            # 3. Check threshold (e.g., 20 messages)
+            SUMMARY_THRESHOLD = 20
+            if message_count >= SUMMARY_THRESHOLD:
+                logger.info(f"Session {session_id} reached {message_count} messages. Triggering summarization.")
+                
+                # Fetch messages
+                messages = await memory_manager.get_recent_history(user_id, self.character_name, limit=message_count)
+                # Convert to dict format expected by SummaryManager
+                msg_dicts = [{"role": "human" if isinstance(m, HumanMessage) else "ai", "content": m.content} for m in messages]
+                
+                # Generate Summary
+                summary_manager = SummaryManager() 
+                result = await summary_manager.generate_summary(msg_dicts)
+                
+                if result:
+                    await summary_manager.save_summary(session_id, result)
+                    logger.info(f"Session {session_id} summarized successfully.")
+                    
+                    # Trigger Reflection
+                    logger.info("Triggering reflection analysis...")
+                    await reflection_engine.analyze_user_patterns(user_id, self.character_name)
+                    
+                    # Ideally we should mark these messages as summarized or close the session to start a fresh one.
+                    # For now, we just log it.
+                    
+        except Exception as e:
+            logger.error(f"Error in _check_and_summarize: {e}")
 
 
 # Global bot instance

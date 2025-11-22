@@ -1,12 +1,80 @@
-from typing import List
+from typing import List, Optional
 from loguru import logger
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 from src_v2.config.settings import settings
 from src_v2.core.database import db_manager
 from src_v2.knowledge.extractor import FactExtractor, Fact
+from src_v2.agents.llm_factory import create_llm
 
 class KnowledgeManager:
     def __init__(self):
         self.extractor = FactExtractor()
+        self.llm = create_llm(temperature=0.0)
+        
+        self.cypher_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert Neo4j Cypher developer.
+Your task is to convert a natural language question into a Cypher query to retrieve information about a user.
+
+SCHEMA:
+- Nodes: (:User {{id: $user_id}}), (:Entity {{name: "..."}})
+- Relationships: [:FACT {{predicate: "..."}}] (e.g., predicate="LIKES", "OWNS", "LIVES_IN")
+
+EXAMPLES:
+1. Q: "What do I like?"
+   A: MATCH (u:User {{id: $user_id}})-[r:FACT]->(o:Entity) WHERE r.predicate = 'LIKES' RETURN o.name
+
+2. Q: "Where do I live?"
+   A: MATCH (u:User {{id: $user_id}})-[r:FACT]->(o:Entity) WHERE r.predicate = 'LIVES_IN' RETURN o.name
+
+3. Q: "Do I have any pets?"
+   A: MATCH (u:User {{id: $user_id}})-[r:FACT]->(o:Entity) WHERE r.predicate = 'OWNS' OR o.name CONTAINS 'dog' OR o.name CONTAINS 'cat' RETURN r.predicate, o.name
+
+RULES:
+- ALWAYS use the parameter $user_id for the User node.
+- Return the relevant properties (usually o.name or r.predicate).
+- Do NOT include markdown formatting (```cypher). Just the raw query.
+- Use case-insensitive matching if unsure (e.g., toLower(r.predicate) = 'likes').
+"""),
+            ("human", "{question}")
+        ])
+        self.cypher_chain = self.cypher_prompt | self.llm | StrOutputParser()
+
+    async def query_graph(self, user_id: str, question: str) -> str:
+        """
+        Generates and executes a Cypher query based on a natural language question.
+        """
+        if not db_manager.neo4j_driver:
+            return "Graph database not available."
+
+        try:
+            # 1. Generate Cypher
+            cypher_query = await self.cypher_chain.ainvoke({"question": question})
+            cypher_query = cypher_query.replace("```cypher", "").replace("```", "").strip()
+            
+            logger.info(f"Generated Cypher: {cypher_query}")
+
+            # 2. Execute
+            async with db_manager.neo4j_driver.session() as session:
+                result = await session.run(cypher_query, user_id=user_id)
+                records = await result.data()
+                
+                if not records:
+                    return "No relevant information found in the graph."
+                
+                # Format results
+                formatted_results = []
+                for record in records:
+                    # Flatten the record values
+                    values = [str(v) for v in record.values()]
+                    formatted_results.append(" ".join(values))
+                
+                return ", ".join(formatted_results)
+
+        except Exception as e:
+            logger.error(f"Graph query failed: {e}")
+            return "Error querying knowledge graph."
 
     async def process_user_message(self, user_id: str, message: str):
         """
@@ -34,22 +102,41 @@ class KnowledgeManager:
     async def _merge_fact(tx, user_id: str, fact: Fact):
         """
         Cypher query to merge the fact into the graph.
+        Handles single-value predicates and antonym conflicts.
         """
-        query = """
-        MERGE (u:User {id: $user_id})
-        MERGE (o:Entity {name: $object_name})
-        WITH u, o
-        CALL apoc.create.relationship(u, $predicate, {}, o) YIELD rel
-        RETURN rel
-        """
-        # Note: Dynamic relationship types in pure Cypher are tricky. 
-        # APOC is best, but if not available, we might need string injection (carefully).
-        # For safety/simplicity without APOC, we can use a generic relationship with a type property,
-        # OR sanitize the predicate and inject it.
+        SINGLE_VALUE_PREDICATES = {"LIVES_IN", "HAS_NAME", "IS_AGED", "HAS_GENDER"}
+        ANTONYM_PAIRS = {
+            "LIKES": ["HATES", "DISLIKES"],
+            "LOVES": ["HATES", "DISLIKES"],
+            "HATES": ["LIKES", "LOVES"],
+            "DISLIKES": ["LIKES", "LOVES"]
+        }
         
-        # Let's try a safer approach without APOC for now to avoid dependency hell:
-        # (User)-[FACT {type: "LIKES"}]->(Entity)
-        
+        predicate = fact.predicate.upper()
+
+        # 1. Handle Single Value Predicates (Global overwrite)
+        if predicate in SINGLE_VALUE_PREDICATES:
+            delete_query = """
+            MATCH (u:User {id: $user_id})-[r:FACT {predicate: $predicate}]->()
+            DELETE r
+            """
+            await tx.run(delete_query, user_id=user_id, predicate=predicate)
+
+        # 2. Handle Antonyms (Specific object overwrite)
+        if predicate in ANTONYM_PAIRS:
+            antonyms = ANTONYM_PAIRS[predicate]
+            # Delete relationships with antonym predicates to the SAME object
+            delete_antonym_query = """
+            MATCH (u:User {id: $user_id})-[r:FACT]->(o:Entity {name: $object_name})
+            WHERE r.predicate IN $antonyms
+            DELETE r
+            """
+            await tx.run(delete_antonym_query, 
+                         user_id=user_id, 
+                         object_name=fact.object, 
+                         antonyms=antonyms)
+
+        # 3. Merge New Fact
         query_safe = """
         MERGE (u:User {id: $user_id})
         MERGE (o:Entity {name: $object_name})
@@ -60,7 +147,7 @@ class KnowledgeManager:
         await tx.run(query_safe, 
                      user_id=user_id, 
                      object_name=fact.object, 
-                     predicate=fact.predicate.upper(),
+                     predicate=predicate,
                      confidence=fact.confidence)
 
     async def get_user_knowledge(self, user_id: str, limit: int = 10) -> str:

@@ -25,7 +25,6 @@ openai>=1.0.0
 asyncpg>=0.29.0  # PostgreSQL
 qdrant-client>=1.7.0  # Qdrant
 neo4j>=5.15.0  # Neo4j
-redis>=5.0.0  # Redis
 influxdb-client>=1.39.0  # InfluxDB
 
 # Embeddings
@@ -36,6 +35,5 @@ fastapi>=0.109.0
 uvicorn>=0.27.0
 
 # Utilities
-arq>=0.25.0  # Async Redis Queue
 alembic>=1.13.0  # Migrations
 tenacity>=8.2.0  # Retries

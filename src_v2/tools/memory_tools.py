@@ -72,14 +72,9 @@ class LookupFactsTool(BaseTool):
 
     async def _arun(self, query: str) -> str:
         try:
-            # TODO: Implement knowledge_manager.query_graph(user_id, query)
-            # For now, return a placeholder or call existing method
-            # facts = await knowledge_manager.get_user_knowledge(self.user_id)
-            # But we want to query based on the input 'query'.
-            # Let's assume get_user_knowledge returns everything for now.
-            
-            facts = await knowledge_manager.get_user_knowledge(self.user_id)
-            return f"User Facts:\n{facts}"
+            # Use the new smart query method
+            result = await knowledge_manager.query_graph(self.user_id, query)
+            return f"Graph Query Result: {result}"
         except Exception as e:
             return f"Error looking up facts: {e}"
 

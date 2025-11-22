@@ -46,3 +46,8 @@ Pillow==11.3.0
 # Testing Dependencies (development only)
 pytest==8.4.2
 pytest-asyncio==1.2.0  # Updated from 1.1.0
+
+# Langchain Dependencies
+langchain-core==0.3.15
+langchain-openai==0.2.6
+langchain-anthropic==0.2.4
