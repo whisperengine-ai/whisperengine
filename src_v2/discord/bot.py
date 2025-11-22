@@ -1,5 +1,6 @@
 from langchain_core.messages import HumanMessage
 import discord
+import asyncio
 from typing import Union
 from datetime import datetime
 from discord.ext import commands
@@ -18,6 +19,7 @@ from src_v2.evolution.feedback import feedback_analyzer
 from src_v2.evolution.goals import goal_analyzer
 from src_v2.evolution.trust import trust_manager
 from src_v2.intelligence.reflection import reflection_engine
+from src_v2.vision.manager import vision_manager
 from influxdb_client.client.write.point import Point
 
 class WhisperBot(commands.Bot):
@@ -188,6 +190,16 @@ class WhisperBot(commands.Bot):
                             if attachment.content_type and attachment.content_type.startswith("image/"):
                                 image_urls.append(attachment.url)
                                 logger.info(f"Detected image attachment: {attachment.url}")
+                                
+                                # Trigger Vision Analysis (Background Task)
+                                if settings.LLM_SUPPORTS_VISION:
+                                    asyncio.create_task(
+                                        vision_manager.analyze_and_store(
+                                            image_url=attachment.url,
+                                            user_id=user_id,
+                                            channel_id=channel_id
+                                        )
+                                    )
                             
                             # Document Handling (PDF, Txt, etc.)
                             else:

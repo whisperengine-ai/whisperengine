@@ -52,41 +52,37 @@ class CharacterCommands(app_commands.Group):
 
     @app_commands.command(name="join", description="Join your voice channel")
     async def join(self, interaction: discord.Interaction):
-        # Ensure we are in a guild
-        if not interaction.guild:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
-            return
-
-        # Ensure user is a Member (has voice state)
-        if not isinstance(interaction.user, discord.Member) or not interaction.user.voice:
-            await interaction.response.send_message("You are not in a voice channel.", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        if not interaction.user.voice:
+            await interaction.followup.send("You are not in a voice channel.", ephemeral=True)
             return
             
         channel = interaction.user.voice.channel
-        if not channel:
-             await interaction.response.send_message("You are not in a voice channel.", ephemeral=True)
-             return
-
-        if interaction.guild.voice_client:
-            await interaction.guild.voice_client.move_to(channel) # type: ignore
-        else:
-            await channel.connect()
-            
-        bot_name = settings.DISCORD_BOT_NAME or "I"
-        await interaction.response.send_message(f"**{bot_name}** joined {channel.name}!", ephemeral=True)
+        try:
+            # Use VoiceManager
+            from src_v2.discord.voice import VoiceManager
+            vm = VoiceManager(interaction.client)
+            await vm.join_channel(channel)
+            await interaction.followup.send(f"Joined {channel.name}!", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Failed to join voice: {e}")
+            await interaction.followup.send("Failed to join voice channel.", ephemeral=True)
 
     @app_commands.command(name="leave", description="Leave the voice channel")
     async def leave(self, interaction: discord.Interaction):
-        if not interaction.guild:
-             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
-             return
-
-        bot_name = settings.DISCORD_BOT_NAME or "I"
-        if interaction.guild.voice_client:
-            await interaction.guild.voice_client.disconnect(force=False)
-            await interaction.response.send_message(f"**{bot_name}** left the voice channel.", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"**{bot_name}** is not in a voice channel.", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        if not interaction.guild.voice_client:
+            await interaction.followup.send("I am not in a voice channel.", ephemeral=True)
+            return
+            
+        try:
+            from src_v2.discord.voice import VoiceManager
+            vm = VoiceManager(interaction.client)
+            await vm.leave_channel(interaction.guild)
+            await interaction.followup.send("Left voice channel.", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Failed to leave voice: {e}")
+            await interaction.followup.send("Failed to leave voice channel.", ephemeral=True)
 
 class WhisperCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):

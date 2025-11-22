@@ -113,3 +113,45 @@ This document tracks the progress of the "Back to Basics" rewrite.
     - Track **Session Duration** and **Engagement Depth** in InfluxDB.
     - Use metrics to determine "Best Time to Message" (Proactive Messaging).
 
+---
+
+## ✅ Phase 8: Goal-Driven Behavior (Completed)
+**Goal**: Give characters long-term objectives and proactive behavior.
+
+- [x] **Goal System**: Implemented `v2_goals` and `GoalManager`.
+- [x] **Proactivity**: Bot steers conversations towards goals.
+
+---
+
+## ✅ Phase 9: Trust & Relationships (Completed)
+**Goal**: Track relationship depth and unlock personality traits.
+
+- [x] **Trust System**: Implemented `TrustManager` and `v2_user_relationships`.
+- [x] **Dynamic Traits**: Unlocking traits based on trust scores.
+
+---
+
+## ✅ Phase 10: Advanced Knowledge Graph (Completed)
+**Goal**: Turn the Knowledge Graph into a dynamic, queryable brain.
+
+- [x] **Smart Extraction**: Improved `FactExtractor` for updates.
+- [x] **Graph QA**: Bot can query the graph for user details.
+
+---
+
+## ✅ Phase 11: Personality & Style Tuning (Completed)
+**Goal**: Ensure the bot expresses itself consistently and naturally.
+
+- [x] **Style Analyzer**: LLM-based critique of bot responses.
+- [x] **Automated Evaluation**: "Golden Scenario" testing.
+- [x] **Dynamic Preferences**: User-configurable verbosity and style.
+
+---
+
+## 🔄 Phase 12: Multimodal Capabilities (Voice & Vision)
+**Goal**: Voice interaction and image understanding.
+
+- [ ] **Voice Output (TTS)**: ElevenLabs integration.
+- [ ] **Discord Voice**: Voice channel support.
+- [ ] **Vision Support**: Image understanding and memory.
+
