@@ -22,7 +22,6 @@ NC='\033[0m' # No Color
 # Available bots
 AVAILABLE_BOTS=(
     "marcus:9092:AI Researcher"
-    "dream:9094:Mythological Entity"
     "gabriel:9095:British Gentleman"
     "sophia:9096:Marketing Executive"
     "jake:9097:Adventure Photographer"
