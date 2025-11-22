@@ -4,6 +4,8 @@ from redis.asyncio import Redis
 from qdrant_client import AsyncQdrantClient
 from neo4j import AsyncGraphDatabase, AsyncDriver
 import asyncpg
+from influxdb_client import InfluxDBClient
+from influxdb_client.client.write_api import WriteOptions
 from loguru import logger
 
 from src_v2.config.settings import settings
@@ -14,6 +16,8 @@ class DatabaseManager:
         self.qdrant_client: Optional[AsyncQdrantClient] = None
         self.neo4j_driver: Optional[AsyncDriver] = None
         self.redis_client: Optional[Redis] = None
+        self.influxdb_client: Optional[InfluxDBClient] = None
+        self.influxdb_write_api = None
 
     async def connect_postgres(self):
         try:
@@ -61,12 +65,33 @@ class DatabaseManager:
             logger.error(f"Failed to connect to Redis: {e}")
             raise
 
+    async def connect_influxdb(self):
+        try:
+            logger.info(f"Connecting to InfluxDB at {settings.INFLUXDB_URL}...")
+            self.influxdb_client = InfluxDBClient(
+                url=settings.INFLUXDB_URL,
+                token=settings.INFLUXDB_TOKEN.get_secret_value() if settings.INFLUXDB_TOKEN else None,
+                org=settings.INFLUXDB_ORG
+            )
+            # Create write API (synchronous but fast enough for batching, or we can use async client if needed)
+            # For now, using synchronous write_api with batching
+            self.influxdb_write_api = self.influxdb_client.write_api(write_options=WriteOptions(batch_size=1))
+            
+            # Verify connection
+            self.influxdb_client.ping()
+            logger.info("Connected to InfluxDB.")
+        except Exception as e:
+            logger.error(f"Failed to connect to InfluxDB: {e}")
+            # We don't raise here because InfluxDB is optional for core functionality
+            # raise
+
     async def connect_all(self):
         await asyncio.gather(
             self.connect_postgres(),
             self.connect_qdrant(),
             self.connect_neo4j(),
-            self.connect_redis()
+            self.connect_redis(),
+            self.connect_influxdb()
         )
 
     async def disconnect_all(self):
@@ -79,6 +104,8 @@ class DatabaseManager:
             await self.redis_client.aclose()
         if self.qdrant_client:
             await self.qdrant_client.close()
+        if self.influxdb_client:
+            self.influxdb_client.close()
         logger.info("Disconnected from databases.")
 
 # Global database manager instance

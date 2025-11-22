@@ -9,10 +9,14 @@ from loguru import logger
 from src_v2.config.settings import settings
 from src_v2.core.character import Character
 from src_v2.agents.llm_factory import create_llm
+from src_v2.agents.router import CognitiveRouter
+from src_v2.evolution.trust import trust_manager
+from src_v2.evolution.goals import goal_manager
 
 class AgentEngine:
     def __init__(self):
         self.llm = create_llm()
+        self.router = CognitiveRouter()
         logger.info("AgentEngine initialized")
 
     async def generate_response(
@@ -22,7 +26,7 @@ class AgentEngine:
         chat_history: Optional[List[BaseMessage]] = None,
         context_variables: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
-        image_url: Optional[str] = None
+        image_urls: Optional[List[str]] = None
     ) -> str:
         """
         Generates a response for the given character and user message.
@@ -30,11 +34,66 @@ class AgentEngine:
         chat_history = chat_history or []
         context_variables = context_variables or {}
         
-        # 1. Construct System Prompt
+        # 1. Cognitive Routing (The "Brain")
+        # Only run if we have a user_id to look up memories for
+        if user_id:
+            try:
+                router_result = await self.router.route_and_retrieve(user_id, user_message)
+                memory_context = router_result.get("context", "")
+                reasoning = router_result.get("reasoning", "")
+                
+                if memory_context:
+                    logger.info(f"Injecting memory context. Reasoning: {reasoning}")
+                    # Inject into context_variables so it can be used in the prompt if {memory_context} exists,
+                    # or append to system prompt.
+                    context_variables["memory_context"] = memory_context
+                    context_variables["router_reasoning"] = reasoning
+                else:
+                    logger.debug(f"No memory context retrieved. Reasoning: {reasoning}")
+            except Exception as e:
+                logger.error(f"Cognitive Router failed: {e}")
+
+        # 2. Construct System Prompt
         # The character object already contains the full prompt loaded from the markdown file
         system_content = character.system_prompt
         
-        # 2. Create Prompt Template
+        # 2.5 Inject Dynamic Persona (Character Evolution State)
+        if user_id:
+            try:
+                relationship = await trust_manager.get_relationship_level(user_id, character.name)
+                
+                # Inject relationship status into prompt
+                evolution_context = f"\n\n[RELATIONSHIP STATUS]\n"
+                evolution_context += f"Trust Level: {relationship['level']} ({relationship['trust_score']}/150)\n"
+                
+                if relationship['unlocked_traits']:
+                    evolution_context += f"Active Traits: {', '.join(relationship['unlocked_traits'])}\n"
+                    evolution_context += f"(You have unlocked deeper aspects of your personality with this user. Adapt your responses accordingly.)\n"
+                
+                system_content += evolution_context
+                logger.debug(f"Injected evolution state: {relationship['level']} (Trust: {relationship['trust_score']})")
+                
+                # 2.6 Inject Active Goals
+                active_goals = await goal_manager.get_active_goals(user_id, character.name)
+                if active_goals:
+                    # Pick the highest priority goal
+                    top_goal = active_goals[0]
+                    goal_context = f"\n\n[CURRENT GOAL: {top_goal['slug']}]\n"
+                    goal_context += f"Objective: {top_goal['description']}\n"
+                    goal_context += f"Success Criteria: {top_goal['success_criteria']}\n"
+                    goal_context += f"(Try to naturally steer the conversation towards this goal without being pushy.)\n"
+                    
+                    system_content += goal_context
+                    logger.debug(f"Injected goal: {top_goal['slug']}")
+                
+            except Exception as e:
+                logger.error(f"Failed to inject evolution/goal state: {e}")
+        
+        # Inject memory context if it exists and wasn't handled by a placeholder
+        if context_variables.get("memory_context"):
+            system_content += f"\n\n[RELEVANT MEMORY CONTEXT]\n{context_variables['memory_context']}\n"
+
+        # 3. Create Prompt Template
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_content),
             MessagesPlaceholder(variable_name="chat_history"),
@@ -47,15 +106,14 @@ class AgentEngine:
         # 4. Execute
         try:
             # Prepare input content
-            if image_url and settings.LLM_SUPPORTS_VISION:
-                # Multimodal input
-                input_content = [
-                    {"type": "text", "text": user_message},
-                    {
+            if image_urls and settings.LLM_SUPPORTS_VISION:
+                # Multimodal input with multiple images
+                input_content = [{"type": "text", "text": user_message}]
+                for img_url in image_urls:
+                    input_content.append({
                         "type": "image_url",
-                        "image_url": {"url": image_url}
-                    }
-                ]
+                        "image_url": {"url": img_url}
+                    })
             else:
                 # Text-only input
                 input_content = user_message
@@ -82,7 +140,7 @@ class AgentEngine:
                     user_input=user_message,
                     context_variables=context_variables,
                     response=response.content,
-                    image_url=image_url
+                    image_urls=image_urls
                 )
             
             return response.content
@@ -100,7 +158,7 @@ class AgentEngine:
         user_input: str,
         context_variables: Dict[str, Any],
         response: str,
-        image_url: Optional[str] = None
+        image_urls: Optional[List[str]] = None
     ):
         """
         Logs the full prompt context and response to a JSON file.
@@ -138,7 +196,7 @@ class AgentEngine:
                     "context_variables": context_variables,
                     "chat_history": history_serialized,
                     "user_input": user_input,
-                    "image_url": image_url
+                    "image_urls": image_urls
                 },
                 "response": response
             }

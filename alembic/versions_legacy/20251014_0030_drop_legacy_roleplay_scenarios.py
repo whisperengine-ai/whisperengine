@@ -37,6 +37,7 @@ Description:
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -51,21 +52,14 @@ def upgrade():
     print("=" * 60)
     
     conn = op.get_bind()
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
     
     # Step 1: Show current data before dropping
     print("\n📊 CURRENT STATE:")
     
     # Check if character_roleplay_scenarios table exists
-    roleplay_exists_result = conn.execute(sa.text("""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = 'character_roleplay_scenarios'
-        )
-    """))
-    row = roleplay_exists_result.fetchone()
-    roleplay_exists = row[0] if row else False
-    
-    if roleplay_exists:
+    if 'character_roleplay_scenarios' in tables:
         # Check character_roleplay_scenarios
         result = conn.execute(sa.text("""
             SELECT c.name, COUNT(*) as scenario_count
@@ -85,16 +79,7 @@ def upgrade():
         print("  character_roleplay_scenarios: table doesn't exist")
     
     # Check character_scenario_triggers
-    trigger_exists_result = conn.execute(sa.text("""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = 'character_scenario_triggers'
-        )
-    """))
-    row = trigger_exists_result.fetchone()
-    trigger_exists = row[0] if row else False
-    
-    if trigger_exists:
+    if 'character_scenario_triggers' in tables:
         result = conn.execute(sa.text(
             "SELECT COUNT(*) as count FROM character_scenario_triggers"
         ))
@@ -106,18 +91,22 @@ def upgrade():
     
     # Show modern replacement system
     print("\n✅ MODERN REPLACEMENT (keeping):")
-    result = conn.execute(sa.text("""
-        SELECT c.name, COUNT(*) as scenario_count
-        FROM character_ai_scenarios cas
-        JOIN characters c ON cas.character_id = c.id
-        GROUP BY c.name
-        ORDER BY c.name
-    """))
-    modern_data = result.fetchall()
     
-    print("  character_ai_scenarios (active system):")
-    for row in modern_data:
-        print(f"    - {row[0]}: {row[1]} scenarios")
+    if 'character_ai_scenarios' in tables:
+        result = conn.execute(sa.text("""
+            SELECT c.name, COUNT(*) as scenario_count
+            FROM character_ai_scenarios cas
+            JOIN characters c ON cas.character_id = c.id
+            GROUP BY c.name
+            ORDER BY c.name
+        """))
+        modern_data = result.fetchall()
+        
+        print("  character_ai_scenarios (active system):")
+        for row in modern_data:
+            print(f"    - {row[0]}: {row[1]} scenarios")
+    else:
+        print("  character_ai_scenarios: table doesn't exist (skipping summary)")
     
     # Step 2: Drop legacy tables (foreign keys will be dropped automatically)
     print("\n🗑️  DROPPING LEGACY TABLES:")

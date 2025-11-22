@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import os
 from loguru import logger
 from src_v2.config.settings import settings
 from src_v2.core.database import db_manager
@@ -16,6 +17,7 @@ async def main():
     logger.info("Starting WhisperEngine 2.0...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"LLM Provider: {settings.LLM_PROVIDER} ({settings.LLM_MODEL_NAME})")
+    logger.debug(f"TOKENIZERS_PARALLELISM: {os.environ.get('TOKENIZERS_PARALLELISM')}")
     
     try:
         # Run Migrations

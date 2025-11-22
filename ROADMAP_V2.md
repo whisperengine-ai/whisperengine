@@ -72,7 +72,44 @@ This document tracks the progress of the "Back to Basics" rewrite.
 
 ---
 
-## 🛠️ Phase 5: Polish & Production
+## ✅ Phase 5: Polish & Production (Completed)
 - [x] **Tooling**: Add "slash commands" for debugging (e.g., `/memory wipe`, `/debug`).
 - [x] **Error Handling**: Graceful fallbacks if LLM or DB is unreachable.
 - [x] **Testing**: Add unit tests for `MemoryManager` and `AgentEngine`.
+
+---
+
+## ✅ Phase 6: Social Awareness & Agentic Memory (Completed)
+**Goal**: Make the bot "socially aware" (Groups, Threads, Replies) and "agentic" (Tool Use).
+
+- [x] **Social Context**:
+    - **Group Chat**: Added `channel_id` to DB and memory lookups.
+    - **Thread Support**: Detects threads and injects "Location Context".
+    - **Reply Handling**: Resolves replies and injects `[Replying to User: ...]` context.
+- [x] **Input Handling**:
+    - **Reaction Logging**: Logs emoji reactions to InfluxDB for feedback analysis.
+    - **File Uploads**: Integrated LlamaIndex to read PDF/TXT attachments.
+- [x] **Cognitive Router**:
+    - Implemented `src_v2/agents/router.py` to classify intent (Memory vs Knowledge vs Chat).
+    - Integrated into `AgentEngine` to dynamically select context.
+
+---
+
+## 🧬 Phase 7: Character Evolution & Feedback Loop
+**Goal**: Enable the character to "grow" and "adapt" based on long-term interaction and feedback.
+
+- [ ] **Emoji Feedback Loop (RLHF)**:
+    - Analyze `reaction_feedback` from InfluxDB.
+    - Implement `MemoryScorer` to boost/penalize memories based on reactions (👍/👎).
+    - **Auto-Tuning**: Adjust character "Temperature" or "Verbosity" based on aggregate feedback.
+- [ ] **Trust & Relationship System**:
+    - Implement `TrustManager` to track `trust_score` per user.
+    - **Dynamic Traits**: Unlock new personality traits (e.g., "Vulnerable", "Sarcastic") as trust increases.
+    - **Relationship Milestones**: Trigger special events when trust thresholds are met (e.g., "Close Friend" status).
+- [ ] **Long-Term Goal Tracking**:
+    - Give characters "Life Goals" (e.g., "Finish my research paper").
+    - Track progress based on conversation topics (e.g., User helps with research -> Progress +1).
+- [ ] **Session Analytics**:
+    - Track **Session Duration** and **Engagement Depth** in InfluxDB.
+    - Use metrics to determine "Best Time to Message" (Proactive Messaging).
+

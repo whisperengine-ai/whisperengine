@@ -1,3 +1,9 @@
+import os
+
+# Suppress HuggingFace Tokenizers warning
+# This must be set before any library using tokenizers is imported
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from typing import Optional, Literal
 from pydantic import Field, SecretStr, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -80,7 +86,6 @@ class Settings(BaseSettings):
     )
 
 # Determine env file based on DISCORD_BOT_NAME env var
-import os
 bot_name = os.getenv("DISCORD_BOT_NAME")
 env_file = f".env.{bot_name}" if bot_name else ".env"
 

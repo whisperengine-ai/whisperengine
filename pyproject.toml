@@ -46,6 +46,13 @@ dependencies = [
     "PyNaCl==1.6.0",  # Updated from 1.5.0
     "audioop-lts==0.2.2",
     "elevenlabs==2.16.0",  # Updated from 1.8.2
+
+    # Document Processing (LlamaIndex)
+    "llama-index>=0.10.0",
+    "llama-index-readers-file>=0.1.0",
+
+    # Metrics
+    "influxdb-client==1.40.0",
 ]
 
 [project.optional-dependencies]
