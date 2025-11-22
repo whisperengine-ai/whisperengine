@@ -1,11 +1,13 @@
 import asyncio
 import sys
 import os
+import uvicorn
 from loguru import logger
 from src_v2.config.settings import settings
 from src_v2.core.database import db_manager
 from src_v2.memory.manager import memory_manager
 from src_v2.discord.bot import bot
+from src_v2.api.app import app as api_app
 from src_v2.scripts.migrate import run_migrations
 from src_v2.utils.shutdown import shutdown_handler
 
@@ -33,6 +35,18 @@ async def main():
         # Register cleanup tasks
         shutdown_handler.add_cleanup_task(db_manager.disconnect_all)
         
+        # Start API Server
+        config = uvicorn.Config(
+            app=api_app, 
+            host=settings.API_HOST, 
+            port=settings.API_PORT, 
+            log_level=settings.LOG_LEVEL.lower()
+        )
+        server = uvicorn.Server(config)
+        
+        logger.info(f"Starting API Server on {settings.API_HOST}:{settings.API_PORT}...")
+        api_task = asyncio.create_task(server.serve())
+        
         # Start Discord Bot
         logger.info("Starting Discord Bot...")
         async with bot:
@@ -41,6 +55,13 @@ async def main():
             
             # Wait for shutdown signal (SIGINT/SIGTERM)
             await shutdown_handler.wait_for_shutdown_signal()
+            
+            # Shutdown sequence
+            logger.info("Shutting down services...")
+            
+            # Stop API
+            server.should_exit = True
+            await api_task
             
             # Close bot explicitly
             if not bot.is_closed():

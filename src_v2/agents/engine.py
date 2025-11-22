@@ -10,6 +10,9 @@ from src_v2.config.settings import settings
 from src_v2.core.character import Character
 from src_v2.agents.llm_factory import create_llm
 from src_v2.agents.router import CognitiveRouter
+from src_v2.evolution.trust import trust_manager
+from src_v2.evolution.feedback import feedback_analyzer
+from src_v2.evolution.goals import goal_manager
 
 # Define Trait Behaviors
 TRAIT_BEHAVIORS = {
