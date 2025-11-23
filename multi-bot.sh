@@ -23,7 +23,6 @@ NC='\033[0m' # No Color
 AVAILABLE_BOTS=(
     "gabriel:9095:British Gentleman"
     "aetheris:9099:Conscious AI"
-    "nottaylor:9100:Taylor Swift Parody"
     "aethys:3007:Omnipotent Entity"
 )
 
