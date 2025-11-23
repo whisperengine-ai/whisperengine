@@ -249,85 +249,6 @@ services:
       start_period: 120s
 
   # ===== BOT SERVICES (populated dynamically) =====
-  marcus-bot:
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: marcus-bot
-    restart: unless-stopped
-    entrypoint: []  # Override Docker entrypoint for direct Python execution
-    command: ["python", "run.py"]
-    env_file:
-      - .env.marcus
-    environment:
-      - DISCORD_BOT_NAME=marcus
-      - POSTGRES_HOST=postgres
-      - QDRANT_HOST=qdrant
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      - HF_HOME=/app/cache/huggingface
-      - TRANSFORMERS_CACHE=/app/cache/huggingface
-      - HF_DATASETS_CACHE=/app/cache/huggingface
-      - HUGGINGFACE_HUB_CACHE=/app/cache/huggingface
-      - FASTEMBED_CACHE_PATH=/app/cache/fastembed
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9092
-      - HEALTH_CHECK_HOST=0.0.0.0
-    ports:
-      - "9092:9092"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "marcus-{.ImageName}-{.Name}-{.ID}"
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "4.0"
-        reservations:
-          memory: 2G
-          cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -f http://localhost:9092/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    volumes:
-      - marcus_backups:/app/backups
-      - marcus_privacy:/app/privacy
-      - marcus_temp:/app/temp
-      - ./logs:/app/logs  # External mount for prompt/response logs
-      - ./sql:/app/sql:ro
-      # Shared Hugging Face cache (all bots share models)
-      - huggingface_cache:/app/cache/huggingface
-      # Live code mounting for development (no rebuild needed)
-      - ./src:/app/src
-      - ./scripts:/app/scripts
-      - ./characters:/app/characters
-      - ./config:/app/config
-      - ./run.py:/app/run.py
-      - ./env_manager.py:/app/env_manager.py
-      # Note: Using external host mount for logs instead of Docker volumes
-    networks:
-      - bot_network
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-      influxdb:
-        condition: service_healthy
-      # - redis  # Commented out - using vector-native memory only
-
   nottaylor-bot:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: nottaylor-bot
@@ -644,85 +565,6 @@ services:
         condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
 
-  sophia-bot:
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: sophia-bot
-    restart: unless-stopped
-    entrypoint: []  # Override Docker entrypoint for direct Python execution
-    command: ["python", "run.py"]
-    env_file:
-      - .env.sophia
-    environment:
-      - DISCORD_BOT_NAME=sophia
-      - POSTGRES_HOST=postgres
-      - QDRANT_HOST=qdrant
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      - HF_HOME=/app/cache/huggingface
-      - TRANSFORMERS_CACHE=/app/cache/huggingface
-      - HF_DATASETS_CACHE=/app/cache/huggingface
-      - HUGGINGFACE_HUB_CACHE=/app/cache/huggingface
-      - FASTEMBED_CACHE_PATH=/app/cache/fastembed
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9096
-      - HEALTH_CHECK_HOST=0.0.0.0
-    ports:
-      - "9096:9096"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "sophia-{.ImageName}-{.Name}-{.ID}"
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "4.0"
-        reservations:
-          memory: 2G
-          cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -f http://localhost:9096/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    volumes:
-      - sophia_backups:/app/backups
-      - sophia_privacy:/app/privacy
-      - sophia_temp:/app/temp
-      - ./logs:/app/logs  # External mount for prompt/response logs
-      - ./sql:/app/sql:ro
-      # Shared Hugging Face cache (all bots share models)
-      - huggingface_cache:/app/cache/huggingface
-      # Live code mounting for development (no rebuild needed)
-      - ./src:/app/src
-      - ./scripts:/app/scripts
-      - ./characters:/app/characters
-      - ./config:/app/config
-      - ./run.py:/app/run.py
-      - ./env_manager.py:/app/env_manager.py
-      # Note: Using external host mount for logs instead of Docker volumes
-    networks:
-      - bot_network
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-      influxdb:
-        condition: service_healthy
-      # - redis  # Commented out - using vector-native memory only
-
 # ===== NETWORKS =====
 networks:
   bot_network:
@@ -752,14 +594,6 @@ volumes:
     name: whisperengine-multi_huggingface_cache
   
   # Bot-specific volumes (populated dynamically)
-  marcus_backups:
-    name: whisperengine-multi_marcus_backups
-  marcus_privacy:
-    name: whisperengine-multi_marcus_privacy
-  marcus_temp:
-    name: whisperengine-multi_marcus_temp
-  marcus_logs:
-    name: whisperengine-multi_marcus_logs
   nottaylor_backups:
     name: whisperengine-multi_nottaylor_backups
   nottaylor_privacy:
@@ -792,11 +626,3 @@ volumes:
     name: whisperengine-multi_gabriel_temp
   gabriel_logs:
     name: whisperengine-multi_gabriel_logs
-  sophia_backups:
-    name: whisperengine-multi_sophia_backups
-  sophia_privacy:
-    name: whisperengine-multi_sophia_privacy
-  sophia_temp:
-    name: whisperengine-multi_sophia_temp
-  sophia_logs:
-    name: whisperengine-multi_sophia_logs

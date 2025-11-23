@@ -186,3 +186,5 @@ disabled.env.aria
 disabled.env.dream
 disabled.env.assistant
 disabled.env.jake
+disabled.env.sophia
+disabled.env.marcus
