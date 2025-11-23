@@ -249,85 +249,6 @@ services:
       start_period: 120s
 
   # ===== BOT SERVICES (populated dynamically) =====
-  jake-bot:
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: jake-bot
-    restart: unless-stopped
-    entrypoint: []  # Override Docker entrypoint for direct Python execution
-    command: ["python", "run.py"]
-    env_file:
-      - .env.jake
-    environment:
-      - DISCORD_BOT_NAME=jake
-      - POSTGRES_HOST=postgres
-      - QDRANT_HOST=qdrant
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      - HF_HOME=/app/cache/huggingface
-      - TRANSFORMERS_CACHE=/app/cache/huggingface
-      - HF_DATASETS_CACHE=/app/cache/huggingface
-      - HUGGINGFACE_HUB_CACHE=/app/cache/huggingface
-      - FASTEMBED_CACHE_PATH=/app/cache/fastembed
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9097
-      - HEALTH_CHECK_HOST=0.0.0.0
-    ports:
-      - "9097:9097"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "jake-{.ImageName}-{.Name}-{.ID}"
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "4.0"
-        reservations:
-          memory: 2G
-          cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -f http://localhost:9097/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    volumes:
-      - jake_backups:/app/backups
-      - jake_privacy:/app/privacy
-      - jake_temp:/app/temp
-      - ./logs:/app/logs  # External mount for prompt/response logs
-      - ./sql:/app/sql:ro
-      # Shared Hugging Face cache (all bots share models)
-      - huggingface_cache:/app/cache/huggingface
-      # Live code mounting for development (no rebuild needed)
-      - ./src:/app/src
-      - ./scripts:/app/scripts
-      - ./characters:/app/characters
-      - ./config:/app/config
-      - ./run.py:/app/run.py
-      - ./env_manager.py:/app/env_manager.py
-      # Note: Using external host mount for logs instead of Docker volumes
-    networks:
-      - bot_network
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-      influxdb:
-        condition: service_healthy
-      # - redis  # Commented out - using vector-native memory only
-
   marcus-bot:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: marcus-bot
@@ -831,14 +752,6 @@ volumes:
     name: whisperengine-multi_huggingface_cache
   
   # Bot-specific volumes (populated dynamically)
-  jake_backups:
-    name: whisperengine-multi_jake_backups
-  jake_privacy:
-    name: whisperengine-multi_jake_privacy
-  jake_temp:
-    name: whisperengine-multi_jake_temp
-  jake_logs:
-    name: whisperengine-multi_jake_logs
   marcus_backups:
     name: whisperengine-multi_marcus_backups
   marcus_privacy:

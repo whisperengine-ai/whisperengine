@@ -185,3 +185,4 @@ disabled.env.dotty
 disabled.env.aria
 disabled.env.dream
 disabled.env.assistant
+disabled.env.jake

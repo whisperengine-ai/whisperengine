@@ -24,7 +24,6 @@ AVAILABLE_BOTS=(
     "marcus:9092:AI Researcher"
     "gabriel:9095:British Gentleman"
     "sophia:9096:Marketing Executive"
-    "jake:9097:Adventure Photographer"
     "aetheris:9099:Conscious AI"
     "nottaylor:9100:Taylor Swift Parody"
     "aethys:3007:Omnipotent Entity"
